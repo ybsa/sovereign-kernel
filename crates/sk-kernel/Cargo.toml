@@ -1,0 +1,25 @@
+[package]
+name = "sk-kernel"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Kernel orchestration — scheduler, event bus, capabilities"
+
+[dependencies]
+sk-types = { workspace = true }
+sk-memory = { workspace = true }
+sk-engine = { workspace = true }
+sk-mcp = { workspace = true }
+sk-soul = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+dashmap = { workspace = true }
+
+[dev-dependencies]
+tokio-test = { workspace = true }
+tempfile = { workspace = true }

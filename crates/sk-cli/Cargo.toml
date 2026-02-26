@@ -1,0 +1,29 @@
+[package]
+name = "sk-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Sovereign Kernel CLI — daemon controller and interactive chat"
+
+[[bin]]
+name = "sovereign"
+path = "src/main.rs"
+
+[dependencies]
+sk-types = { workspace = true }
+sk-kernel = { workspace = true }
+sk-engine = { workspace = true }
+sk-memory = { workspace = true }
+sk-soul = { workspace = true }
+sk-mcp = { workspace = true }
+sk-tools = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+toml = { workspace = true }
+dirs = { workspace = true }
+anyhow = { workspace = true }

@@ -1,0 +1,97 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/sk-types",
+    "crates/sk-soul",
+    "crates/sk-memory",
+    "crates/sk-engine",
+    "crates/sk-mcp",
+    "crates/sk-kernel",
+    "crates/sk-tools",
+    "crates/sk-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.75"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-stream = "0.1"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Concurrency
+dashmap = "6"
+crossbeam = "0.8"
+
+# Logging / Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# IDs
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# Database
+rusqlite = { version = "0.31", features = ["bundled", "serde_json"] }
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# HTTP client (for LLM drivers & MCP SSE)
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+
+# Async trait
+async-trait = "0.1"
+
+# Bytes
+bytes = "1"
+
+# Futures
+futures = "0.3"
+
+# Home directory resolution
+dirs = "6"
+
+# YAML parsing (for SOUL.md frontmatter)
+serde_yaml = "0.9"
+
+# Security
+sha2 = "0.10"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+rand = "0.8"
+
+# Lightweight regex
+regex-lite = "0.1"
+
+# Testing
+tokio-test = "0.4"
+tempfile = "3"
+
+# Inter-crate
+sk-types = { path = "crates/sk-types" }
+sk-soul = { path = "crates/sk-soul" }
+sk-memory = { path = "crates/sk-memory" }
+sk-engine = { path = "crates/sk-engine" }
+sk-mcp = { path = "crates/sk-mcp" }
+sk-kernel = { path = "crates/sk-kernel" }
+sk-tools = { path = "crates/sk-tools" }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+opt-level = 3

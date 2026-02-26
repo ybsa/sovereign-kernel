@@ -1,0 +1,248 @@
+//! Anthropic Claude API driver.
+
+use crate::llm_driver::{CompletionRequest, CompletionResponse, LlmDriver, LlmError, StopReason, TokenUsage};
+use async_trait::async_trait;
+use sk_types::{Role, ToolCall};
+use serde::{Deserialize, Serialize};
+
+/// Anthropic Claude API driver.
+pub struct AnthropicDriver {
+    api_key: String,
+    base_url: String,
+    client: reqwest::Client,
+}
+
+impl AnthropicDriver {
+    /// Create a new Anthropic driver.
+    pub fn new(api_key: String, base_url: String) -> Self {
+        Self {
+            api_key,
+            base_url,
+            client: reqwest::Client::new(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct ApiRequest {
+    model: String,
+    max_tokens: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    system: Option<String>,
+    messages: Vec<ApiMessage>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tools: Vec<ApiTool>,
+    temperature: f32,
+}
+
+#[derive(Debug, Serialize)]
+struct ApiMessage {
+    role: String,
+    content: Vec<ApiContentBlock>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "type")]
+enum ApiContentBlock {
+    #[serde(rename = "text")]
+    Text { text: String },
+    #[serde(rename = "tool_use")]
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    #[serde(rename = "tool_result")]
+    ToolResult {
+        tool_use_id: String,
+        content: String,
+    },
+}
+
+#[derive(Debug, Serialize)]
+struct ApiTool {
+    name: String,
+    description: String,
+    input_schema: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiResponse {
+    content: Vec<ResponseContentBlock>,
+    stop_reason: String,
+    usage: ApiUsage,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+enum ResponseContentBlock {
+    #[serde(rename = "text")]
+    Text { text: String },
+    #[serde(rename = "tool_use")]
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    #[serde(rename = "thinking")]
+    Thinking { thinking: String },
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiUsage {
+    input_tokens: u32,
+    output_tokens: u32,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiErrorResponse {
+    error: ApiErrorDetail,
+}
+
+#[derive(Debug, Deserialize)]
+struct ApiErrorDetail {
+    message: String,
+}
+
+#[async_trait]
+impl LlmDriver for AnthropicDriver {
+    fn provider(&self) -> &str {
+        "anthropic"
+    }
+
+    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
+        // Find system prompt
+        let system = request.messages.iter()
+            .find(|m| m.role == Role::System)
+            .map(|m| m.content.clone());
+
+        // Map messages
+        let mut api_messages = Vec::new();
+        for msg in &request.messages {
+            if msg.role == Role::System { continue; }
+            
+            let mut blocks = Vec::new();
+            if !msg.content.is_empty() {
+                if msg.role == Role::Tool {
+                    if let Some(ref id) = msg.tool_call_id {
+                        blocks.push(ApiContentBlock::ToolResult {
+                            tool_use_id: id.clone(),
+                            content: msg.content.clone(),
+                        });
+                        api_messages.push(ApiMessage {
+                            role: "user".to_string(), // Anthropic requires tool results from user
+                            content: blocks,
+                        });
+                        continue;
+                    }
+                } else {
+                    blocks.push(ApiContentBlock::Text { text: msg.content.clone() });
+                }
+            }
+            
+            for tool_call in &msg.tool_calls {
+                blocks.push(ApiContentBlock::ToolUse {
+                    id: tool_call.id.clone(),
+                    name: tool_call.name.clone(),
+                    input: serde_json::from_str(&tool_call.arguments).unwrap_or(serde_json::json!({})),
+                });
+            }
+            
+            let role = match msg.role {
+                Role::User | Role::Tool => "user",
+                Role::Assistant => "assistant",
+                Role::System => "user",
+            };
+            
+            if !blocks.is_empty() {
+                api_messages.push(ApiMessage {
+                    role: role.to_string(),
+                    content: blocks,
+                });
+            }
+        }
+        
+        let api_tools: Vec<ApiTool> = request.tools.iter().map(|t| ApiTool {
+            name: t.name.clone(),
+            description: t.description.clone(),
+            input_schema: t.parameters.clone(),
+        }).collect();
+
+        let api_request = ApiRequest {
+            model: request.model.clone(),
+            max_tokens: request.max_tokens,
+            system,
+            messages: api_messages,
+            tools: api_tools,
+            temperature: request.temperature,
+        };
+
+        // Retry loop
+        for attempt in 0..=3 {
+            let url = format!("{}/v1/messages", self.base_url.trim_end_matches('/'));
+            let resp = self.client.post(&url)
+                .header("x-api-key", &self.api_key)
+                .header("anthropic-version", "2023-06-01")
+                .json(&api_request)
+                .send()
+                .await
+                .map_err(|e| LlmError::NetworkError(e.to_string()))?;
+
+            let status = resp.status().as_u16();
+            if status == 429 || status == 529 {
+                if attempt < 3 {
+                    tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+                    continue;
+                }
+                return Err(LlmError::RateLimited { retry_after_ms: 5000 });
+            }
+
+            if !resp.status().is_success() {
+                let err_text = resp.text().await.unwrap_or_default();
+                if let Ok(err_json) = serde_json::from_str::<ApiErrorResponse>(&err_text) {
+                    return Err(LlmError::ApiError { status, message: err_json.error.message });
+                }
+                return Err(LlmError::ApiError { status, message: err_text });
+            }
+
+            let resp_text = resp.text().await.map_err(|e| LlmError::NetworkError(e.to_string()))?;
+            let api_resp: ApiResponse = serde_json::from_str(&resp_text)
+                .map_err(|e| LlmError::ParseError(e.to_string()))?;
+
+            let mut final_content = String::new();
+            let mut tool_calls = Vec::new();
+
+            for block in api_resp.content {
+                match block {
+                    ResponseContentBlock::Text { text } => final_content.push_str(&text),
+                    ResponseContentBlock::Thinking { thinking } => {
+                        final_content.push_str(&format!("<think>\n{thinking}\n</think>\n"));
+                    }
+                    ResponseContentBlock::ToolUse { id, name, input } => {
+                        tool_calls.push(ToolCall { id, name, arguments: input.to_string() });
+                    }
+                }
+            }
+
+            let stop_reason = match api_resp.stop_reason.as_str() {
+                "end_turn" => StopReason::EndTurn,
+                "tool_use" => StopReason::ToolUse,
+                "max_tokens" => StopReason::MaxTokens,
+                _ => StopReason::EndTurn, // fallback
+            };
+
+            return Ok(CompletionResponse {
+                content: final_content,
+                tool_calls,
+                stop_reason,
+                usage: TokenUsage {
+                    prompt_tokens: api_resp.usage.input_tokens,
+                    completion_tokens: api_resp.usage.output_tokens,
+                    total_tokens: api_resp.usage.input_tokens + api_resp.usage.output_tokens,
+                },
+            });
+        }
+
+        Err(LlmError::NetworkError("Max retries exceeded".to_string()))
+    }
+}
