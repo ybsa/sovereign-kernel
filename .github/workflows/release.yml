@@ -27,7 +27,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           cd target/release
-          mv sk-cli.exe sovereign-kernel-${{ matrix.os }}.exe
+          mv sovereign.exe sovereign-kernel-${{ matrix.os }}.exe
           Compress-Archive -Path sovereign-kernel-${{ matrix.os }}.exe -DestinationPath ../../sovereign-kernel-${{ matrix.os }}.zip
 
       - name: Package Linux/Mac
@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           cd target/release
-          mv sk-cli sovereign-kernel-${{ matrix.os }}
+          mv sovereign sovereign-kernel-${{ matrix.os }}
           tar -czvf ../../sovereign-kernel-${{ matrix.os }}.tar.gz sovereign-kernel-${{ matrix.os }}
 
       - name: Upload Release
