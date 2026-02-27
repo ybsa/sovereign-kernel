@@ -31,7 +31,16 @@ Yes, Sovereign Kernel is a **Framework and an OS**. While tools like LangChain o
 | **Resource Usage** | ~20MB RAM at idle | 500MB+ depending on Python environment |
 
 *(See [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive into the 8-crate system).*
-## ⚡ Quick Start
+## 📦 Installation (Pre-compiled Binaries)
+
+You do **not** need to install Rust to run the Sovereign Kernel! 
+
+We provide pre-built, ready-to-run executables for Windows, macOS, and Linux.
+1. Go to the [GitHub Releases](https://github.com/ybsa/sovereign-kernel/releases) page.
+2. Download the `.zip` or `.tar.gz` for your operating system.
+3. Extract the archive and run the `sovereign` binary directly from your terminal!
+
+## ⚡ Quick Start (Building from Source)
 
 ### 1. Requirements
 
