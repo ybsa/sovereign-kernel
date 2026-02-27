@@ -27,13 +27,15 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           cd target/release
-          Compress-Archive -Path sovereign.exe -DestinationPath ../../sovereign-kernel-${{ matrix.os }}.zip
+          mv sovereign.exe sovereign-kernel-${{ matrix.os }}.exe
+          Compress-Archive -Path sovereign-kernel-${{ matrix.os }}.exe -DestinationPath ../../sovereign-kernel-${{ matrix.os }}.zip
 
       - name: Package Linux/Mac
         if: matrix.os != 'windows-latest'
         run: |
           cd target/release
-          tar -czvf ../../sovereign-kernel-${{ matrix.os }}.tar.gz sovereign
+          mv sovereign sovereign-kernel-${{ matrix.os }}
+          tar -czvf ../../sovereign-kernel-${{ matrix.os }}.tar.gz sovereign-kernel-${{ matrix.os }}
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
