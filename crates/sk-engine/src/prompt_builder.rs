@@ -1,11 +1,11 @@
 //! System prompt builder — assembles the system prompt with Soul + Persona + Memories.
-//! 
+//!
 //! This module fuses OpenFang's structured, multi-section prompt system with
 //! OpenClaw's dynamic persona and memory elements.
 
+use chrono::Local;
 use sk_soul::{Persona, SoulIdentity};
 use sk_types::ToolDefinition;
-use chrono::Local;
 
 /// Build the complete system prompt for an agent.
 ///
@@ -33,7 +33,7 @@ pub fn build_system_prompt(
         format!("You are {agent_name}, an AI agent running inside the Sovereign Kernel.")
     };
     parts.push(identity_header);
-    
+
     parts.push(persona.to_prompt_fragment());
 
     if !base_instructions.is_empty() {
@@ -47,17 +47,19 @@ pub fn build_system_prompt(
     // 3. Workspace & Runtime Context (OpenClaw DNA)
     let now = Local::now();
     let time_str = now.format("%Y-%m-%d %H:%M:%S %z").to_string();
-    
+
     let mut runtime_parts = vec![
         "## Runtime Environment".to_string(),
         format!("Current Date & Time: {time_str} (ISO-8601)"),
     ];
-    
+
     if let Some(ws) = workspace_dir {
         runtime_parts.push(format!("Your working directory is: {ws}"));
-        runtime_parts.push("Treat this directory as the single global workspace for file operations.".to_string());
+        runtime_parts.push(
+            "Treat this directory as the single global workspace for file operations.".to_string(),
+        );
     }
-    
+
     parts.push(runtime_parts.join("\n"));
 
     // 4. Safety & Guidelines
@@ -67,8 +69,11 @@ pub fn build_system_prompt(
     // 5. Memory Context (Continuity)
     parts.push("## Memory".to_string());
     parts.push("- When the user asks about something from a previous conversation, use memory_search first.".to_string());
-    parts.push("- Store important preferences, decisions, and context with memory_store for future use.".to_string());
-    
+    parts.push(
+        "- Store important preferences, decisions, and context with memory_store for future use."
+            .to_string(),
+    );
+
     if !memory_context.is_empty() {
         parts.push(format!("\nRecalled Memories:\n{memory_context}"));
     }
@@ -126,15 +131,14 @@ mod tests {
     fn build_prompt_with_tools() {
         let soul = SoulIdentity::empty();
         let persona = Persona::default();
-        let tools = vec![
-            ToolDefinition {
-                name: "file_read".to_string(),
-                description: "Read a file".to_string(),
-                parameters: Default::default(),
-                source: "test".to_string(),
-            }
-        ];
-        
+        let tools = vec![ToolDefinition {
+            name: "file_read".to_string(),
+            description: "Read a file".to_string(),
+            parameters: Default::default(),
+            source: "test".to_string(),
+            required_capabilities: vec![],
+        }];
+
         let prompt = build_system_prompt(
             "Agent",
             &soul,
@@ -144,7 +148,7 @@ mod tests {
             "User likes Rust.",
             Some("/workspace"),
         );
-        
+
         assert!(prompt.contains("You are Agent"));
         assert!(prompt.contains("file_read"));
         assert!(prompt.contains("/workspace"));

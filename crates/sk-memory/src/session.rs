@@ -16,7 +16,10 @@ impl SessionStore {
 
     /// Save a session (insert or update).
     pub fn save(&self, session: &Session) -> SovereignResult<()> {
-        let conn = self.conn.lock().map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
         let messages_json = serde_json::to_string(&session.messages)?;
         conn.execute(
             "INSERT OR REPLACE INTO sessions (id, agent_id, messages, label, created_at, updated_at)
@@ -35,7 +38,10 @@ impl SessionStore {
 
     /// Load a session by ID.
     pub fn load(&self, session_id: SessionId) -> SovereignResult<Option<Session>> {
-        let conn = self.conn.lock().map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
         let result = conn.query_row(
             "SELECT id, agent_id, messages, label, created_at, updated_at FROM sessions WHERE id = ?1",
             rusqlite::params![session_id.to_string()],
@@ -54,8 +60,10 @@ impl SessionStore {
             Ok((id, agent_id, messages_json, label, created_at, updated_at)) => {
                 let messages: Vec<Message> = serde_json::from_str(&messages_json)?;
                 Ok(Some(Session {
-                    id: SessionId::parse(&id).map_err(|e| SovereignError::MemoryError(e.to_string()))?,
-                    agent_id: AgentId::parse(&agent_id).map_err(|e| SovereignError::MemoryError(e.to_string()))?,
+                    id: SessionId::parse(&id)
+                        .map_err(|e| SovereignError::MemoryError(e.to_string()))?,
+                    agent_id: AgentId::parse(&agent_id)
+                        .map_err(|e| SovereignError::MemoryError(e.to_string()))?,
                     messages,
                     label,
                     created_at: chrono::DateTime::parse_from_rfc3339(&created_at)
@@ -79,23 +87,33 @@ impl SessionStore {
     }
 
     /// List all sessions for an agent.
-    pub fn list_for_agent(&self, agent_id: AgentId) -> SovereignResult<Vec<(SessionId, Option<String>, String)>> {
-        let conn = self.conn.lock().map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
+    pub fn list_for_agent(
+        &self,
+        agent_id: AgentId,
+    ) -> SovereignResult<Vec<(SessionId, Option<String>, String)>> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
         let mut stmt = conn.prepare(
             "SELECT id, label, updated_at FROM sessions WHERE agent_id = ?1 ORDER BY updated_at DESC"
         ).map_err(|e| SovereignError::MemoryError(e.to_string()))?;
 
-        let rows = stmt.query_map(rusqlite::params![agent_id.to_string()], |row| {
-            let id: String = row.get(0)?;
-            let label: Option<String> = row.get(1)?;
-            let updated: String = row.get(2)?;
-            Ok((id, label, updated))
-        }).map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+        let rows = stmt
+            .query_map(rusqlite::params![agent_id.to_string()], |row| {
+                let id: String = row.get(0)?;
+                let label: Option<String> = row.get(1)?;
+                let updated: String = row.get(2)?;
+                Ok((id, label, updated))
+            })
+            .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
 
         let mut results = Vec::new();
         for row in rows {
-            let (id, label, updated) = row.map_err(|e| SovereignError::MemoryError(e.to_string()))?;
-            let session_id = SessionId::parse(&id).map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+            let (id, label, updated) =
+                row.map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+            let session_id =
+                SessionId::parse(&id).map_err(|e| SovereignError::MemoryError(e.to_string()))?;
             results.push((session_id, label, updated));
         }
         Ok(results)
@@ -103,11 +121,15 @@ impl SessionStore {
 
     /// Delete a session by ID.
     pub fn delete(&self, session_id: SessionId) -> SovereignResult<()> {
-        let conn = self.conn.lock().map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
         conn.execute(
             "DELETE FROM sessions WHERE id = ?1",
             rusqlite::params![session_id.to_string()],
-        ).map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+        )
+        .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
         Ok(())
     }
 }

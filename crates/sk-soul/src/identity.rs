@@ -161,7 +161,9 @@ fn extract_section(content: &str, section_name: &str) -> Option<String> {
 
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.eq_ignore_ascii_case(&target) || trimmed.eq_ignore_ascii_case(&format!("## {section_name}")) {
+        if trimmed.eq_ignore_ascii_case(&target)
+            || trimmed.eq_ignore_ascii_case(&format!("## {section_name}"))
+        {
             in_section = true;
             continue;
         }

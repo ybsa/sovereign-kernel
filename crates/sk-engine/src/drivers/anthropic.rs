@@ -1,9 +1,11 @@
 //! Anthropic Claude API driver.
 
-use crate::llm_driver::{CompletionRequest, CompletionResponse, LlmDriver, LlmError, StopReason, TokenUsage};
+use crate::llm_driver::{
+    CompletionRequest, CompletionResponse, LlmDriver, LlmError, StopReason, TokenUsage,
+};
 use async_trait::async_trait;
-use sk_types::{Role, ToolCall};
 use serde::{Deserialize, Serialize};
+use sk_types::{Role, ToolCall};
 
 /// Anthropic Claude API driver.
 pub struct AnthropicDriver {
@@ -112,15 +114,19 @@ impl LlmDriver for AnthropicDriver {
 
     async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
         // Find system prompt
-        let system = request.messages.iter()
+        let system = request
+            .messages
+            .iter()
             .find(|m| m.role == Role::System)
             .map(|m| m.content.clone());
 
         // Map messages
         let mut api_messages = Vec::new();
         for msg in &request.messages {
-            if msg.role == Role::System { continue; }
-            
+            if msg.role == Role::System {
+                continue;
+            }
+
             let mut blocks = Vec::new();
             if !msg.content.is_empty() {
                 if msg.role == Role::Tool {
@@ -136,24 +142,27 @@ impl LlmDriver for AnthropicDriver {
                         continue;
                     }
                 } else {
-                    blocks.push(ApiContentBlock::Text { text: msg.content.clone() });
+                    blocks.push(ApiContentBlock::Text {
+                        text: msg.content.clone(),
+                    });
                 }
             }
-            
+
             for tool_call in &msg.tool_calls {
                 blocks.push(ApiContentBlock::ToolUse {
                     id: tool_call.id.clone(),
                     name: tool_call.name.clone(),
-                    input: serde_json::from_str(&tool_call.arguments).unwrap_or(serde_json::json!({})),
+                    input: serde_json::from_str(&tool_call.arguments)
+                        .unwrap_or(serde_json::json!({})),
                 });
             }
-            
+
             let role = match msg.role {
                 Role::User | Role::Tool => "user",
                 Role::Assistant => "assistant",
                 Role::System => "user",
             };
-            
+
             if !blocks.is_empty() {
                 api_messages.push(ApiMessage {
                     role: role.to_string(),
@@ -161,12 +170,16 @@ impl LlmDriver for AnthropicDriver {
                 });
             }
         }
-        
-        let api_tools: Vec<ApiTool> = request.tools.iter().map(|t| ApiTool {
-            name: t.name.clone(),
-            description: t.description.clone(),
-            input_schema: t.parameters.clone(),
-        }).collect();
+
+        let api_tools: Vec<ApiTool> = request
+            .tools
+            .iter()
+            .map(|t| ApiTool {
+                name: t.name.clone(),
+                description: t.description.clone(),
+                input_schema: t.parameters.clone(),
+            })
+            .collect();
 
         let api_request = ApiRequest {
             model: request.model.clone(),
@@ -180,7 +193,9 @@ impl LlmDriver for AnthropicDriver {
         // Retry loop
         for attempt in 0..=3 {
             let url = format!("{}/v1/messages", self.base_url.trim_end_matches('/'));
-            let resp = self.client.post(&url)
+            let resp = self
+                .client
+                .post(&url)
                 .header("x-api-key", &self.api_key)
                 .header("anthropic-version", "2023-06-01")
                 .json(&api_request)
@@ -194,18 +209,29 @@ impl LlmDriver for AnthropicDriver {
                     tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
                     continue;
                 }
-                return Err(LlmError::RateLimited { retry_after_ms: 5000 });
+                return Err(LlmError::RateLimited {
+                    retry_after_ms: 5000,
+                });
             }
 
             if !resp.status().is_success() {
                 let err_text = resp.text().await.unwrap_or_default();
                 if let Ok(err_json) = serde_json::from_str::<ApiErrorResponse>(&err_text) {
-                    return Err(LlmError::ApiError { status, message: err_json.error.message });
+                    return Err(LlmError::ApiError {
+                        status,
+                        message: err_json.error.message,
+                    });
                 }
-                return Err(LlmError::ApiError { status, message: err_text });
+                return Err(LlmError::ApiError {
+                    status,
+                    message: err_text,
+                });
             }
 
-            let resp_text = resp.text().await.map_err(|e| LlmError::NetworkError(e.to_string()))?;
+            let resp_text = resp
+                .text()
+                .await
+                .map_err(|e| LlmError::NetworkError(e.to_string()))?;
             let api_resp: ApiResponse = serde_json::from_str(&resp_text)
                 .map_err(|e| LlmError::ParseError(e.to_string()))?;
 
@@ -219,7 +245,11 @@ impl LlmDriver for AnthropicDriver {
                         final_content.push_str(&format!("<think>\n{thinking}\n</think>\n"));
                     }
                     ResponseContentBlock::ToolUse { id, name, input } => {
-                        tool_calls.push(ToolCall { id, name, arguments: input.to_string() });
+                        tool_calls.push(ToolCall {
+                            id,
+                            name,
+                            arguments: input.to_string(),
+                        });
                     }
                 }
             }

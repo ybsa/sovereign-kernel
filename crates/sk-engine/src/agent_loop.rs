@@ -4,7 +4,7 @@
 //! calls the LLM, executes tool calls, saves the conversation.
 //! Stripped of Hands, browser, and Docker logic.
 
-use crate::llm_driver::{CompletionRequest, CompletionResponse, LlmDriver, StopReason};
+use crate::llm_driver::{CompletionRequest, LlmDriver, StopReason};
 use sk_types::{Message, Session, SovereignResult, ToolCall, ToolDefinition};
 use tracing::{debug, info, warn};
 
@@ -42,7 +42,13 @@ pub struct AgentLoopConfig<'a> {
     pub temperature: f32,
     /// Tool executor callback.
     pub tool_executor: Box<dyn Fn(&ToolCall) -> SovereignResult<String> + Send + Sync>,
+    /// Optional streaming callback to receive tokens as they are generated.
+    pub stream_handler: Option<Box<dyn Fn(&str) + Send + Sync>>,
 }
+
+use crate::loop_guard::LoopGuard;
+use crate::retry;
+use tokio::time::sleep;
 
 /// Run the agent execution loop for a single user message.
 ///
@@ -65,28 +71,76 @@ pub async fn run_agent_loop(
     let mut iterations = 0u32;
     let mut final_response = String::new();
 
+    let mut loop_guard = LoopGuard::new();
+
     // 3. Agent loop: LLM → tool calls → LLM → ... → end turn
     loop {
         iterations += 1;
         if iterations > MAX_ITERATIONS {
             warn!("Agent loop hit MAX_ITERATIONS ({MAX_ITERATIONS})");
+            messages.push(Message::system(
+                "System Error: Maximum reasoning steps exceeded.",
+            ));
             break;
         }
 
         debug!(iteration = iterations, "Agent loop iteration");
 
-        // Call LLM
-        let request = CompletionRequest {
-            model: config.model.clone(),
-            messages: messages.clone(),
-            tools: config.tools.clone(),
-            max_tokens: config.max_tokens,
-            temperature: config.temperature,
-            stream: false,
+        // Call LLM with retry backoff
+        let mut attempt = 0;
+        let response = loop {
+            let request = CompletionRequest {
+                model: config.model.clone(),
+                messages: messages.clone(),
+                tools: config.tools.clone(),
+                max_tokens: config.max_tokens,
+                temperature: config.temperature,
+                stream: false,
+            };
+
+            match config.driver.complete(request).await {
+                Ok(resp) => break resp,
+                Err(e) if e.is_retryable() || attempt < retry::max_retries() => {
+                    attempt += 1;
+                    if attempt > retry::max_retries() {
+                        return Err(e.into());
+                    }
+                    let delay = retry::backoff_delay(attempt);
+                    warn!(
+                        "LLM error: {e}. Retrying ({attempt}/{}) in {:?}",
+                        retry::max_retries(),
+                        delay
+                    );
+                    sleep(delay).await;
+                }
+                Err(e) => return Err(e.into()),
+            }
         };
 
-        let response: CompletionResponse = config.driver.complete(request).await?;
         total_tokens += response.usage.total_tokens;
+
+        // Context budget check
+        if !crate::context_budget::fits_in_context(
+            total_tokens as usize,
+            config.max_tokens as usize * 10,
+        ) {
+            warn!("Approaching context window limit: {} tokens", total_tokens);
+            // In a full implementation, we would compact here
+        }
+
+        // Empty response guard validation
+        if response.content.trim().is_empty() && response.tool_calls.is_empty() {
+            warn!("LLM returned empty output without tool calls. Nudging.");
+            messages.push(Message::user("Please provide a response or call a tool."));
+            continue;
+        }
+
+        // Output streaming
+        if let Some(handler) = &config.stream_handler {
+            if !response.content.is_empty() {
+                handler(&response.content);
+            }
+        }
 
         // Add assistant message
         let mut assistant_msg = Message::assistant(&response.content);
@@ -106,9 +160,29 @@ pub async fn run_agent_loop(
                     tool_calls_made += 1;
                     debug!(tool = %tool_call.name, "Executing tool call");
 
+                    // 1. Check loop guard
+                    let args_str = serde_json::to_string(&tool_call.arguments).unwrap_or_default();
+                    if loop_guard.check(&tool_call.name, &args_str) {
+                        warn!(tool = %tool_call.name, "Loop detected by guard!");
+                        let tool_msg = Message::tool_result(
+                            &tool_call.id,
+                            "System Error: Infinite loop detected. You are calling the same tool with the same arguments repeatedly. Please try a completely different approach.",
+                        );
+                        messages.push(tool_msg.clone());
+                        session.push_message(tool_msg);
+                        continue;
+                    }
+
+                    // 2. Execute tool
                     let result = match (config.tool_executor)(tool_call) {
-                        Ok(output) => output,
-                        Err(e) => format!("Error: {e}"),
+                        Ok(output) => {
+                            if output.is_empty() {
+                                "Success (No output returned)".to_string()
+                            } else {
+                                output
+                            }
+                        }
+                        Err(e) => format!("Error executing tool: {e}"),
                     };
 
                     let tool_msg = Message::tool_result(&tool_call.id, &result);

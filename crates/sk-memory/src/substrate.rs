@@ -38,9 +38,8 @@ pub struct MemorySubstrate {
 impl MemorySubstrate {
     /// Open or create a memory substrate at the given database path.
     pub fn open(db_path: &Path, decay_rate: f32) -> SovereignResult<Self> {
-        let conn = Connection::open(db_path).map_err(|e| {
-            SovereignError::MemoryError(format!("Failed to open database: {e}"))
-        })?;
+        let conn = Connection::open(db_path)
+            .map_err(|e| SovereignError::MemoryError(format!("Failed to open database: {e}")))?;
 
         // Enable WAL mode for concurrent reads
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")
@@ -102,9 +101,10 @@ impl MemorySubstrate {
 
     /// Initialize all database tables.
     fn initialize_schema(&self) -> SovereignResult<()> {
-        let conn = self.conn.lock().map_err(|e| {
-            SovereignError::MemoryError(format!("Lock poisoned: {e}"))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
 
         conn.execute_batch(
             "

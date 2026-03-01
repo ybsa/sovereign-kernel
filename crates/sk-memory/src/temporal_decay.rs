@@ -66,8 +66,8 @@ mod tests {
 
     #[test]
     fn access_count_reduces_decay() {
-        let rarely_accessed = apply_temporal_decay(1.0, 168.0, 0.1, 1);  // 7 days, 1 access
-        let often_accessed = apply_temporal_decay(1.0, 168.0, 0.1, 15);  // 7 days, 15 accesses
+        let rarely_accessed = apply_temporal_decay(1.0, 168.0, 0.1, 1); // 7 days, 1 access
+        let often_accessed = apply_temporal_decay(1.0, 168.0, 0.1, 15); // 7 days, 15 accesses
         assert!(often_accessed > rarely_accessed);
     }
 

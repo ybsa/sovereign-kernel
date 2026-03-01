@@ -60,9 +60,15 @@ impl Persona {
         lines.push("## Communication Style".to_string());
 
         match self.style.as_str() {
-            "concise" => lines.push("- Be brief and to the point. Avoid unnecessary elaboration.".into()),
-            "thorough" => lines.push("- Be comprehensive. Explain reasoning and provide context.".into()),
-            "casual" => lines.push("- Be relaxed and conversational. Like talking to a friend.".into()),
+            "concise" => {
+                lines.push("- Be brief and to the point. Avoid unnecessary elaboration.".into())
+            }
+            "thorough" => {
+                lines.push("- Be comprehensive. Explain reasoning and provide context.".into())
+            }
+            "casual" => {
+                lines.push("- Be relaxed and conversational. Like talking to a friend.".into())
+            }
             "formal" => lines.push("- Be professional and precise. Maintain a formal tone.".into()),
             _ => lines.push("- Balance brevity with thoroughness. Adapt to the situation.".into()),
         }

@@ -11,10 +11,13 @@ pub async fn execute_sql_query(
     query: &str,
 ) -> Result<String, SovereignError> {
     tracing::info!("Mock executing SQL query: {}", query);
-    
+
     // In a full implementation, you'd use sqlx or rusqlite here
     // to execute the query against the connection string.
-    Ok(format!("(Mock Result) Successfully executed query: {}", query))
+    Ok(format!(
+        "(Mock Result) Successfully executed query: {}",
+        query
+    ))
 }
 
 /// Provides the tool definition for SQL querying.
@@ -33,5 +36,6 @@ pub fn sql_query_tool() -> ToolDefinition {
             "required": ["query"]
         }),
         source: "sk-mcp-sql".into(),
+        required_capabilities: vec![sk_types::security::Capability::McpAccess],
     }
 }

@@ -102,16 +102,16 @@ mod tests {
     fn mmr_diverse_selection() {
         let query = vec![1.0, 0.0];
         let candidates = vec![
-            ("a".into(), vec![0.99, 0.01], 0.95),  // Very similar to query
-            ("b".into(), vec![0.98, 0.02], 0.94),  // Almost identical to "a"
-            ("c".into(), vec![0.0, 1.0], 0.70),    // Very different direction
+            ("a".into(), vec![0.99, 0.01], 0.95), // Very similar to query
+            ("b".into(), vec![0.98, 0.02], 0.94), // Almost identical to "a"
+            ("c".into(), vec![0.0, 1.0], 0.70),   // Very different direction
         ];
 
         // With diversity (λ=0.5), "c" should be preferred over "b"
         let result = mmr_rerank(&query, &candidates, 0.5, 3);
         assert_eq!(result.len(), 3);
         assert_eq!(result[0].0, "a"); // Most relevant first
-        // "c" should come before "b" due to diversity
+                                      // "c" should come before "b" due to diversity
         assert_eq!(result[1].0, "c");
         assert_eq!(result[2].0, "b");
     }

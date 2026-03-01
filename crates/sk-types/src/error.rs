@@ -14,7 +14,6 @@ pub enum SovereignError {
     #[error("Tool execution error: {0}")]
     ToolExecutionError(String),
 
-
     #[error("MCP error: {0}")]
     McpError(String),
 
@@ -45,6 +44,24 @@ pub enum SovereignError {
     #[error("Timeout: {0}")]
     Timeout(String),
 
+    #[error("Quota exceeded: {0}")]
+    QuotaExceeded(String),
+
+    #[error("Budget exceeded: {resource} — {message}")]
+    BudgetExceeded { resource: String, message: String },
+
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+
+    #[error("Approval denied: {tool} — {reason}")]
+    ApprovalDenied { tool: String, reason: String },
+
+    #[error("Auth denied: {0}")]
+    AuthDenied(String),
+
+    #[error("Approval timeout: {tool}")]
+    ApprovalTimeout { tool: String },
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -66,6 +83,14 @@ impl SovereignError {
             SovereignError::RateLimited { .. } | SovereignError::Timeout(_)
         )
     }
+
+    /// Whether this error is a budget/quota violation.
+    pub fn is_budget_error(&self) -> bool {
+        matches!(
+            self,
+            SovereignError::QuotaExceeded(_) | SovereignError::BudgetExceeded { .. }
+        )
+    }
 }
 
 #[cfg(test)]
@@ -80,7 +105,10 @@ mod tests {
 
     #[test]
     fn error_retryable() {
-        assert!(SovereignError::RateLimited { retry_after_ms: 1000 }.is_retryable());
+        assert!(SovereignError::RateLimited {
+            retry_after_ms: 1000
+        }
+        .is_retryable());
         assert!(SovereignError::Timeout("slow".into()).is_retryable());
         assert!(!SovereignError::ConfigError("bad".into()).is_retryable());
     }

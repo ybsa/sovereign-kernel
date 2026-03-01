@@ -29,9 +29,10 @@ impl McpTransport {
                 stdin.write_all(msg.as_bytes()).await.map_err(|e| {
                     SovereignError::McpError(format!("Failed to write to stdin: {e}"))
                 })?;
-                stdin.flush().await.map_err(|e| {
-                    SovereignError::McpError(format!("Failed to flush stdin: {e}"))
-                })?;
+                stdin
+                    .flush()
+                    .await
+                    .map_err(|e| SovereignError::McpError(format!("Failed to flush stdin: {e}")))?;
                 debug!(len = message.len(), "Sent MCP message via stdio");
                 Ok(())
             }
@@ -74,9 +75,10 @@ impl McpTransport {
                 })?;
 
                 let mut buf = vec![0u8; len];
-                stdout.read_exact(&mut buf).await.map_err(|e| {
-                    SovereignError::McpError(format!("Failed to read body: {e}"))
-                })?;
+                stdout
+                    .read_exact(&mut buf)
+                    .await
+                    .map_err(|e| SovereignError::McpError(format!("Failed to read body: {e}")))?;
 
                 let body = String::from_utf8(buf).map_err(|e| {
                     SovereignError::McpError(format!("Invalid UTF-8 response: {e}"))
@@ -86,7 +88,9 @@ impl McpTransport {
             }
             McpTransport::Sse { .. } => {
                 // SSE responses come via the event stream — simplified here
-                Err(SovereignError::McpError("SSE recv not yet implemented — use stdio transport".into()))
+                Err(SovereignError::McpError(
+                    "SSE recv not yet implemented — use stdio transport".into(),
+                ))
             }
         }
     }

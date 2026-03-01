@@ -12,7 +12,11 @@ use tracing::{debug, error, info};
 /// Trait for executing tools exposed by the MCP server.
 #[async_trait::async_trait]
 pub trait ToolHandler: Send + Sync {
-    async fn execute_tool(&self, name: &str, arguments: &serde_json::Value) -> Result<String, SovereignError>;
+    async fn execute_tool(
+        &self,
+        name: &str,
+        arguments: &serde_json::Value,
+    ) -> Result<String, SovereignError>;
     fn list_tools(&self) -> Vec<ToolDefinition>;
 }
 
@@ -30,7 +34,7 @@ impl McpServer {
     /// Run the server loop indefinitely on stdin/stdout.
     pub async fn run(&self) -> Result<(), SovereignError> {
         info!("Starting Sovereign MCP Server on stdio");
-        
+
         let mut stdin = BufReader::new(tokio::io::stdin());
         let mut stdout = tokio::io::stdout();
 
@@ -39,9 +43,10 @@ impl McpServer {
             let mut content_length: Option<usize> = None;
             loop {
                 let mut line = String::new();
-                let bytes_read = stdin.read_line(&mut line).await.map_err(|e| {
-                    SovereignError::McpError(format!("Failed to read stdin: {e}"))
-                })?;
+                let bytes_read = stdin
+                    .read_line(&mut line)
+                    .await
+                    .map_err(|e| SovereignError::McpError(format!("Failed to read stdin: {e}")))?;
 
                 if bytes_read == 0 {
                     info!("Client disconnected (EOF)");
@@ -68,9 +73,9 @@ impl McpServer {
 
             // Read payload
             let mut buf = vec![0u8; len];
-            tokio::io::AsyncReadExt::read_exact(&mut stdin, &mut buf).await.map_err(|e| {
-                SovereignError::McpError(format!("Failed to read body: {e}"))
-            })?;
+            tokio::io::AsyncReadExt::read_exact(&mut stdin, &mut buf)
+                .await
+                .map_err(|e| SovereignError::McpError(format!("Failed to read body: {e}")))?;
 
             let body = String::from_utf8_lossy(&buf);
             debug!(len, "Received MCP message");
@@ -109,13 +114,16 @@ impl McpServer {
             }
             "tools/list" => {
                 let tools = self.handler.list_tools();
-                let mcp_tools: Vec<serde_json::Value> = tools.into_iter().map(|t| {
-                    serde_json::json!({
-                        "name": t.name,
-                        "description": t.description,
-                        "inputSchema": t.parameters,
+                let mcp_tools: Vec<serde_json::Value> = tools
+                    .into_iter()
+                    .map(|t| {
+                        serde_json::json!({
+                            "name": t.name,
+                            "description": t.description,
+                            "inputSchema": t.parameters,
+                        })
                     })
-                }).collect();
+                    .collect();
                 Some(serde_json::json!({ "tools": mcp_tools }))
             }
             "tools/call" => {
@@ -123,24 +131,20 @@ impl McpServer {
                     let name = params.get("name").and_then(|v| v.as_str()).unwrap_or("");
                     let default_args = serde_json::json!({});
                     let arguments = params.get("arguments").unwrap_or(&default_args);
-                    
+
                     match self.handler.execute_tool(name, arguments).await {
-                        Ok(content) => {
-                            Some(serde_json::json!({
-                                "content": [
-                                    { "type": "text", "text": content }
-                                ],
-                                "isError": false,
-                            }))
-                        }
-                        Err(e) => {
-                            Some(serde_json::json!({
-                                "content": [
-                                    { "type": "text", "text": e.to_string() }
-                                ],
-                                "isError": true,
-                            }))
-                        }
+                        Ok(content) => Some(serde_json::json!({
+                            "content": [
+                                { "type": "text", "text": content }
+                            ],
+                            "isError": false,
+                        })),
+                        Err(e) => Some(serde_json::json!({
+                            "content": [
+                                { "type": "text", "text": e.to_string() }
+                            ],
+                            "isError": true,
+                        })),
                     }
                 } else {
                     None

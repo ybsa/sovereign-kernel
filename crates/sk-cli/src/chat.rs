@@ -1,17 +1,20 @@
 //! Interactive chat REPL.
 
 use sk_kernel::SovereignKernel;
-use sk_types::config::SovereignConfig;
+use sk_types::config::KernelConfig;
 use sk_types::AgentId;
 use tracing::info;
 
 /// Run the interactive chat REPL.
-pub async fn run(config: SovereignConfig) -> anyhow::Result<()> {
+pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
     println!("═══════════════════════════════════════════════════════");
     println!("  ⚡ Sovereign Kernel v{}", env!("CARGO_PKG_VERSION"));
     println!("  Type 'exit' or 'quit' to leave, 'clear' to reset");
     println!("═══════════════════════════════════════════════════════");
     println!();
+
+    // Clone browser config before config is moved into kernel
+    let browser_config = config.browser.clone();
 
     // Initialize kernel
     let kernel = SovereignKernel::init(config).await?;
@@ -23,32 +26,74 @@ pub async fn run(config: SovereignConfig) -> anyhow::Result<()> {
     // Initialize LLM Driver from environment
     let anthropic_key = std::env::var("ANTHROPIC_API_KEY").ok();
     let gemini_key = std::env::var("GEMINI_API_KEY").ok();
-    
+    let openai_key = std::env::var("OPENAI_API_KEY").ok();
+    let github_token = std::env::var("GITHUB_TOKEN").ok();
+    let groq_key = std::env::var("GROQ_API_KEY").ok();
+
     let mut driver: Option<Box<dyn sk_engine::llm_driver::LlmDriver>> = None;
     let mut model_name = String::new();
 
     if let Some(key) = anthropic_key {
-        driver = Some(Box::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
-            key,
-            "https://api.anthropic.com".to_string()
-        )));
+        driver = Some(Box::new(
+            sk_engine::drivers::anthropic::AnthropicDriver::new(
+                key,
+                "https://api.anthropic.com".to_string(),
+            ),
+        ));
         model_name = "claude-3-5-sonnet-20241022".to_string();
+    } else if let Some(key) = openai_key {
+        driver = Some(Box::new(sk_engine::drivers::openai::OpenAIDriver::new(
+            key,
+            "https://api.openai.com/v1".to_string(),
+        )));
+        model_name = "gpt-4o".to_string();
+    } else if let Some(key) = github_token {
+        driver = Some(Box::new(sk_engine::drivers::copilot::CopilotDriver::new(
+            key,
+            "".to_string(),
+        )));
+        model_name = "gpt-4o".to_string();
+    } else if let Some(key) = groq_key {
+        driver = Some(Box::new(sk_engine::drivers::openai::OpenAIDriver::new(
+            key,
+            "https://api.groq.com/openai/v1".to_string(),
+        )));
+        model_name = "llama3-70b-8192".to_string();
     } else if let Some(key) = gemini_key {
         driver = Some(Box::new(sk_engine::drivers::gemini::GeminiDriver::new(
-            key, 
-            "https://generativelanguage.googleapis.com".to_string()
+            key,
+            "https://generativelanguage.googleapis.com".to_string(),
         )));
-        model_name = "gemini-2.5-flash".to_string();
+        model_name = "gemini-2.0-flash-lite".to_string();
     }
 
     if driver.is_none() {
-        println!("\nSovereign: [WARNING] No ANTHROPIC_API_KEY or GEMINI_API_KEY found in environment. Chat will not work.\n");
+        println!("\nSovereign: [WARNING] No valid API key found in environment (tried ANTHROPIC, OPENAI, GITHUB_TOKEN, GROQ, GEMINI). Chat will not work.\n");
     } else {
         println!("\nSovereign: [Connected to {}]\n", model_name);
     }
 
-    let mut session = sk_types::Session::new(agent_id);
+    // Load existing session or create new one
+    let mut session = if let Ok(entries) = kernel.memory.sessions.list_for_agent(agent_id.clone()) {
+        if let Some((latest_id, _, _)) = entries.first() {
+            if let Ok(Some(loaded_session)) = kernel.memory.sessions.load(*latest_id) {
+                loaded_session
+            } else {
+                sk_types::Session::new(agent_id.clone())
+            }
+        } else {
+            sk_types::Session::new(agent_id.clone())
+        }
+    } else {
+        sk_types::Session::new(agent_id.clone())
+    };
+
     let system_prompt = kernel.soul.to_system_prompt_fragment();
+
+    // Setup BrowserManager (using Arc so it persists and is shared)
+    use sk_engine::media::browser::BrowserManager;
+    use std::sync::Arc;
+    let browser_manager = Arc::new(BrowserManager::new(browser_config));
 
     // Chat loop
     loop {
@@ -71,7 +116,7 @@ pub async fn run(config: SovereignConfig) -> anyhow::Result<()> {
                 break;
             }
             "clear" | "/clear" => {
-                session = sk_types::Session::new(agent_id);
+                session = sk_types::Session::new(agent_id.clone());
                 println!("Session cleared.\n");
                 continue;
             }
@@ -79,54 +124,18 @@ pub async fn run(config: SovereignConfig) -> anyhow::Result<()> {
         }
 
         if let Some(ref d) = driver {
-            let tools = vec![
-                sk_tools::memory_tools::remember_tool(),
-                sk_tools::memory_tools::recall_tool(),
-                sk_tools::memory_tools::forget_tool(),
-            ];
+            let kernel_ref = kernel.memory.clone();
 
-            let kernel_ref = std::sync::Arc::new(kernel.memory.clone());
-
-            let config = sk_engine::agent_loop::AgentLoopConfig {
-                driver: d.as_ref(),
-                system_prompt: system_prompt.clone(),
-                tools,
-                model: model_name.clone(),
-                max_tokens: 4096,
-                temperature: 0.7,
-                tool_executor: Box::new(move |tool_call| {
-                    let k = kernel_ref.clone();
-                    match tool_call.name.as_str() {
-                        "remember" => {
-                            if let Ok(args) = tool_call.parsed_arguments() {
-                                let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                                let source = args.get("source").and_then(|v| v.as_str()).unwrap_or("chat");
-                                sk_tools::memory_tools::handle_remember(&k, agent_id.clone(), content, source)
-                            } else {
-                                Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
-                            }
-                        }
-                        "recall" => {
-                            if let Ok(args) = tool_call.parsed_arguments() {
-                                let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
-                                let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize).unwrap_or(5);
-                                sk_tools::memory_tools::handle_recall(&k, agent_id.clone(), query, limit)
-                            } else {
-                                Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
-                            }
-                        }
-                        "forget" => {
-                             if let Ok(args) = tool_call.parsed_arguments() {
-                                let memory_id = args.get("memory_id").and_then(|v| v.as_str()).unwrap_or("");
-                                sk_tools::memory_tools::handle_forget(&k, memory_id)
-                            } else {
-                                Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
-                            }
-                        }
-                        _ => Err(sk_types::SovereignError::ToolExecutionError(format!("Unknown tool: {}", tool_call.name)))
-                    }
-                }),
-            };
+            let config = crate::tool_executor::create_agent_config(
+                d.as_ref(),
+                system_prompt.clone(),
+                model_name.clone(),
+                kernel_ref,
+                browser_manager.clone(),
+                agent_id.clone(),
+                false, // Safety warnings bypassed for local interactive CLI
+                None,
+            );
 
             match sk_engine::agent_loop::run_agent_loop(config, &mut session, input).await {
                 Ok(result) => {
@@ -135,6 +144,11 @@ pub async fn run(config: SovereignConfig) -> anyhow::Result<()> {
                 Err(e) => {
                     println!("\nSovereign Error: {}\n", e);
                 }
+            }
+
+            // Save after every turn
+            if let Err(e) = kernel.memory.sessions.save(&session) {
+                tracing::warn!("Failed to save chat session: {e}");
             }
         }
     }

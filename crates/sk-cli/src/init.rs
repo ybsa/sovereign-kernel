@@ -15,7 +15,7 @@ pub async fn run() -> anyhow::Result<()> {
 
     if !env_path.exists() || !soul_path.exists() {
         println!("We noticed you are starting fresh. Let's configure your Agent!");
-        
+
         let mut name = String::new();
         print!("What is your name? : ");
         io::stdout().flush()?;
@@ -40,13 +40,26 @@ pub async fn run() -> anyhow::Result<()> {
         io::stdin().read_line(&mut anthropic_key)?;
         let anthropic_key = anthropic_key.trim();
 
-        if !env_path.exists() && (!gemini_key.is_empty() || !anthropic_key.is_empty()) {
+        // Channel setup — Telegram
+        println!("\n── Channel Setup ──────────────────────────────────────");
+        let mut telegram_token = String::new();
+        print!("Enter your Telegram Bot Token (or press Enter to skip): ");
+        io::stdout().flush()?;
+        io::stdin().read_line(&mut telegram_token)?;
+        let telegram_token = telegram_token.trim();
+
+        if !env_path.exists()
+            && (!gemini_key.is_empty() || !anthropic_key.is_empty() || !telegram_token.is_empty())
+        {
             let mut env_content = String::new();
             if !gemini_key.is_empty() {
                 env_content.push_str(&format!("GEMINI_API_KEY={}\n", gemini_key));
             }
             if !anthropic_key.is_empty() {
                 env_content.push_str(&format!("ANTHROPIC_API_KEY={}\n", anthropic_key));
+            }
+            if !telegram_token.is_empty() {
+                env_content.push_str(&format!("TELEGRAM_BOT_TOKEN={}\n", telegram_token));
             }
             fs::write(&env_path, env_content)?;
             println!("✓ Created .env file (excluded in .gitignore to protect privacy)");
@@ -55,7 +68,7 @@ pub async fn run() -> anyhow::Result<()> {
         if !soul_path.exists() {
             fs::create_dir_all(&soul_dir)?;
             let soul_content = format!(
-r#"# SOUL.md
+                r#"# SOUL.md
 
 [AGENT_NAME]: Sovereign Agent
 [USER_NAME]: {name}
@@ -71,11 +84,41 @@ You are the Sovereign Agent. Your user is {name}. You are concise, highly hyper-
 ## Boundaries
 - Never delete files without explicitly asking for confirmation first.
 - Be extremely brief and direct in your answers. Do not use filler words.
-"#);
+"#
+            );
             fs::write(&soul_path, soul_content)?;
             println!("✓ Created soul/SOUL.md custom identity template");
         }
-        println!("\nAwesome. Your identity and environment are secured.\n");
+
+        // Show available hands
+        println!("\n── Available Autonomous Hands ─────────────────────────");
+        let mut hand_registry = sk_hands::registry::HandRegistry::new();
+        let loaded = hand_registry.load_bundled();
+        if loaded > 0 {
+            let defs = hand_registry.list_definitions();
+            for def in &defs {
+                println!("  {} {} — {}", def.icon, def.name, def.description);
+            }
+            println!("\n  Run `sovereign hands list` for details or `sovereign hands activate <name>` to enable.");
+        } else {
+            println!("  No bundled hands found.");
+        }
+
+        // Connection summary
+        println!("\n── Setup Summary ──────────────────────────────────────");
+        if !gemini_key.is_empty() {
+            println!("  ✅ Gemini API configured");
+        }
+        if !anthropic_key.is_empty() {
+            println!("  ✅ Anthropic API configured");
+        }
+        if !telegram_token.is_empty() {
+            println!("  ✅ Telegram Bot configured");
+        }
+        if gemini_key.is_empty() && anthropic_key.is_empty() {
+            println!("  ⚠️  No LLM API key set — chat will not work until you add one to .env");
+        }
+        println!();
     }
 
     // Existing config dir creation
@@ -94,7 +137,7 @@ You are the Sovereign Agent. Your user is {name}. You are concise, highly hyper-
     let config_path = config_dir.join("config.toml");
     if !config_path.exists() {
         let default_config = format!(
-r#"# Sovereign Kernel Configuration
+            r#"# Sovereign Kernel Configuration
 # ==================================
 
 data_dir = "{}"

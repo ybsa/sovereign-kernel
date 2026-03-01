@@ -90,11 +90,11 @@ mod tests {
             ..Default::default()
         };
         let memories = vec![
-            ("a".into(), 200.0, 1u32),  // Old, rarely accessed
-            ("b".into(), 100.0, 5),     // Medium age, some accesses
-            ("c".into(), 0.5, 10),      // Very recent, lots of accesses (too young)
-            ("d".into(), 300.0, 0),     // Very old, never accessed
-            ("e".into(), 50.0, 3),      // Medium
+            ("a".into(), 200.0, 1u32), // Old, rarely accessed
+            ("b".into(), 100.0, 5),    // Medium age, some accesses
+            ("c".into(), 0.5, 10),     // Very recent, lots of accesses (too young)
+            ("d".into(), 300.0, 0),    // Very old, never accessed
+            ("e".into(), 50.0, 3),     // Medium
         ];
         let candidates = select_consolidation_candidates(&memories, &config).unwrap();
         // Should select 2 candidates (5 - 3 = 2), not including "c" (too young)

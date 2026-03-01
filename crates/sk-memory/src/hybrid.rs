@@ -42,7 +42,7 @@ impl Default for HybridWeights {
 /// RRF score = Σ (weight / (k + rank)) across both result sets.
 /// This is robust against different score distributions between the two backends.
 pub fn reciprocal_rank_fusion(
-    bm25_results: &[(String, String, f64)],  // (id, content, rank)
+    bm25_results: &[(String, String, f64)], // (id, content, rank)
     vector_results: &[(String, String, f32)], // (id, content, similarity)
     weights: &HybridWeights,
     limit: usize,
@@ -81,7 +81,11 @@ pub fn reciprocal_rank_fusion(
 
     // Sort by combined RRF score descending
     let mut results: Vec<HybridResult> = scores.into_values().collect();
-    results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+    results.sort_by(|a, b| {
+        b.score
+            .partial_cmp(&a.score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     results.truncate(limit);
     results
 }

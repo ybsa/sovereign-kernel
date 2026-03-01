@@ -2,6 +2,7 @@
 //!
 //! Subset of OpenFang's 53 tools, focused on essentials.
 
+pub mod browser_tools;
 pub mod file_ops;
 pub mod mcp_bridge;
 pub mod memory_tools;
@@ -13,7 +14,7 @@ use sk_types::ToolDefinition;
 
 /// Get all built-in tool definitions.
 pub fn builtin_tools() -> Vec<ToolDefinition> {
-    vec![
+    let mut tools = vec![
         memory_tools::remember_tool(),
         memory_tools::recall_tool(),
         memory_tools::forget_tool(),
@@ -23,5 +24,7 @@ pub fn builtin_tools() -> Vec<ToolDefinition> {
         file_ops::write_file_tool(),
         file_ops::list_dir_tool(),
         shell::shell_exec_tool(),
-    ]
+    ];
+    tools.extend(browser_tools::browser_tools());
+    tools
 }

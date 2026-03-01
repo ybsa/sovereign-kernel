@@ -1,9 +1,11 @@
 //! Google Gemini API driver.
 
-use crate::llm_driver::{CompletionRequest, CompletionResponse, LlmDriver, LlmError, StopReason, TokenUsage};
+use crate::llm_driver::{
+    CompletionRequest, CompletionResponse, LlmDriver, LlmError, StopReason, TokenUsage,
+};
 use async_trait::async_trait;
-use sk_types::{Role, ToolCall};
 use serde::{Deserialize, Serialize};
+use sk_types::{Role, ToolCall};
 
 /// Google Gemini API driver.
 pub struct GeminiDriver {
@@ -45,7 +47,9 @@ struct GeminiContent {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 enum GeminiPart {
-    Text { text: String },
+    Text {
+        text: String,
+    },
     FunctionCall {
         #[serde(rename = "functionCall")]
         function_call: GeminiFunctionCallData,
@@ -157,10 +161,15 @@ impl LlmDriver for GeminiDriver {
             if msg.role == Role::Tool {
                 if let Some(ref id) = msg.tool_call_id {
                     let mut obj = serde_json::Map::new();
-                    obj.insert("result".to_string(), serde_json::Value::String(msg.content.clone()));
+                    obj.insert(
+                        "result".to_string(),
+                        serde_json::Value::String(msg.content.clone()),
+                    );
                     parts.push(GeminiPart::FunctionResponse {
                         function_response: GeminiFunctionResponseData {
-                            name: request.tools.iter()
+                            name: request
+                                .tools
+                                .iter()
                                 .find(|t| t.name == *id)
                                 .map(|t| t.name.clone())
                                 .unwrap_or_else(|| id.clone()),
@@ -169,14 +178,17 @@ impl LlmDriver for GeminiDriver {
                     });
                 }
             } else if !msg.content.is_empty() {
-                parts.push(GeminiPart::Text { text: msg.content.clone() });
+                parts.push(GeminiPart::Text {
+                    text: msg.content.clone(),
+                });
             }
 
             for tool_call in &msg.tool_calls {
                 parts.push(GeminiPart::FunctionCall {
                     function_call: GeminiFunctionCallData {
                         name: tool_call.name.clone(),
-                        args: serde_json::from_str(&tool_call.arguments).unwrap_or(serde_json::json!({})),
+                        args: serde_json::from_str(&tool_call.arguments)
+                            .unwrap_or(serde_json::json!({})),
                     },
                 });
             }
@@ -202,11 +214,15 @@ impl LlmDriver for GeminiDriver {
             Vec::new()
         } else {
             vec![GeminiToolConfig {
-                function_declarations: request.tools.iter().map(|t| GeminiFunctionDeclaration {
-                    name: t.name.clone(),
-                    description: t.description.clone(),
-                    parameters: t.parameters.clone(),
-                }).collect(),
+                function_declarations: request
+                    .tools
+                    .iter()
+                    .map(|t| GeminiFunctionDeclaration {
+                        name: t.name.clone(),
+                        description: t.description.clone(),
+                        parameters: t.parameters.clone(),
+                    })
+                    .collect(),
             }]
         };
 
@@ -220,9 +236,19 @@ impl LlmDriver for GeminiDriver {
             }),
         };
 
-        for attempt in 0..=3 {
-            let url = format!("{}/v1beta/models/{}:generateContent", self.base_url.trim_end_matches('/'), request.model);
-            let resp = self.client.post(&url)
+        // DEBUG LOGGING THE EXACT JSON PAYLOAD
+        let payload_json = serde_json::to_string_pretty(&gemini_request).unwrap_or_default();
+        tracing::debug!("GEMINI REQUEST PAYLOAD:\n{}", payload_json);
+
+        for attempt in 0..=5 {
+            let url = format!(
+                "{}/v1beta/models/{}:generateContent",
+                self.base_url.trim_end_matches('/'),
+                request.model
+            );
+            let resp = self
+                .client
+                .post(&url)
                 .header("x-goog-api-key", &self.api_key)
                 .json(&gemini_request)
                 .send()
@@ -231,26 +257,43 @@ impl LlmDriver for GeminiDriver {
 
             let status = resp.status().as_u16();
             if status == 429 || status == 503 {
-                if attempt < 3 {
-                    tokio::time::sleep(std::time::Duration::from_millis(2000)).await;
+                if attempt < 5 {
+                    // Exponential backoff: 5s, 10s, 20s, 40s, 60s
+                    let delay = std::cmp::min(5000 * (1 << attempt), 60000);
+                    tracing::warn!(attempt, delay_ms = delay, "Rate limited, retrying...");
+                    tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
                     continue;
                 }
-                return Err(LlmError::RateLimited { retry_after_ms: 5000 });
+                return Err(LlmError::RateLimited {
+                    retry_after_ms: 60000,
+                });
             }
 
             if !resp.status().is_success() {
                 let err_text = resp.text().await.unwrap_or_default();
                 if let Ok(err_json) = serde_json::from_str::<GeminiErrorResponse>(&err_text) {
-                    return Err(LlmError::ApiError { status, message: err_json.error.message });
+                    return Err(LlmError::ApiError {
+                        status,
+                        message: err_json.error.message,
+                    });
                 }
-                return Err(LlmError::ApiError { status, message: err_text });
+                return Err(LlmError::ApiError {
+                    status,
+                    message: err_text,
+                });
             }
 
-            let resp_text = resp.text().await.map_err(|e| LlmError::NetworkError(e.to_string()))?;
+            let resp_text = resp
+                .text()
+                .await
+                .map_err(|e| LlmError::NetworkError(e.to_string()))?;
             let gemini_resp: GeminiResponse = serde_json::from_str(&resp_text)
                 .map_err(|e| LlmError::ParseError(e.to_string()))?;
 
-            let candidate = gemini_resp.candidates.into_iter().next()
+            let candidate = gemini_resp
+                .candidates
+                .into_iter()
+                .next()
                 .ok_or_else(|| LlmError::ParseError("No candidates in response".to_string()))?;
 
             let mut final_content = String::new();
@@ -284,11 +327,14 @@ impl LlmDriver for GeminiDriver {
                 }
             };
 
-            let usage = gemini_resp.usage_metadata.map(|u| TokenUsage {
-                prompt_tokens: u.prompt_token_count,
-                completion_tokens: u.candidates_token_count,
-                total_tokens: u.prompt_token_count + u.candidates_token_count,
-            }).unwrap_or_default();
+            let usage = gemini_resp
+                .usage_metadata
+                .map(|u| TokenUsage {
+                    prompt_tokens: u.prompt_token_count,
+                    completion_tokens: u.candidates_token_count,
+                    total_tokens: u.prompt_token_count + u.candidates_token_count,
+                })
+                .unwrap_or_default();
 
             return Ok(CompletionResponse {
                 content: final_content,

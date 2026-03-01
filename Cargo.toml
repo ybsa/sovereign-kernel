@@ -8,6 +8,8 @@ members = [
     "crates/sk-mcp",
     "crates/sk-kernel",
     "crates/sk-tools",
+    "crates/sk-channels",
+    "crates/sk-hands",
     "crates/sk-cli",
 ]
 
@@ -81,6 +83,16 @@ regex-lite = "0.1"
 tokio-test = "0.4"
 tempfile = "3"
 
+# Messaging integrations
+tokio-tungstenite = "0.21"
+url = "2.5"
+zeroize = "1.7"
+axum = "0.7"
+dotenvy = "0.15"
+hmac = "0.12"
+base64 = "0.22"
+hex = "0.4"
+
 # Inter-crate
 sk-types = { path = "crates/sk-types" }
 sk-soul = { path = "crates/sk-soul" }
@@ -89,6 +101,8 @@ sk-engine = { path = "crates/sk-engine" }
 sk-mcp = { path = "crates/sk-mcp" }
 sk-kernel = { path = "crates/sk-kernel" }
 sk-tools = { path = "crates/sk-tools" }
+sk-channels = { path = "crates/sk-channels" }
+sk-hands = { path = "crates/sk-hands" }
 
 [profile.release]
 lto = true

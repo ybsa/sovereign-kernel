@@ -15,9 +15,9 @@ pub trait EmbeddingDriver: Send + Sync {
     /// Compute embedding for a single text.
     async fn embed_one(&self, text: &str) -> Result<Vec<f32>, SovereignError> {
         let mut results = self.embed(&[text]).await?;
-        results.pop().ok_or_else(|| {
-            SovereignError::MemoryError("Empty embedding response".into())
-        })
+        results
+            .pop()
+            .ok_or_else(|| SovereignError::MemoryError("Empty embedding response".into()))
     }
 
     /// Get the embedding dimensions.

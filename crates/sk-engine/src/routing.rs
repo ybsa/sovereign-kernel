@@ -54,7 +54,11 @@ impl ModelRouter {
         // Keyword heuristics for complex tasks
         if let Some(last_msg) = messages.last() {
             let lower = last_msg.content.to_lowercase();
-            if lower.contains("code") || lower.contains("architect") || lower.contains("debug") || lower.contains("analyze") {
+            if lower.contains("code")
+                || lower.contains("architect")
+                || lower.contains("debug")
+                || lower.contains("analyze")
+            {
                 return TaskComplexity::DeepReasoning;
             }
         }

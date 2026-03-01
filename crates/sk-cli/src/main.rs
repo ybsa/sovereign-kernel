@@ -9,9 +9,16 @@
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
+mod bridge;
 mod chat;
 mod daemon;
+mod dashboard;
+mod hands;
 mod init;
+mod middleware;
+mod openai_compat;
+mod safety;
+mod tool_executor;
 
 #[derive(Parser)]
 #[command(name = "sovereign", version, about = "Sovereign Kernel — Agentic OS")]
@@ -36,15 +43,26 @@ enum Commands {
     Status,
     /// Stop the daemon
     Stop,
+    /// Manage autonomous hands (list, activate, deactivate, status)
+    Hands {
+        /// Action: list, activate, deactivate, status
+        #[arg(default_value = "list")]
+        action: String,
+        /// Additional arguments (hand name, instance ID, etc.)
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // Load environment variables from .env file
+    dotenvy::dotenv().ok();
+
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info")),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .init();
 
@@ -52,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Load config
     let config = if let Some(ref path) = cli.config {
-        sk_types::SovereignConfig::load(std::path::Path::new(path))?
+        sk_types::KernelConfig::load(std::path::Path::new(path))?
     } else {
         // Look for config in default locations
         let default_path = dirs::config_dir()
@@ -61,9 +79,9 @@ async fn main() -> anyhow::Result<()> {
             .join("config.toml");
 
         if default_path.exists() {
-            sk_types::SovereignConfig::load(&default_path)?
+            sk_types::KernelConfig::load(&default_path)?
         } else {
-            sk_types::SovereignConfig::default()
+            sk_types::KernelConfig::default()
         }
     };
 
@@ -73,6 +91,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Start => daemon::start(config).await?,
         Commands::Status => daemon::status().await?,
         Commands::Stop => daemon::stop().await?,
+        Commands::Hands { action, args } => hands::run(&action, &args).await?,
     }
 
     Ok(())

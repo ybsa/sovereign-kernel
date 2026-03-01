@@ -29,15 +29,11 @@ impl Bm25Index {
     }
 
     /// Index a memory entry for full-text search.
-    pub fn index(
-        &self,
-        agent_id: AgentId,
-        memory_id: &str,
-        content: &str,
-    ) -> SovereignResult<()> {
-        let conn = self.conn.lock().map_err(|e| {
-            SovereignError::MemoryError(format!("Lock poisoned: {e}"))
-        })?;
+    pub fn index(&self, agent_id: AgentId, memory_id: &str, content: &str) -> SovereignResult<()> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
         conn.execute(
             "INSERT INTO fts_memories (content, agent_id, memory_id) VALUES (?1, ?2, ?3)",
             rusqlite::params![content, agent_id.to_string(), memory_id],
@@ -53,9 +49,10 @@ impl Bm25Index {
         query: &str,
         limit: usize,
     ) -> SovereignResult<Vec<Bm25Result>> {
-        let conn = self.conn.lock().map_err(|e| {
-            SovereignError::MemoryError(format!("Lock poisoned: {e}"))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
 
         // Sanitize query for FTS5
         let sanitized = sanitize_fts5_query(query);
@@ -95,9 +92,10 @@ impl Bm25Index {
 
     /// Remove a memory from the FTS index.
     pub fn remove(&self, memory_id: &str) -> SovereignResult<()> {
-        let conn = self.conn.lock().map_err(|e| {
-            SovereignError::MemoryError(format!("Lock poisoned: {e}"))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
         conn.execute(
             "DELETE FROM fts_memories WHERE memory_id = ?1",
             rusqlite::params![memory_id],
@@ -117,7 +115,10 @@ fn sanitize_fts5_query(query: &str) -> String {
         .split_whitespace()
         .filter(|w| !w.is_empty())
         .map(|word| {
-            let cleaned: String = word.chars().filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-').collect();
+            let cleaned: String = word
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+                .collect();
             if cleaned.is_empty() {
                 String::new()
             } else {

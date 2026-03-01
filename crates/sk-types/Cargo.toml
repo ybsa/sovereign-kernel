@@ -10,7 +10,7 @@ description = "Core types for the Sovereign Kernel"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 uuid = { workspace = true }
 sha2 = { workspace = true }
 ed25519-dalek = { workspace = true }

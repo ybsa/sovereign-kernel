@@ -45,9 +45,10 @@ impl SemanticStore {
     ) -> SovereignResult<String> {
         let id = Uuid::new_v4().to_string();
         let embedding_bytes = embedding_to_bytes(embedding);
-        let conn = self.conn.lock().map_err(|e| {
-            SovereignError::MemoryError(format!("Lock poisoned: {e}"))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
         conn.execute(
             "INSERT INTO semantic_memories (id, agent_id, content, embedding, source) VALUES (?1, ?2, ?3, ?4, ?5)",
             rusqlite::params![id, agent_id.to_string(), content, embedding_bytes, source],
@@ -68,9 +69,10 @@ impl SemanticStore {
         let mut results = Vec::new();
 
         {
-            let conn = self.conn.lock().map_err(|e| {
-                SovereignError::MemoryError(format!("Lock poisoned: {e}"))
-            })?;
+            let conn = self
+                .conn
+                .lock()
+                .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
             let mut stmt = conn
                 .prepare(
                     "SELECT id, agent_id, content, embedding, source, created_at
@@ -109,7 +111,11 @@ impl SemanticStore {
         } // conn lock released here
 
         // Sort by similarity descending
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         results.truncate(limit);
 
         // Update access timestamps for returned results
@@ -122,9 +128,10 @@ impl SemanticStore {
 
     /// Update the access timestamp and count for a memory.
     fn touch(&self, memory_id: &str) -> SovereignResult<()> {
-        let conn = self.conn.lock().map_err(|e| {
-            SovereignError::MemoryError(format!("Lock poisoned: {e}"))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
         conn.execute(
             "UPDATE semantic_memories SET accessed_at = datetime('now'), access_count = access_count + 1 WHERE id = ?1",
             rusqlite::params![memory_id],
@@ -135,9 +142,10 @@ impl SemanticStore {
 
     /// Delete a specific memory by ID.
     pub fn delete(&self, memory_id: &str) -> SovereignResult<()> {
-        let conn = self.conn.lock().map_err(|e| {
-            SovereignError::MemoryError(format!("Lock poisoned: {e}"))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
         conn.execute(
             "DELETE FROM semantic_memories WHERE id = ?1",
             rusqlite::params![memory_id],
@@ -148,9 +156,10 @@ impl SemanticStore {
 
     /// Count total memories for an agent.
     pub fn count(&self, agent_id: AgentId) -> SovereignResult<usize> {
-        let conn = self.conn.lock().map_err(|e| {
-            SovereignError::MemoryError(format!("Lock poisoned: {e}"))
-        })?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
         let count: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM semantic_memories WHERE agent_id = ?1",
@@ -191,10 +200,7 @@ pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 
 /// Serialize an embedding vector to bytes (for SQLite BLOB storage).
 pub fn embedding_to_bytes(embedding: &[f32]) -> Vec<u8> {
-    embedding
-        .iter()
-        .flat_map(|f| f.to_le_bytes())
-        .collect()
+    embedding.iter().flat_map(|f| f.to_le_bytes()).collect()
 }
 
 /// Deserialize an embedding vector from bytes.

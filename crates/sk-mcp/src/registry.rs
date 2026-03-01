@@ -82,9 +82,7 @@ impl McpRegistry {
         let server_name = self
             .clients
             .iter()
-            .find(|(_, client)| {
-                client.tools().iter().any(|t| t.name == namespaced_name)
-            })
+            .find(|(_, client)| client.tools().iter().any(|t| t.name == namespaced_name))
             .map(|(name, _)| name.clone())
             .ok_or_else(|| {
                 SovereignError::McpError(format!("No MCP server owns tool: {namespaced_name}"))

@@ -1,7 +1,7 @@
 //! Memory tools — remember, recall, forget.
 
-use sk_types::{AgentId, SovereignResult, ToolDefinition};
 use sk_memory::MemorySubstrate;
+use sk_types::{AgentId, SovereignResult, ToolDefinition};
 use uuid::Uuid;
 
 pub fn remember_tool() -> ToolDefinition {
@@ -16,7 +16,8 @@ pub fn remember_tool() -> ToolDefinition {
             },
             "required": ["content"]
         }),
-        source: "builtin".into(),
+        source: "".into(),
+        required_capabilities: vec![],
     }
 }
 
@@ -32,7 +33,8 @@ pub fn recall_tool() -> ToolDefinition {
             },
             "required": ["query"]
         }),
-        source: "builtin".into(),
+        source: "".into(),
+        required_capabilities: vec![],
     }
 }
 
@@ -47,7 +49,8 @@ pub fn forget_tool() -> ToolDefinition {
             },
             "required": ["memory_id"]
         }),
-        source: "builtin".into(),
+        source: "".into(),
+        required_capabilities: vec![],
     }
 }
 
@@ -60,7 +63,9 @@ pub fn handle_remember(
     // For now we use a newly generated Uuid for BM25 since exact semantic embeddings are missing
     let memory_id = Uuid::new_v4().to_string();
     substrate.bm25.index(agent_id, &memory_id, content)?;
-    Ok(format!("Successfully remembered with ID: {memory_id} (source: {source})"))
+    Ok(format!(
+        "Successfully remembered with ID: {memory_id} (source: {source})"
+    ))
 }
 
 pub fn handle_recall(
@@ -76,15 +81,17 @@ pub fn handle_recall(
 
     let mut output = String::from("Recalled memories:\n");
     for (i, res) in results.iter().enumerate() {
-        output.push_str(&format!("{}. [ID: {}] {}\n", i + 1, res.memory_id, res.content));
+        output.push_str(&format!(
+            "{}. [ID: {}] {}\n",
+            i + 1,
+            res.memory_id,
+            res.content
+        ));
     }
     Ok(output)
 }
 
-pub fn handle_forget(
-    substrate: &MemorySubstrate,
-    memory_id: &str,
-) -> SovereignResult<String> {
+pub fn handle_forget(substrate: &MemorySubstrate, memory_id: &str) -> SovereignResult<String> {
     substrate.bm25.remove(memory_id)?;
     Ok(format!("Forgot memory ID: {memory_id}"))
 }

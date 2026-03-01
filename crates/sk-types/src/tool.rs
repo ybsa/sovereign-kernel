@@ -19,6 +19,9 @@ pub struct ToolDefinition {
     /// Source of the tool: "builtin", "mcp:{server_name}", "plugin".
     #[serde(default = "default_source")]
     pub source: String,
+    /// Capabilities required to invoke this tool.
+    #[serde(default)]
+    pub required_capabilities: Vec<crate::security::Capability>,
 }
 
 fn default_source() -> String {
@@ -127,6 +130,7 @@ mod tests {
                 }
             }),
             source: "builtin".into(),
+            required_capabilities: vec![],
         };
         let json = serde_json::to_string(&td).unwrap();
         let parsed: ToolDefinition = serde_json::from_str(&json).unwrap();
