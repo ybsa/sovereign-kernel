@@ -48,34 +48,34 @@ The Sovereign Kernel is a meticulously architected 8-crate workspace that brings
 
 ## 🆚 The Reality Check: Sovereign Kernel vs. Ancestors
 
-Let's be completely transparent. While Sovereign Kernel is the *future* of this architecture, its ancestors (**OpenFang** and **OpenClaw**) currently have much larger, battle-tested surface areas. Sovereign Kernel is a lightweight, clean-slate rewrite that is still missing many features.
+Let's be completely rigorous and transparent. While Sovereign Kernel is the *future* of this architecture, its ancestors (**OpenFang** and **OpenClaw**) represent massive engineering efforts with vastly larger feature sets. Sovereign Kernel is an early-stage, clean-slate rewrite that is currently missing most of the advanced infrastructure.
 
-Here is the exact state of the project right now:
+Here is the objective state of the project based on actual codebase metrics:
 
-| Category | OpenFang (Rust) | OpenClaw (Node.js) | Sovereign Kernel | The Gap |
-| :--- | :--- | :--- | :--- | :--- |
-| **Runtime Modules** | 52 | N/A (NPM ecosystem) | 13 | 39 missing |
-| **Kernel Modules** | 22 | N/A (Agent cluster) | 7 | 15 missing |
-| **Agent Loop LOC** | 2,854 | ~4,000 (TypeScript) | 154 | 18x-25x smaller |
-| **Metering LOC** | 693 | Extensive Billing API | 3 (stub) | Not implemented yet |
-| **Supervisor LOC** | 228 | N/A (PM2/Docker relied) | 3 (stub) | Not implemented yet |
-| **Scheduler LOC** | 169 | Full Cron Service API | 3 (stub) | Not implemented yet |
-| **LLM Drivers** | 5 (OpenAI, Anthropic, etc) | 10+ (Vast support) | 2 (Gemini, Anthropic) | 3+ missing |
-| **Security Layers** | 16 (WASM, Docker, Taint...) | 3 (Basic Docker Auth) | Taint + 8 Capabilities | WASM/Docker not enforced |
-| **Browser Hand** | Full Playwright CDP | Deep Puppeteer Bridge | Defined in `HAND.toml` | Not functional yet |
-| **Channels** | 40 adapters | 15+ (WhatsApp, iMessage) | 2 (Telegram, Discord)| 38 missing |
+| Category | OpenFang Has | Sovereign Kernel Has | Gap |
+| :--- | :--- | :--- | :--- |
+| **Runtime modules** | 52 | 13 | 39 missing |
+| **Kernel modules** | 22 | 7 | 15 missing |
+| **Agent loop LOC** | 2,854 | 154 | 18x smaller |
+| **Metering LOC** | 693 | 3 (stub) | Not implemented |
+| **Supervisor LOC** | 228 | 3 (stub) | Not implemented |
+| **Scheduler LOC** | 169 | 3 (stub) | Not implemented |
+| **LLM Drivers** | 5 (OpenAI, Anthropic, Gemini, Copilot, Fallback) | 2 (Gemini, Anthropic) | 3 missing |
+| **Security** | 16 layers (WASM, Docker, shell_bleed, taint, audit) | Taint + 8 Capabilities | Not enforced |
+| **Browser** | Full Playwright CDP bridge | Defined in `HAND.toml`, not wired | Not functional |
+| **Channels** | 40 adapters | 2 (Telegram, Discord) | 38 missing |
 
-*(Sovereign Kernel is currently focused on establishing the core safe `sk-engine` execution loop before porting the massive feature sets of its ancestors.)*
+*(Sovereign Kernel is currently an alpha-stage engine. It has established the core memory representations but lacks the critical execution guards, cost metering, and isolation layers present in OpenFang.)*
+
 ## ⚖️ The Honest Comparison (Best vs. Worst)
 
-We believe in transparency. Here is how Sovereign Kernel stacks up against its predecessors and the broader market:
+We believe in radical transparency. Here is how Sovereign Kernel stacks up against its predecessors and the broader market:
 
 | Platform | The Best Things 🏆 | The Worst Things ⚠️ |
 | :--- | :--- | :--- |
-| **Sovereign Kernel** | **Unbreakable Security**: Native WASM sandboxing and cryptographically signed audit trails.<br>**Raw Power**: Blazingly fast Rust engine with zero telemetry.<br>**Infinite Memory**: Perfect temporal decay and vector search built-in. | **Steep Learning Curve**: Requires understanding agent lifecycles.<br>**UI Pending**: Currently CLI-only (Web UI is coming in Phase 12). |
-| **OpenClaw** | **Rich Interfaces**: Incredible macOS app, Canvas, and WebChat UI.<br>**Massive Reach**: Plug-and-play with WhatsApp, Telegram, iMessage, etc. | **Resource Heavy**: Node.js ecosystem consumes significant RAM.<br>**Lower Security**: Lacks process-level WASM sandboxing for scripts. |
-| **OpenFang** | **Autonomous Hands**: Great built-in autonomous schedules and 40+ adapters. | **Legacy Architecture**: Massive, tightly-coupled codebase that is harder to extend natively. |
-| **LangChain/AutoGen** | **Massive Community**: Huge ecosystem of tutorials and plugins.<br>**Easy to Start**: Just write a 10-line Python script. | **Fragile**: Scripts easily crash or loop infinitely in production.<br>**Dangerous**: Runs unsandboxed Python code with your API keys. |
+| **Sovereign Kernel** | **Clean Architecture**: 8-crate modular design.<br>**Blazingly Fast**: 100% Rust engine with minimal bloat. | **Vastly Incomplete**: Missing nearly all advanced security, metering, and workflow features of its ancestors.<br>**No UI**: Strictly command-line. |
+| **OpenClaw (Node.js)** | **Rich Interfaces**: Incredible macOS app, Canvas, and WebChat UI.<br>**Massive Reach**: Plug-and-play with WhatsApp, Telegram, iMessage, etc. | **Resource Heavy**: Node.js ecosystem consumes significant RAM.<br>**Lower Security**: Lacks process-level WASM sandboxing. |
+| **OpenFang (Rust)** | **Production Ready**: 16-layer security model and highly robust agent loop.<br>**Ecosystem**: 40+ adapters and deep sandbox implementations. | **Legacy Architecture**: Massive, tightly-coupled codebase that is harder to extend safely. |
 
 *(See [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive into the 8-crate system).*
 
