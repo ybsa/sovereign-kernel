@@ -28,7 +28,7 @@ impl SoulIdentity {
     /// Load and parse a SOUL.md file.
     pub fn load(path: &Path) -> Result<Self, sk_types::SovereignError> {
         let raw = std::fs::read_to_string(path).map_err(|e| {
-            sk_types::SovereignError::ConfigError(format!(
+            sk_types::SovereignError::Config(format!(
                 "Failed to read SOUL.md at {}: {e}",
                 path.display()
             ))

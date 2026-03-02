@@ -92,8 +92,15 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
 
     // Setup BrowserManager (using Arc so it persists and is shared)
     use sk_engine::media::browser::BrowserManager;
+    use sk_tools::skills::SkillRegistry;
     use std::sync::Arc;
+
     let browser_manager = Arc::new(BrowserManager::new(browser_config));
+
+    // Load OpenClaw skills
+    let skills_path = std::env::current_dir()?.join("crates").join("sk-tools").join("skills");
+    let skill_registry = Arc::new(SkillRegistry::load_from_dir(skills_path));
+    info!(skills = skill_registry.list().len(), "Skills loaded");
 
     // Chat loop
     loop {
@@ -133,6 +140,7 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
                 kernel_ref,
                 browser_manager.clone(),
                 agent_id.clone(),
+                skill_registry.clone(),
                 false, // Safety warnings bypassed for local interactive CLI
                 None,
             );

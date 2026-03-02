@@ -12,6 +12,7 @@ pub struct SovereignBridge {
     kernel: Arc<SovereignKernel>,
     sessions: DashMap<AgentId, Arc<Mutex<sk_types::Session>>>,
     safety: Arc<crate::safety::SafetyGate>,
+    skills: Arc<sk_tools::skills::SkillRegistry>,
 }
 
 impl SovereignBridge {
@@ -20,10 +21,15 @@ impl SovereignBridge {
         let safety_enabled = std::env::var("SOVEREIGN_UNSAFE")
             .map(|v| v != "1")
             .unwrap_or(true);
+
+        let skills_path = std::env::current_dir().unwrap_or_default().join("crates").join("sk-tools").join("skills");
+        let skills = Arc::new(sk_tools::skills::SkillRegistry::load_from_dir(skills_path));
+
         Self {
             kernel,
             sessions: DashMap::new(),
             safety: Arc::new(crate::safety::SafetyGate::new(safety_enabled)),
+            skills,
         }
     }
 }
@@ -123,6 +129,7 @@ impl ChannelBridgeHandle for SovereignBridge {
             self.kernel.memory.clone(),
             browser_manager.clone(), // Pass browser_manager here
             agent_id.clone(),
+            self.skills.clone(),
             self.safety.enabled,
             Some(self.safety.clone()),
         );

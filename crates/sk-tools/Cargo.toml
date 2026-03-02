@@ -16,6 +16,8 @@ uuid = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 reqwest = { workspace = true }
+serde_yaml = { workspace = true }
+regex-lite = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

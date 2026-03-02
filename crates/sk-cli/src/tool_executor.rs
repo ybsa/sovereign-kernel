@@ -10,6 +10,7 @@ pub fn create_agent_config<'a>(
     kernel_memory: Arc<sk_memory::MemorySubstrate>,
     browser_manager: Arc<sk_engine::media::browser::BrowserManager>,
     agent_id: AgentId,
+    skill_registry: Arc<sk_tools::skills::SkillRegistry>,
     safety_enabled: bool,
     safety_gate: Option<Arc<crate::safety::SafetyGate>>,
 ) -> AgentLoopConfig<'a> {
@@ -25,6 +26,8 @@ pub fn create_agent_config<'a>(
         sk_tools::shell::shell_exec_tool(),
     ];
     tools.extend(sk_tools::browser_tools::browser_tools());
+    tools.push(sk_tools::skills::get_skill_tool());
+    tools.push(sk_tools::skills::list_skills_tool());
 
     let k = kernel_memory;
     let b = browser_manager;
@@ -40,13 +43,15 @@ pub fn create_agent_config<'a>(
         tool_executor: Box::new(move |tool_call| {
             let kernel = k.clone();
             let browser = b.clone();
+            let aid = aid.clone();
+            let skills = skill_registry.clone();
             let agent_id_str = aid.to_string();
 
             // Safety check
             if safety_enabled {
                 let args = tool_call
-                    .parsed_arguments()
-                    .unwrap_or_else(|_| serde_json::Value::Null);
+                    .input
+                    .clone();
 
                 // If we have a specific gate, use it
                 let blocked = if let Some(gate) = &safety_gate {
@@ -85,17 +90,12 @@ pub fn create_agent_config<'a>(
 
             match tool_call.name.as_str() {
                 "remember" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(args) = tool_call.input.as_object() {
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                        let source = args
-                            .get("source")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("agent");
                         sk_tools::memory_tools::handle_remember(
                             &kernel,
                             aid.clone(),
                             content,
-                            source,
                         )
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
@@ -104,7 +104,7 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "recall" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(args) = tool_call.input.as_object() {
                         let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
                         let limit = args
                             .get("limit")
@@ -119,7 +119,7 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "forget" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(args) = tool_call.input.as_object() {
                         let memory_id =
                             args.get("memory_id").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::memory_tools::handle_forget(&kernel, memory_id)
@@ -130,7 +130,7 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "web_search" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(args) = tool_call.input.as_object() {
                         let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::web_search::handle_web_search(query)
                     } else {
@@ -140,7 +140,7 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "web_fetch" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(args) = tool_call.input.as_object() {
                         let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::web_fetch::handle_web_fetch(url)
                     } else {
@@ -150,7 +150,7 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "read_file" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::file_ops::handle_read_file(path)
                     } else {
@@ -160,7 +160,7 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "write_file" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::file_ops::handle_write_file(path, content)
@@ -171,7 +171,7 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "list_dir" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
                         sk_tools::file_ops::handle_list_dir(path)
                     } else {
@@ -181,7 +181,7 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "shell_exec" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(args) = tool_call.input.as_object() {
                         let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::shell::handle_shell_exec(command)
                     } else {
@@ -191,11 +191,11 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "browser_navigate" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
                                 sk_engine::media::browser::tool_browser_navigate(
-                                    &args,
+                                    &tool_call.input,
                                     &browser,
                                     &agent_id_str,
                                 ),
@@ -209,11 +209,11 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "browser_click" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
                                 sk_engine::media::browser::tool_browser_click(
-                                    &args,
+                                    &tool_call.input,
                                     &browser,
                                     &agent_id_str,
                                 ),
@@ -227,11 +227,11 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "browser_type" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
                                 sk_engine::media::browser::tool_browser_type(
-                                    &args,
+                                    &tool_call.input,
                                     &browser,
                                     &agent_id_str,
                                 ),
@@ -245,11 +245,11 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "browser_screenshot" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
                                 sk_engine::media::browser::tool_browser_screenshot(
-                                    &args,
+                                    &tool_call.input,
                                     &browser,
                                     &agent_id_str,
                                 ),
@@ -263,11 +263,11 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "browser_read_page" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
                                 sk_engine::media::browser::tool_browser_read_page(
-                                    &args,
+                                    &tool_call.input,
                                     &browser,
                                     &agent_id_str,
                                 ),
@@ -281,11 +281,11 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "browser_close" => {
-                    if let Ok(args) = tool_call.parsed_arguments() {
+                    if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
                                 sk_engine::media::browser::tool_browser_close(
-                                    &args,
+                                    &tool_call.input,
                                     &browser,
                                     &agent_id_str,
                                 ),
@@ -297,6 +297,19 @@ pub fn create_agent_config<'a>(
                             "Invalid arguments".into(),
                         ))
                     }
+                }
+                "get_skill" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                        Ok(sk_tools::skills::handle_get_skill(&skills, name))
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "list_skills" => {
+                    Ok(sk_tools::skills::handle_list_skills(&skills))
                 }
                 _ => Err(sk_types::SovereignError::ToolExecutionError(format!(
                     "Unknown tool: {}",

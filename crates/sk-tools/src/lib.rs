@@ -7,6 +7,7 @@ pub mod file_ops;
 pub mod mcp_bridge;
 pub mod memory_tools;
 pub mod shell;
+pub mod skills;
 pub mod web_fetch;
 pub mod web_search;
 
@@ -26,5 +27,7 @@ pub fn builtin_tools() -> Vec<ToolDefinition> {
         shell::shell_exec_tool(),
     ];
     tools.extend(browser_tools::browser_tools());
+    tools.push(skills::get_skill_tool());
+    tools.push(skills::list_skills_tool());
     tools
 }

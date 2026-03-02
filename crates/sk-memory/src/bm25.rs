@@ -33,12 +33,12 @@ impl Bm25Index {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
         conn.execute(
             "INSERT INTO fts_memories (content, agent_id, memory_id) VALUES (?1, ?2, ?3)",
             rusqlite::params![content, agent_id.to_string(), memory_id],
         )
-        .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+        .map_err(|e| SovereignError::Memory(e.to_string()))?;
         Ok(())
     }
 
@@ -52,7 +52,7 @@ impl Bm25Index {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
 
         // Sanitize query for FTS5
         let sanitized = sanitize_fts5_query(query);
@@ -68,7 +68,7 @@ impl Bm25Index {
                  ORDER BY rank
                  LIMIT ?3",
             )
-            .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+            .map_err(|e| SovereignError::Memory(e.to_string()))?;
 
         let rows = stmt
             .query_map(
@@ -81,11 +81,11 @@ impl Bm25Index {
                     })
                 },
             )
-            .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+            .map_err(|e| SovereignError::Memory(e.to_string()))?;
 
         let mut results = Vec::new();
         for row in rows {
-            results.push(row.map_err(|e| SovereignError::MemoryError(e.to_string()))?);
+            results.push(row.map_err(|e| SovereignError::Memory(e.to_string()))?);
         }
         Ok(results)
     }
@@ -95,12 +95,12 @@ impl Bm25Index {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
         conn.execute(
             "DELETE FROM fts_memories WHERE memory_id = ?1",
             rusqlite::params![memory_id],
         )
-        .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+        .map_err(|e| SovereignError::Memory(e.to_string()))?;
         Ok(())
     }
 }

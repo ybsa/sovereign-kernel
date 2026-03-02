@@ -48,12 +48,12 @@ impl SemanticStore {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
         conn.execute(
             "INSERT INTO semantic_memories (id, agent_id, content, embedding, source) VALUES (?1, ?2, ?3, ?4, ?5)",
             rusqlite::params![id, agent_id.to_string(), content, embedding_bytes, source],
         )
-        .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+        .map_err(|e| SovereignError::Memory(e.to_string()))?;
         Ok(id)
     }
 
@@ -72,13 +72,13 @@ impl SemanticStore {
             let conn = self
                 .conn
                 .lock()
-                .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
+                .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
             let mut stmt = conn
                 .prepare(
                     "SELECT id, agent_id, content, embedding, source, created_at
                      FROM semantic_memories WHERE agent_id = ?1 AND embedding IS NOT NULL",
                 )
-                .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
 
             let rows = stmt
                 .query_map(rusqlite::params![agent_id.to_string()], |row| {
@@ -89,11 +89,11 @@ impl SemanticStore {
                     let created_at: String = row.get(5)?;
                     Ok((id, content, emb_bytes, source, created_at))
                 })
-                .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
 
             for row in rows {
                 let (id, content, emb_bytes, source, created_at) =
-                    row.map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+                    row.map_err(|e| SovereignError::Memory(e.to_string()))?;
                 let embedding = embedding_from_bytes(&emb_bytes);
                 let similarity = cosine_similarity(query_embedding, &embedding);
 
@@ -131,12 +131,12 @@ impl SemanticStore {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
         conn.execute(
             "UPDATE semantic_memories SET accessed_at = datetime('now'), access_count = access_count + 1 WHERE id = ?1",
             rusqlite::params![memory_id],
         )
-        .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+        .map_err(|e| SovereignError::Memory(e.to_string()))?;
         Ok(())
     }
 
@@ -145,12 +145,12 @@ impl SemanticStore {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
         conn.execute(
             "DELETE FROM semantic_memories WHERE id = ?1",
             rusqlite::params![memory_id],
         )
-        .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+        .map_err(|e| SovereignError::Memory(e.to_string()))?;
         Ok(())
     }
 
@@ -159,14 +159,14 @@ impl SemanticStore {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
         let count: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM semantic_memories WHERE agent_id = ?1",
                 rusqlite::params![agent_id.to_string()],
                 |row| row.get(0),
             )
-            .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+            .map_err(|e| SovereignError::Memory(e.to_string()))?;
         Ok(count as usize)
     }
 }

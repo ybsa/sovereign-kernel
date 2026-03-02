@@ -23,26 +23,9 @@
 //! `host_call` reads a JSON request `{"method": "...", "params": {...}}`
 //! and returns a packed pointer to JSON `{"ok": ...}` or `{"error": "..."}`.
 
-use sk_types::security::Capability;
-
 use crate::host_functions;
-
-#[async_trait::async_trait]
-pub trait KernelHandle: Send + Sync {
-    fn memory_recall(&self, key: &str) -> std::result::Result<Option<serde_json::Value>, String>;
-    fn memory_store(&self, key: &str, value: serde_json::Value) -> std::result::Result<(), String>;
-    async fn send_to_agent(
-        &self,
-        target: &str,
-        message: &str,
-    ) -> std::result::Result<serde_json::Value, String>;
-    async fn spawn_agent_checked(
-        &self,
-        manifest: &str,
-        parent: Option<&str>,
-        caps: &[Capability],
-    ) -> std::result::Result<(String, String), String>;
-}
+use super::kernel_handle::KernelHandle;
+use sk_types::capability::Capability;
 use std::sync::Arc;
 use tracing::debug;
 use wasmtime::*;
@@ -513,7 +496,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(windows, ignore = "Wasmtime fuel exhaustion traps crash Windows SEH unwinding")]
     async fn test_fuel_exhaustion() {
         let sandbox = WasmSandbox::new().unwrap();
         let input = serde_json::json!({});

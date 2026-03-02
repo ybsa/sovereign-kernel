@@ -6,9 +6,9 @@
 //! These functions are called from the `host_call` dispatch in `sandbox.rs`.
 //! They receive `&GuestState` (not `&mut`) and return JSON values.
 
-use crate::sandbox::sandbox::GuestState;
+use crate::runtime::sandbox::GuestState;
 use serde_json::json;
-use sk_types::security::Capability;
+use sk_types::capability::Capability;
 use std::net::ToSocketAddrs;
 use std::path::{Component, Path};
 use tracing::debug;
@@ -58,7 +58,7 @@ fn check_capability(
     capabilities: &[Capability],
     required: &Capability,
 ) -> Result<(), serde_json::Value> {
-    if capabilities.contains(required) || capabilities.contains(&Capability::Admin) {
+    if capabilities.contains(required) {
         return Ok(());
     }
     Err(json!({"error": format!("Capability denied: {required:?}")}))
@@ -195,7 +195,7 @@ fn host_fs_read(state: &GuestState, params: &serde_json::Value) -> serde_json::V
         None => return json!({"error": "Missing 'path' parameter"}),
     };
     // Check capability with raw path first
-    if let Err(e) = check_capability(&state.capabilities, &Capability::FileRead) {
+    if let Err(e) = check_capability(&state.capabilities, &Capability::FileRead(path.to_string())) {
         return e;
     }
     // SECURITY: Reject path traversal after capability gate
@@ -218,7 +218,7 @@ fn host_fs_write(state: &GuestState, params: &serde_json::Value) -> serde_json::
         Some(c) => c,
         None => return json!({"error": "Missing 'content' parameter"}),
     };
-    if let Err(e) = check_capability(&state.capabilities, &Capability::FileWrite) {
+    if let Err(e) = check_capability(&state.capabilities, &Capability::FileWrite(path.to_string())) {
         return e;
     }
     // SECURITY: Reject path traversal after capability gate
@@ -238,7 +238,7 @@ fn host_fs_list(state: &GuestState, params: &serde_json::Value) -> serde_json::V
         None => return json!({"error": "Missing 'path' parameter"}),
     };
     // Check capability with raw path first
-    if let Err(e) = check_capability(&state.capabilities, &Capability::FileRead) {
+    if let Err(e) = check_capability(&state.capabilities, &Capability::FileRead(path.to_string())) {
         return e;
     }
     // SECURITY: Reject path traversal after capability gate
@@ -278,7 +278,7 @@ fn host_net_fetch(state: &GuestState, params: &serde_json::Value) -> serde_json:
         return e;
     }
 
-    if let Err(e) = check_capability(&state.capabilities, &Capability::HttpRequest) {
+    if let Err(e) = check_capability(&state.capabilities, &Capability::NetConnect(url.to_string())) {
         return e;
     }
 
@@ -328,7 +328,7 @@ fn host_shell_exec(state: &GuestState, params: &serde_json::Value) -> serde_json
         Some(c) => c,
         None => return json!({"error": "Missing 'command' parameter"}),
     };
-    if let Err(e) = check_capability(&state.capabilities, &Capability::ShellExec) {
+    if let Err(e) = check_capability(&state.capabilities, &Capability::ShellExec(command.to_string())) {
         return e;
     }
 
@@ -365,7 +365,7 @@ fn host_env_read(state: &GuestState, params: &serde_json::Value) -> serde_json::
         Some(n) => n,
         None => return json!({"error": "Missing 'name' parameter"}),
     };
-    if let Err(e) = check_capability(&state.capabilities, &Capability::ShellExec) {
+    if let Err(e) = check_capability(&state.capabilities, &Capability::EnvRead(name.to_string())) {
         return e;
     }
     match std::env::var(name) {
@@ -383,7 +383,7 @@ fn host_kv_get(state: &GuestState, params: &serde_json::Value) -> serde_json::Va
         Some(k) => k,
         None => return json!({"error": "Missing 'key' parameter"}),
     };
-    if let Err(e) = check_capability(&state.capabilities, &Capability::AgentManage) {
+    if let Err(e) = check_capability(&state.capabilities, &Capability::MemoryRead(key.to_string())) {
         return e;
     }
     let kernel = match &state.kernel {
@@ -406,7 +406,7 @@ fn host_kv_set(state: &GuestState, params: &serde_json::Value) -> serde_json::Va
         Some(v) => v.clone(),
         None => return json!({"error": "Missing 'value' parameter"}),
     };
-    if let Err(e) = check_capability(&state.capabilities, &Capability::AgentManage) {
+    if let Err(e) = check_capability(&state.capabilities, &Capability::MemoryWrite(key.to_string())) {
         return e;
     }
     let kernel = match &state.kernel {
@@ -432,7 +432,7 @@ fn host_agent_send(state: &GuestState, params: &serde_json::Value) -> serde_json
         Some(m) => m,
         None => return json!({"error": "Missing 'message' parameter"}),
     };
-    if let Err(e) = check_capability(&state.capabilities, &Capability::AgentManage) {
+    if let Err(e) = check_capability(&state.capabilities, &Capability::AgentMessage(target.to_string())) {
         return e;
     }
     let kernel = match &state.kernel {
@@ -449,7 +449,7 @@ fn host_agent_send(state: &GuestState, params: &serde_json::Value) -> serde_json
 }
 
 fn host_agent_spawn(state: &GuestState, params: &serde_json::Value) -> serde_json::Value {
-    if let Err(e) = check_capability(&state.capabilities, &Capability::AgentManage) {
+    if let Err(e) = check_capability(&state.capabilities, &Capability::AgentSpawn) {
         return e;
     }
     let manifest_toml = match params.get("manifest").and_then(|m| m.as_str()) {
@@ -510,7 +510,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fs_read_granted_wildcard() {
-        let state = test_state(vec![Capability::FileRead]);
+        let state = test_state(vec![Capability::FileRead("*".to_string())]);
         let result = host_fs_read(&state, &json!({"path": "Cargo.toml"}));
         // Should not be capability-denied (may still fail on path)
         if let Some(err) = result.get("error") {
@@ -540,14 +540,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_env_read_granted() {
-        let state = test_state(vec![Capability::ShellExec]);
+        let state = test_state(vec![Capability::EnvRead("*".to_string())]);
         let result = host_env_read(&state, &json!({"name": "PATH"}));
         assert!(result.get("ok").is_some(), "Expected ok: {:?}", result);
     }
 
     #[tokio::test]
     async fn test_kv_get_no_kernel() {
-        let state = test_state(vec![Capability::AgentManage]);
+        let state = test_state(vec![Capability::MemoryRead("*".to_string())]);
         let result = host_kv_get(&state, &json!({"key": "test"}));
         let err = result["error"].as_str().unwrap();
         assert!(err.contains("kernel"));
@@ -579,7 +579,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_missing_params() {
-        let state = test_state(vec![Capability::FileRead]);
+        let state = test_state(vec![Capability::FileRead("*".to_string())]);
         let result = host_fs_read(&state, &json!({}));
         let err = result["error"].as_str().unwrap();
         assert!(err.contains("Missing"));

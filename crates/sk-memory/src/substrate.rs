@@ -39,11 +39,11 @@ impl MemorySubstrate {
     /// Open or create a memory substrate at the given database path.
     pub fn open(db_path: &Path, decay_rate: f32) -> SovereignResult<Self> {
         let conn = Connection::open(db_path)
-            .map_err(|e| SovereignError::MemoryError(format!("Failed to open database: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Failed to open database: {e}")))?;
 
         // Enable WAL mode for concurrent reads
         conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")
-            .map_err(|e| SovereignError::MemoryError(format!("PRAGMA failed: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("PRAGMA failed: {e}")))?;
 
         let conn = Arc::new(Mutex::new(conn));
 
@@ -71,11 +71,11 @@ impl MemorySubstrate {
     /// Create an in-memory substrate (for testing).
     pub fn open_in_memory(decay_rate: f32) -> SovereignResult<Self> {
         let conn = Connection::open_in_memory().map_err(|e| {
-            SovereignError::MemoryError(format!("Failed to open in-memory database: {e}"))
+            SovereignError::Memory(format!("Failed to open in-memory database: {e}"))
         })?;
 
         conn.execute_batch("PRAGMA foreign_keys=ON;")
-            .map_err(|e| SovereignError::MemoryError(format!("PRAGMA failed: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("PRAGMA failed: {e}")))?;
 
         let conn = Arc::new(Mutex::new(conn));
 
@@ -104,7 +104,7 @@ impl MemorySubstrate {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock poisoned: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
 
         conn.execute_batch(
             "
@@ -182,7 +182,7 @@ impl MemorySubstrate {
             );
             ",
         )
-        .map_err(|e| SovereignError::MemoryError(format!("Schema init failed: {e}")))?;
+        .map_err(|e| SovereignError::Memory(format!("Schema init failed: {e}")))?;
 
         Ok(())
     }

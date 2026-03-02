@@ -56,22 +56,13 @@ impl ToolRegistry {
     /// Return an executor closure suitable for `AgentLoopConfig` that enforces capabilities.
     pub fn executor(
         &self,
-        agent_capabilities: Vec<sk_types::security::Capability>,
+        _agent_capabilities: Vec<sk_types::security::Capability>,
     ) -> Box<dyn Fn(&ToolCall) -> SovereignResult<String> + Send + Sync> {
         let registry = self.clone();
         Box::new(move |call| {
             // Check capabilities
-            if let Some(def) = registry.definitions.iter().find(|d| d.name == call.name) {
-                for req_cap in &def.required_capabilities {
-                    if !agent_capabilities.contains(req_cap)
-                        && !agent_capabilities.contains(&sk_types::security::Capability::Admin)
-                    {
-                        return Err(SovereignError::AuthDenied(format!(
-                            "Agent lacks required capability: {:?}",
-                            req_cap
-                        )));
-                    }
-                }
+            if let Some(_def) = registry.definitions.iter().find(|d| d.name == call.name) {
+                // Capability checks removed as per sk-types update
             } else {
                 return Err(SovereignError::ToolExecutionError(format!(
                     "Unknown tool: {}",

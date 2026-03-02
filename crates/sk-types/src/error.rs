@@ -1,115 +1,109 @@
-//! Error types for the Sovereign Kernel.
+//! Shared error types for the OpenFang system.
 
 use thiserror::Error;
 
-/// Unified error type for the Sovereign Kernel.
-#[derive(Debug, Error)]
+/// Top-level error type for the OpenFang system.
+#[derive(Error, Debug)]
 pub enum SovereignError {
-    #[error("LLM driver error: {0}")]
-    LlmError(String),
-
-    #[error("Tool execution error: {tool}: {message}")]
-    ToolError { tool: String, message: String },
-
-    #[error("Tool execution error: {0}")]
-    ToolExecutionError(String),
-
-    #[error("MCP error: {0}")]
-    McpError(String),
-
-    #[error("Memory error: {0}")]
-    MemoryError(String),
-
-    #[error("Configuration error: {0}")]
-    ConfigError(String),
-
-    #[error("Session not found: {0}")]
-    SessionNotFound(String),
-
+    /// The requested agent was not found.
     #[error("Agent not found: {0}")]
     AgentNotFound(String),
 
-    #[error("Permission denied: {0}")]
-    PermissionDenied(String),
+    /// An agent with this name or ID already exists.
+    #[error("Agent already exists: {0}")]
+    AgentAlreadyExists(String),
 
-    #[error("Rate limited: retry after {retry_after_ms}ms")]
-    RateLimited { retry_after_ms: u64 },
+    /// A capability check failed.
+    #[error("Capability denied: {0}")]
+    CapabilityDenied(String),
 
-    #[error("Context overflow: {used} tokens used, {limit} limit")]
-    ContextOverflow { used: usize, limit: usize },
-
-    #[error("Loop detected: {0}")]
-    LoopDetected(String),
-
-    #[error("Timeout: {0}")]
-    Timeout(String),
-
-    #[error("Quota exceeded: {0}")]
+    /// A resource quota was exceeded.
+    #[error("Resource quota exceeded: {0}")]
     QuotaExceeded(String),
 
-    #[error("Budget exceeded: {resource} — {message}")]
-    BudgetExceeded { resource: String, message: String },
+    /// The agent is in an invalid state for the requested operation.
+    #[error("Agent is in invalid state '{current}' for operation '{operation}'")]
+    InvalidState {
+        /// The current state of the agent.
+        current: String,
+        /// The operation that was attempted.
+        operation: String,
+    },
 
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
+    /// The requested session was not found.
+    #[error("Session not found: {0}")]
+    SessionNotFound(String),
 
-    #[error("Approval denied: {tool} — {reason}")]
-    ApprovalDenied { tool: String, reason: String },
+    /// A memory substrate error occurred.
+    #[error("Memory error: {0}")]
+    Memory(String),
 
-    #[error("Auth denied: {0}")]
-    AuthDenied(String),
+    /// A tool execution failed.
+    #[error("Tool execution failed: {0}")]
+    ToolExecutionError(String),
 
-    #[error("Approval timeout: {tool}")]
-    ApprovalTimeout { tool: String },
+    /// An LLM driver error occurred.
+    #[error("LLM driver error: {0}")]
+    LlmDriver(String),
 
+    /// An MCP server error occurred.
+    #[error("MCP error: {0}")]
+    McpError(String),
+
+    /// A configuration error occurred.
+    #[error("Configuration error: {0}")]
+    Config(String),
+
+    /// Failed to parse an agent manifest.
+    #[error("Manifest parsing error: {0}")]
+    ManifestParse(String),
+
+    /// A WASM sandbox error occurred.
+    #[error("WASM sandbox error: {0}")]
+    Sandbox(String),
+
+    /// A network error occurred.
+    #[error("Network error: {0}")]
+    Network(String),
+
+    /// A serialization/deserialization error occurred.
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+
+    /// The agent loop exceeded the maximum iteration count.
+    #[error("Max iterations exceeded: {0}")]
+    MaxIterationsExceeded(u32),
+
+    /// The kernel is shutting down.
+    #[error("Shutdown in progress")]
+    ShuttingDown,
+
+    /// An I/O error occurred.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),
-
+    /// An internal error occurred.
     #[error("Internal error: {0}")]
     Internal(String),
+
+    /// Authentication/authorization denied.
+    #[error("Auth denied: {0}")]
+    AuthDenied(String),
+
+    /// Metering/cost tracking error.
+    #[error("Metering error: {0}")]
+    MeteringError(String),
+
+    /// Invalid user input.
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }
 
-/// Convenience alias.
+/// Alias for Result with SovereignError.
 pub type SovereignResult<T> = Result<T, SovereignError>;
 
-impl SovereignError {
-    /// Whether this error is retryable (rate limit, overload, transient).
-    pub fn is_retryable(&self) -> bool {
-        matches!(
-            self,
-            SovereignError::RateLimited { .. } | SovereignError::Timeout(_)
-        )
-    }
-
-    /// Whether this error is a budget/quota violation.
-    pub fn is_budget_error(&self) -> bool {
-        matches!(
-            self,
-            SovereignError::QuotaExceeded(_) | SovereignError::BudgetExceeded { .. }
-        )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn error_display() {
-        let e = SovereignError::LlmError("bad request".into());
-        assert!(e.to_string().contains("bad request"));
-    }
-
-    #[test]
-    fn error_retryable() {
-        assert!(SovereignError::RateLimited {
-            retry_after_ms: 1000
-        }
-        .is_retryable());
-        assert!(SovereignError::Timeout("slow".into()).is_retryable());
-        assert!(!SovereignError::ConfigError("bad".into()).is_retryable());
+impl From<serde_json::Error> for SovereignError {
+    fn from(err: serde_json::Error) -> Self {
+        SovereignError::Serialization(err.to_string())
     }
 }

@@ -8,7 +8,7 @@ pub fn remember_tool() -> ToolDefinition {
     ToolDefinition {
         name: "remember".into(),
         description: "Store information in long-term memory for future recall.".into(),
-        parameters: serde_json::json!({
+        input_schema: serde_json::json!({
             "type": "object",
             "properties": {
                 "content": { "type": "string", "description": "The information to remember" },
@@ -16,8 +16,6 @@ pub fn remember_tool() -> ToolDefinition {
             },
             "required": ["content"]
         }),
-        source: "".into(),
-        required_capabilities: vec![],
     }
 }
 
@@ -25,7 +23,7 @@ pub fn recall_tool() -> ToolDefinition {
     ToolDefinition {
         name: "recall".into(),
         description: "Search long-term memory for relevant information.".into(),
-        parameters: serde_json::json!({
+        input_schema: serde_json::json!({
             "type": "object",
             "properties": {
                 "query": { "type": "string", "description": "Search query" },
@@ -33,8 +31,6 @@ pub fn recall_tool() -> ToolDefinition {
             },
             "required": ["query"]
         }),
-        source: "".into(),
-        required_capabilities: vec![],
     }
 }
 
@@ -42,15 +38,13 @@ pub fn forget_tool() -> ToolDefinition {
     ToolDefinition {
         name: "forget".into(),
         description: "Remove a specific memory by ID.".into(),
-        parameters: serde_json::json!({
+        input_schema: serde_json::json!({
             "type": "object",
             "properties": {
                 "memory_id": { "type": "string", "description": "ID of the memory to forget" }
             },
             "required": ["memory_id"]
         }),
-        source: "".into(),
-        required_capabilities: vec![],
     }
 }
 
@@ -58,13 +52,12 @@ pub fn handle_remember(
     substrate: &MemorySubstrate,
     agent_id: AgentId,
     content: &str,
-    source: &str,
 ) -> SovereignResult<String> {
     // For now we use a newly generated Uuid for BM25 since exact semantic embeddings are missing
     let memory_id = Uuid::new_v4().to_string();
     substrate.bm25.index(agent_id, &memory_id, content)?;
     Ok(format!(
-        "Successfully remembered with ID: {memory_id} (source: {source})"
+        "Successfully remembered with ID: {memory_id}"
     ))
 }
 

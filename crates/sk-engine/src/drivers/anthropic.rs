@@ -118,7 +118,7 @@ impl LlmDriver for AnthropicDriver {
             .messages
             .iter()
             .find(|m| m.role == Role::System)
-            .map(|m| m.content.clone());
+            .map(|m| m.content.text_content());
 
         // Map messages
         let mut api_messages = Vec::new();
@@ -128,37 +128,44 @@ impl LlmDriver for AnthropicDriver {
             }
 
             let mut blocks = Vec::new();
-            if !msg.content.is_empty() {
-                if msg.role == Role::Tool {
-                    if let Some(ref id) = msg.tool_call_id {
-                        blocks.push(ApiContentBlock::ToolResult {
-                            tool_use_id: id.clone(),
-                            content: msg.content.clone(),
-                        });
-                        api_messages.push(ApiMessage {
-                            role: "user".to_string(), // Anthropic requires tool results from user
-                            content: blocks,
-                        });
-                        continue;
+            match &msg.content {
+                sk_types::message::MessageContent::Text(t) => {
+                    blocks.push(ApiContentBlock::Text { text: t.clone() });
+                }
+                sk_types::message::MessageContent::Blocks(b) => {
+                    for block in b {
+                        match block {
+                            sk_types::message::ContentBlock::Text { text } => {
+                                blocks.push(ApiContentBlock::Text {
+                                    text: text.clone(),
+                                });
+                            }
+                            sk_types::message::ContentBlock::ToolUse { id, name, input } => {
+                                blocks.push(ApiContentBlock::ToolUse {
+                                    id: id.clone(),
+                                    name: name.clone(),
+                                    input: input.clone(),
+                                });
+                            }
+                            sk_types::message::ContentBlock::ToolResult {
+                                tool_use_id,
+                                content,
+                                ..
+                            } => {
+                                blocks.push(ApiContentBlock::ToolResult {
+                                    tool_use_id: tool_use_id.clone(),
+                                    content: content.clone(),
+                                });
+                            }
+                            _ => {}
+                        }
                     }
-                } else {
-                    blocks.push(ApiContentBlock::Text {
-                        text: msg.content.clone(),
-                    });
                 }
             }
 
-            for tool_call in &msg.tool_calls {
-                blocks.push(ApiContentBlock::ToolUse {
-                    id: tool_call.id.clone(),
-                    name: tool_call.name.clone(),
-                    input: serde_json::from_str(&tool_call.arguments)
-                        .unwrap_or(serde_json::json!({})),
-                });
-            }
-
+            // Anthropic requires tool results from user
             let role = match msg.role {
-                Role::User | Role::Tool => "user",
+                Role::User => "user",
                 Role::Assistant => "assistant",
                 Role::System => "user",
             };
@@ -177,7 +184,7 @@ impl LlmDriver for AnthropicDriver {
             .map(|t| ApiTool {
                 name: t.name.clone(),
                 description: t.description.clone(),
-                input_schema: t.parameters.clone(),
+                input_schema: t.input_schema.clone(),
             })
             .collect();
 
@@ -248,7 +255,7 @@ impl LlmDriver for AnthropicDriver {
                         tool_calls.push(ToolCall {
                             id,
                             name,
-                            arguments: input.to_string(),
+                            input: input.clone(),
                         });
                     }
                 }

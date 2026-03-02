@@ -96,12 +96,7 @@ impl LlmError {
 
 impl From<LlmError> for SovereignError {
     fn from(e: LlmError) -> Self {
-        match e {
-            LlmError::RateLimited { retry_after_ms } => {
-                SovereignError::RateLimited { retry_after_ms }
-            }
-            other => SovereignError::LlmError(other.to_string()),
-        }
+        SovereignError::LlmDriver(e.to_string())
     }
 }
 
@@ -148,9 +143,14 @@ impl LlmDriver for OpenAICompatDriver {
             .messages
             .iter()
             .map(|m| {
+                let role_str = match m.role {
+                    sk_types::Role::System => "system",
+                    sk_types::Role::User => "user",
+                    sk_types::Role::Assistant => "assistant",
+                };
                 serde_json::json!({
-                    "role": m.role.to_string(),
-                    "content": m.content,
+                    "role": role_str,
+                    "content": m.content.text_content(),
                 })
             })
             .collect();
@@ -165,7 +165,7 @@ impl LlmDriver for OpenAICompatDriver {
                     "function": {
                         "name": t.name,
                         "description": t.description,
-                        "parameters": t.parameters,
+                        "parameters": t.input_schema,
                     }
                 })
             })
@@ -240,10 +240,10 @@ impl LlmDriver for OpenAICompatDriver {
                 tool_calls.push(sk_types::ToolCall {
                     id: tc["id"].as_str().unwrap_or("").to_string(),
                     name: tc["function"]["name"].as_str().unwrap_or("").to_string(),
-                    arguments: tc["function"]["arguments"]
+                    input: serde_json::from_str(tc["function"]["arguments"]
                         .as_str()
-                        .unwrap_or("{}")
-                        .to_string(),
+                        .unwrap_or("{}"))
+                        .unwrap_or(serde_json::json!({})),
                 });
             }
         }

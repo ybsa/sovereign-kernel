@@ -1,4 +1,4 @@
-//! Cron/scheduled job types for the Sovereign Kernel scheduler.
+//! Cron/scheduled job types for the OpenFang scheduler.
 //!
 //! Defines the core types for recurring and one-shot scheduled jobs that can
 //! trigger agent turns, system events, or webhook deliveries.
@@ -666,7 +666,7 @@ mod tests {
         let mut job = valid_job();
         job.action = CronAction::AgentTurn {
             message: "hello".into(),
-            model_override: Some("gemini-2.0-flash".into()),
+            model_override: Some("claude-haiku-4-5-20251001".into()),
             timeout_secs: Some(10),
         };
         assert!(job.validate(0).is_ok());
@@ -798,12 +798,70 @@ mod tests {
             tz: Some("UTC".into()),
         };
         let json = serde_json::to_string(&schedule).unwrap();
+        assert!(json.contains("\"kind\":\"cron\""));
         let back: CronSchedule = serde_json::from_str(&json).unwrap();
         if let CronSchedule::Cron { expr, tz } = back {
             assert_eq!(expr, "*/5 * * * *");
             assert_eq!(tz, Some("UTC".into()));
         } else {
-            panic!("Expected Cron variant");
+            panic!("expected Cron variant");
         }
+    }
+
+    #[test]
+    fn serde_action_tags() {
+        let action = CronAction::AgentTurn {
+            message: "hi".into(),
+            model_override: None,
+            timeout_secs: Some(30),
+        };
+        let json = serde_json::to_string(&action).unwrap();
+        assert!(json.contains("\"kind\":\"agent_turn\""));
+    }
+
+    #[test]
+    fn serde_delivery_tags() {
+        let d = CronDelivery::LastChannel;
+        let json = serde_json::to_string(&d).unwrap();
+        assert!(json.contains("\"kind\":\"last_channel\""));
+
+        let d2 = CronDelivery::Webhook {
+            url: "https://x.com".into(),
+        };
+        let json2 = serde_json::to_string(&d2).unwrap();
+        assert!(json2.contains("\"kind\":\"webhook\""));
+    }
+
+    // -- Cron expression edge cases --
+
+    #[test]
+    fn cron_extra_whitespace_ok() {
+        let mut job = valid_job();
+        job.schedule = CronSchedule::Cron {
+            expr: "  0  9  *  *  *  ".into(),
+            tz: None,
+        };
+        assert!(job.validate(0).is_ok());
+    }
+
+    #[test]
+    fn cron_six_fields_rejected() {
+        let mut job = valid_job();
+        job.schedule = CronSchedule::Cron {
+            expr: "0 0 9 * * 1".into(),
+            tz: None,
+        };
+        let err = job.validate(0).unwrap_err();
+        assert!(err.contains("5 fields"), "{err}");
+    }
+
+    #[test]
+    fn cron_slash_and_comma_ok() {
+        let mut job = valid_job();
+        job.schedule = CronSchedule::Cron {
+            expr: "*/15 0,12 1-15 * 1,3,5".into(),
+            tz: None,
+        };
+        assert!(job.validate(0).is_ok());
     }
 }

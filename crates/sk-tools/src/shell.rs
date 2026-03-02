@@ -4,9 +4,7 @@ pub fn shell_exec_tool() -> ToolDefinition {
     ToolDefinition {
         name: "shell_exec".into(),
         description: "Execute a shell command.".into(),
-        parameters: serde_json::json!({"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}),
-        source: "builtin".into(),
-        required_capabilities: vec![sk_types::security::Capability::ShellExec],
+        input_schema: serde_json::json!({"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}),
     }
 }
 

@@ -17,7 +17,7 @@ pub trait EmbeddingDriver: Send + Sync {
         let mut results = self.embed(&[text]).await?;
         results
             .pop()
-            .ok_or_else(|| SovereignError::MemoryError("Empty embedding response".into()))
+            .ok_or_else(|| SovereignError::Memory("Empty embedding response".into()))
     }
 
     /// Get the embedding dimensions.

@@ -91,9 +91,7 @@ impl McpClient {
                         self.tools.push(ToolDefinition {
                             name: namespaced,
                             description: info.description.unwrap_or_default(),
-                            parameters: info.input_schema.unwrap_or(serde_json::json!({})),
-                            source: format!("mcp:{}", self.name),
-                            required_capabilities: vec![sk_types::security::Capability::McpAccess],
+                            input_schema: info.input_schema.unwrap_or(serde_json::json!({})),
                         });
                     }
                 }

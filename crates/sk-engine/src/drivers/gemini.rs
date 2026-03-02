@@ -146,51 +146,63 @@ impl LlmDriver for GeminiDriver {
                 if !system_text.is_empty() {
                     system_text.push('\n');
                 }
-                system_text.push_str(&msg.content);
+                system_text.push_str(&msg.content.text_content());
                 continue;
             }
 
             let role = match msg.role {
                 Role::User => "user",
                 Role::Assistant => "model",
-                Role::Tool => "user", // Tool results sent as user
                 Role::System => unreachable!(),
             };
 
             let mut parts = Vec::new();
-            if msg.role == Role::Tool {
-                if let Some(ref id) = msg.tool_call_id {
-                    let mut obj = serde_json::Map::new();
-                    obj.insert(
-                        "result".to_string(),
-                        serde_json::Value::String(msg.content.clone()),
-                    );
-                    parts.push(GeminiPart::FunctionResponse {
-                        function_response: GeminiFunctionResponseData {
-                            name: request
-                                .tools
-                                .iter()
-                                .find(|t| t.name == *id)
-                                .map(|t| t.name.clone())
-                                .unwrap_or_else(|| id.clone()),
-                            response: serde_json::Value::Object(obj),
-                        },
-                    });
+            match &msg.content {
+                sk_types::message::MessageContent::Text(t) => {
+                    if !t.is_empty() {
+                        parts.push(GeminiPart::Text { text: t.clone() });
+                    }
                 }
-            } else if !msg.content.is_empty() {
-                parts.push(GeminiPart::Text {
-                    text: msg.content.clone(),
-                });
-            }
-
-            for tool_call in &msg.tool_calls {
-                parts.push(GeminiPart::FunctionCall {
-                    function_call: GeminiFunctionCallData {
-                        name: tool_call.name.clone(),
-                        args: serde_json::from_str(&tool_call.arguments)
-                            .unwrap_or(serde_json::json!({})),
-                    },
-                });
+                sk_types::message::MessageContent::Blocks(b) => {
+                    for block in b {
+                        match block {
+                            sk_types::message::ContentBlock::Text { text } => {
+                                parts.push(GeminiPart::Text { text: text.clone() });
+                            }
+                            sk_types::message::ContentBlock::ToolUse { id: _, name, input } => {
+                                parts.push(GeminiPart::FunctionCall {
+                                    function_call: GeminiFunctionCallData {
+                                        name: name.clone(),
+                                        args: input.clone(),
+                                    },
+                                });
+                            }
+                            sk_types::message::ContentBlock::ToolResult {
+                                tool_use_id,
+                                content,
+                                ..
+                            } => {
+                                let mut obj = serde_json::Map::new();
+                                obj.insert(
+                                    "result".to_string(),
+                                    serde_json::Value::String(content.clone()),
+                                );
+                                parts.push(GeminiPart::FunctionResponse {
+                                    function_response: GeminiFunctionResponseData {
+                                        name: request
+                                            .tools
+                                            .iter()
+                                            .find(|t| t.name == *tool_use_id)
+                                            .map(|t| t.name.clone())
+                                            .unwrap_or_else(|| tool_use_id.clone()),
+                                        response: serde_json::Value::Object(obj),
+                                    },
+                                });
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             }
 
             if !parts.is_empty() {
@@ -220,7 +232,7 @@ impl LlmDriver for GeminiDriver {
                     .map(|t| GeminiFunctionDeclaration {
                         name: t.name.clone(),
                         description: t.description.clone(),
-                        parameters: t.parameters.clone(),
+                        parameters: t.input_schema.clone(),
                     })
                     .collect(),
             }]
@@ -310,7 +322,7 @@ impl LlmDriver for GeminiDriver {
                             tool_calls.push(ToolCall {
                                 id,
                                 name: function_call.name,
-                                arguments: function_call.args.to_string(),
+                                input: function_call.args.clone(),
                             });
                         }
                         _ => {}

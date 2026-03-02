@@ -8,7 +8,9 @@ The Sovereign Kernel is a virtual operating system for AI agents, built with a M
 Defines shared data structures including `Message`, `ToolCall`, `AgentManifest`, and `SovereignError`. It ensures type safety and taint tracking across crate boundaries.
 
 ### 2. `sk-engine` (The Brain)
-Manages the agent logic loop, LLM driver integration (OpenAI, Copilot, Fallback), and tool execution. It handles loop guards, context budgets, and inference routing.
+Manages the agent logic loop, LLM driver integration (OpenAI, Copilot, Fallback), and tool execution.
+- **Runtime Engine**: Houses **32 modules** ported from OpenFang, including `browser_tools`, `docker_sandbox`, `web_fetch`, `media_understanding`, and LLM-based `compactor`.
+- **Loop Guards**: Implements `loop_guard`, `tool_policy`, and `session_repair` to prevent autonomous runaway.
 
 ### 3. `sk-kernel` (The Supervisor)
 The OS monitor. Manages agent lifecycles, resource quotas, heartbeat monitoring, and background scheduling.
@@ -23,7 +25,9 @@ A unified memory system using SQLite and vector embeddings. Features BM25 search
 A native Rust implementation of the Model Context Protocol (MCP). Allows the kernel to consume and expose tools via JSON-RPC 2.0.
 
 ### 7. `sk-tools` (The Hands)
-Contains native tool implementations (filesystem, web search, process management) that the agents use to interact with the world.
+Provides the interface between the agent and the host system.
+- **Native Tools**: High-performance Rust implementations for filesystem, shell, and browser management.
+- **Skills System**: A dynamic registry of **52 expert skills** (Obsidian, GitHub, Weather) ported from OpenClaw. Parsed from `SKILL.md` files to provide on-demand instructions without prompt bloat.
 
 ### 8. `sk-cli` (The Shell)
 The user interface. Provides the entry point for starting the kernel daemon and interacting via a terminal REPL.

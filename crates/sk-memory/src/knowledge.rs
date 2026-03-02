@@ -47,11 +47,11 @@ impl KnowledgeStore {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock: {e}")))?;
         conn.execute(
             "INSERT INTO knowledge_entities (id, agent_id, name, entity_type, properties) VALUES (?1, ?2, ?3, ?4, ?5)",
             rusqlite::params![id, agent_id.to_string(), name, entity_type, properties.to_string()],
-        ).map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+        ).map_err(|e| SovereignError::Memory(e.to_string()))?;
         Ok(id)
     }
 
@@ -68,11 +68,11 @@ impl KnowledgeStore {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock: {e}")))?;
         conn.execute(
             "INSERT INTO knowledge_relations (id, agent_id, from_entity, relation, to_entity, weight) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             rusqlite::params![id, agent_id.to_string(), from_entity, relation, to_entity, weight],
-        ).map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+        ).map_err(|e| SovereignError::Memory(e.to_string()))?;
         Ok(id)
     }
 
@@ -81,10 +81,10 @@ impl KnowledgeStore {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock: {e}")))?;
         let mut stmt = conn.prepare(
             "SELECT id, agent_id, name, entity_type, properties FROM knowledge_entities WHERE agent_id = ?1 AND name LIKE ?2"
-        ).map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+        ).map_err(|e| SovereignError::Memory(e.to_string()))?;
 
         let pattern = format!("%{pattern}%");
         let rows = stmt
@@ -95,12 +95,12 @@ impl KnowledgeStore {
                 let props_str: String = row.get(4)?;
                 Ok((id, name, entity_type, props_str))
             })
-            .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+            .map_err(|e| SovereignError::Memory(e.to_string()))?;
 
         let mut entities = Vec::new();
         for row in rows {
             let (id, name, entity_type, props_str) =
-                row.map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+                row.map_err(|e| SovereignError::Memory(e.to_string()))?;
             let properties: serde_json::Value =
                 serde_json::from_str(&props_str).unwrap_or_default();
             entities.push(Entity {
@@ -119,10 +119,10 @@ impl KnowledgeStore {
         let conn = self
             .conn
             .lock()
-            .map_err(|e| SovereignError::MemoryError(format!("Lock: {e}")))?;
+            .map_err(|e| SovereignError::Memory(format!("Lock: {e}")))?;
         let mut stmt = conn.prepare(
             "SELECT id, from_entity, relation, to_entity, weight FROM knowledge_relations WHERE from_entity = ?1 OR to_entity = ?1"
-        ).map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+        ).map_err(|e| SovereignError::Memory(e.to_string()))?;
 
         let rows = stmt
             .query_map(rusqlite::params![entity_id], |row| {
@@ -134,11 +134,11 @@ impl KnowledgeStore {
                     weight: row.get(4)?,
                 })
             })
-            .map_err(|e| SovereignError::MemoryError(e.to_string()))?;
+            .map_err(|e| SovereignError::Memory(e.to_string()))?;
 
         let mut relations = Vec::new();
         for row in rows {
-            relations.push(row.map_err(|e| SovereignError::MemoryError(e.to_string()))?);
+            relations.push(row.map_err(|e| SovereignError::Memory(e.to_string()))?);
         }
         Ok(relations)
     }

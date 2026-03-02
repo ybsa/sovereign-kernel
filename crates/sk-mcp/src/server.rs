@@ -120,7 +120,7 @@ impl McpServer {
                         serde_json::json!({
                             "name": t.name,
                             "description": t.description,
-                            "inputSchema": t.parameters,
+                            "inputSchema": t.input_schema,
                         })
                     })
                     .collect();

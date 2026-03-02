@@ -25,7 +25,7 @@ pub fn sql_query_tool() -> ToolDefinition {
     ToolDefinition {
         name: "sql_query".into(),
         description: "Executes a raw SQL query against the connected database.".into(),
-        parameters: serde_json::json!({
+        input_schema: serde_json::json!({
             "type": "object",
             "properties": {
                 "query": {
@@ -35,7 +35,5 @@ pub fn sql_query_tool() -> ToolDefinition {
             },
             "required": ["query"]
         }),
-        source: "sk-mcp-sql".into(),
-        required_capabilities: vec![sk_types::security::Capability::McpAccess],
     }
 }

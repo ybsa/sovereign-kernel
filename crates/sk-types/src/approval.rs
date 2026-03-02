@@ -1,4 +1,4 @@
-//! Execution approval types for the Sovereign Kernel.
+//! Execution approval types for the OpenFang agent OS.
 //!
 //! When an agent attempts a dangerous operation (e.g. `shell_exec`), the kernel
 //! creates an [`ApprovalRequest`] and pauses the agent until a human operator
@@ -318,6 +318,10 @@ mod tests {
         assert!(valid_request().validate().is_ok());
     }
 
+    // -----------------------------------------------------------------------
+    // ApprovalRequest — tool_name
+    // -----------------------------------------------------------------------
+
     #[test]
     fn request_empty_tool_name() {
         let mut req = valid_request();
@@ -356,6 +360,10 @@ mod tests {
         assert!(req.validate().is_ok());
     }
 
+    // -----------------------------------------------------------------------
+    // ApprovalRequest — description
+    // -----------------------------------------------------------------------
+
     #[test]
     fn request_description_too_long() {
         let mut req = valid_request();
@@ -379,6 +387,10 @@ mod tests {
         assert!(req.validate().is_ok());
     }
 
+    // -----------------------------------------------------------------------
+    // ApprovalRequest — action_summary
+    // -----------------------------------------------------------------------
+
     #[test]
     fn request_action_summary_too_long() {
         let mut req = valid_request();
@@ -394,6 +406,10 @@ mod tests {
         req.action_summary = "x".repeat(512);
         assert!(req.validate().is_ok());
     }
+
+    // -----------------------------------------------------------------------
+    // ApprovalRequest — timeout_secs
+    // -----------------------------------------------------------------------
 
     #[test]
     fn request_timeout_too_small() {
@@ -473,11 +489,16 @@ mod tests {
 
     #[test]
     fn policy_serde_default() {
+        // An empty JSON object should deserialize to defaults via #[serde(default)].
         let policy: ApprovalPolicy = serde_json::from_str("{}").unwrap();
         assert_eq!(policy.timeout_secs, 60);
         assert_eq!(policy.require_approval, vec!["shell_exec".to_string()]);
         assert!(!policy.auto_approve_autonomous);
     }
+
+    // -----------------------------------------------------------------------
+    // ApprovalPolicy — timeout_secs
+    // -----------------------------------------------------------------------
 
     #[test]
     fn policy_timeout_too_small() {
@@ -503,6 +524,10 @@ mod tests {
         policy.timeout_secs = 300;
         assert!(policy.validate().is_ok());
     }
+
+    // -----------------------------------------------------------------------
+    // ApprovalPolicy — require_approval tool names
+    // -----------------------------------------------------------------------
 
     #[test]
     fn policy_empty_tool_name() {
@@ -556,7 +581,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // Full serde roundtrip
+    // Full serde roundtrip — ApprovalRequest
     // -----------------------------------------------------------------------
 
     #[test]
@@ -572,6 +597,10 @@ mod tests {
         assert_eq!(back.risk_level, req.risk_level);
         assert_eq!(back.timeout_secs, req.timeout_secs);
     }
+
+    // -----------------------------------------------------------------------
+    // Full serde roundtrip — ApprovalPolicy
+    // -----------------------------------------------------------------------
 
     #[test]
     fn policy_serde_roundtrip() {

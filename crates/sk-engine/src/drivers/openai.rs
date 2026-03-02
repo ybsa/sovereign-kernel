@@ -115,11 +115,55 @@ impl LlmDriver for OpenAIDriver {
 
         // Convert messages
         for msg in &request.messages {
+            let mut text_content = None;
+            let mut tool_calls = Vec::new();
+            let mut _tool_call_id = None;
+
+            match &msg.content {
+                sk_types::message::MessageContent::Text(t) => {
+                    if !t.is_empty() {
+                        text_content = Some(t.clone());
+                    }
+                }
+                sk_types::message::MessageContent::Blocks(b) => {
+                    let mut text_parts = Vec::new();
+                    for block in b {
+                        match block {
+                            sk_types::message::ContentBlock::Text { text } => {
+                                text_parts.push(text.clone());
+                            }
+                            sk_types::message::ContentBlock::ToolUse { id, name, input } => {
+                                tool_calls.push(OaiToolCall {
+                                    id: id.clone(),
+                                    call_type: "function".to_string(),
+                                    function: OaiFunction {
+                                        name: name.clone(),
+                                        arguments: serde_json::to_string(input).unwrap_or_default(),
+                                    },
+                                });
+                            }
+                            sk_types::message::ContentBlock::ToolResult {
+                                tool_use_id,
+                                content,
+                                ..
+                            } => {
+                                text_parts.push(content.clone());
+                                _tool_call_id = Some(tool_use_id.clone());
+                            }
+                            _ => {}
+                        }
+                    }
+                    if !text_parts.is_empty() {
+                        text_content = Some(text_parts.join("\n"));
+                    }
+                }
+            }
+
             match msg.role {
                 Role::System => {
                     oai_messages.push(OaiMessage {
                         role: "system".to_string(),
-                        content: Some(msg.content.clone()),
+                        content: text_content,
                         tool_calls: None,
                         tool_call_id: None,
                     });
@@ -127,45 +171,17 @@ impl LlmDriver for OpenAIDriver {
                 Role::User => {
                     oai_messages.push(OaiMessage {
                         role: "user".to_string(),
-                        content: Some(msg.content.clone()),
+                        content: text_content,
                         tool_calls: None,
                         tool_call_id: None,
                     });
                 }
                 Role::Assistant => {
-                    let mut tool_calls = Vec::new();
-                    for tc in &msg.tool_calls {
-                        tool_calls.push(OaiToolCall {
-                            id: tc.id.clone(),
-                            call_type: "function".to_string(),
-                            function: OaiFunction {
-                                name: tc.name.clone(),
-                                arguments: tc.arguments.clone(),
-                            },
-                        });
-                    }
-
                     oai_messages.push(OaiMessage {
                         role: "assistant".to_string(),
-                        content: if msg.content.is_empty() {
-                            None
-                        } else {
-                            Some(msg.content.clone())
-                        },
-                        tool_calls: if tool_calls.is_empty() {
-                            None
-                        } else {
-                            Some(tool_calls)
-                        },
+                        content: text_content,
+                        tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls) },
                         tool_call_id: None,
-                    });
-                }
-                Role::Tool => {
-                    oai_messages.push(OaiMessage {
-                        role: "tool".to_string(),
-                        content: Some(msg.content.clone()),
-                        tool_calls: None,
-                        tool_call_id: msg.tool_call_id.clone(),
                     });
                 }
             }
@@ -179,7 +195,7 @@ impl LlmDriver for OpenAIDriver {
                 function: OaiToolDef {
                     name: t.name.clone(),
                     description: t.description.clone(),
-                    parameters: t.parameters.clone(),
+                    parameters: t.input_schema.clone(),
                 },
             })
             .collect();
@@ -293,7 +309,7 @@ impl LlmDriver for OpenAIDriver {
                     tool_calls.push(ToolCall {
                         id: call.id,
                         name: call.function.name,
-                        arguments: call.function.arguments,
+                        input: serde_json::from_str(&call.function.arguments).unwrap_or(serde_json::json!({})),
                     });
                 }
             }
@@ -402,7 +418,7 @@ fn parse_groq_failed_tool_call(body: &str) -> Option<CompletionResponse> {
         tool_calls.push(ToolCall {
             id: format!("groq_recovered_{}", tool_calls.len()),
             name: name.to_string(),
-            arguments: args_value.to_string(),
+            input: args_value,
         });
     }
 

@@ -4,9 +4,7 @@ pub fn web_fetch_tool() -> ToolDefinition {
     ToolDefinition {
         name: "web_fetch".into(),
         description: "Fetch content from a URL.".into(),
-        parameters: serde_json::json!({"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}),
-        source: "".into(),
-        required_capabilities: vec![sk_types::security::Capability::HttpRequest],
+        input_schema: serde_json::json!({"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}),
     }
 }
 

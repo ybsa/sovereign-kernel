@@ -143,8 +143,27 @@ pub async fn run_agent_loop(
         }
 
         // Add assistant message
-        let mut assistant_msg = Message::assistant(&response.content);
-        assistant_msg.tool_calls = response.tool_calls.clone();
+        let assistant_msg = if response.tool_calls.is_empty() {
+            Message::assistant(&response.content)
+        } else {
+            let mut blocks = Vec::new();
+            if !response.content.is_empty() {
+                blocks.push(sk_types::message::ContentBlock::Text {
+                    text: response.content.clone(),
+                });
+            }
+            for tc in &response.tool_calls {
+                blocks.push(sk_types::message::ContentBlock::ToolUse {
+                    id: tc.id.clone(),
+                    name: tc.name.clone(),
+                    input: tc.input.clone(),
+                });
+            }
+            Message {
+                role: sk_types::message::Role::Assistant,
+                content: sk_types::message::MessageContent::Blocks(blocks),
+            }
+        };
         messages.push(assistant_msg.clone());
         session.push_message(assistant_msg);
 
@@ -161,13 +180,19 @@ pub async fn run_agent_loop(
                     debug!(tool = %tool_call.name, "Executing tool call");
 
                     // 1. Check loop guard
-                    let args_str = serde_json::to_string(&tool_call.arguments).unwrap_or_default();
+                    let args_str = serde_json::to_string(&tool_call.input).unwrap_or_default();
                     if loop_guard.check(&tool_call.name, &args_str) {
                         warn!(tool = %tool_call.name, "Loop detected by guard!");
-                        let tool_msg = Message::tool_result(
-                            &tool_call.id,
-                            "System Error: Infinite loop detected. You are calling the same tool with the same arguments repeatedly. Please try a completely different approach.",
-                        );
+                        let tool_msg = sk_types::message::Message {
+                            role: sk_types::message::Role::User,
+                            content: sk_types::message::MessageContent::Blocks(vec![
+                                sk_types::message::ContentBlock::ToolResult {
+                                    tool_use_id: tool_call.id.clone(),
+                                    content: "System Error: Infinite loop detected. You are calling the same tool with the same arguments repeatedly. Please try a completely different approach.".to_string(),
+                                    is_error: true,
+                                }
+                            ]),
+                        };
                         messages.push(tool_msg.clone());
                         session.push_message(tool_msg);
                         continue;
@@ -185,7 +210,16 @@ pub async fn run_agent_loop(
                         Err(e) => format!("Error executing tool: {e}"),
                     };
 
-                    let tool_msg = Message::tool_result(&tool_call.id, &result);
+                    let tool_msg = sk_types::message::Message {
+                        role: sk_types::message::Role::User,
+                        content: sk_types::message::MessageContent::Blocks(vec![
+                            sk_types::message::ContentBlock::ToolResult {
+                                tool_use_id: tool_call.id.clone(),
+                                content: result,
+                                is_error: false,
+                            }
+                        ]),
+                    };
                     messages.push(tool_msg.clone());
                     session.push_message(tool_msg);
                 }

@@ -4,7 +4,8 @@
 //! rolling hourly usage windows, resource quota enforcement, and task abort.
 
 use dashmap::DashMap;
-use sk_types::agent::{AgentId, ResourceQuota, TokenUsage};
+use sk_types::agent::{AgentId, ResourceQuota};
+use sk_types::TokenUsage;
 use sk_types::{SovereignError, SovereignResult};
 use std::time::Instant;
 use tokio::task::JoinHandle;
