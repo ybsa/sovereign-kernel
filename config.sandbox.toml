@@ -1,0 +1,22 @@
+# Sovereign Kernel - Sandbox Configuration
+# High security, restricted access.
+
+execution_mode = "sandbox"
+log_level = "info"
+
+[exec_policy]
+mode = "allowlist"
+# Only allow safe common utilities
+allowed_commands = ["ls", "cat", "grep", "echo", "pwd", "whoami"]
+
+[approval]
+# Require approval for all destructive or external actions
+require_approval = [
+    "write_file", 
+    "shell_exec", 
+    "browser_navigate", 
+    "browser_click", 
+    "browser_type",
+    "forget"
+]
+timeout_secs = 60

@@ -112,6 +112,13 @@ impl SovereignKernel {
         })
     }
 
+    /// Start the API bridge server if enabled in configuration.
+    pub async fn start_api_server(self: Arc<Self>) -> SovereignResult<()> {
+        let addr = &self.config.api_listen;
+        let port = addr.split(':').last().and_then(|p| p.parse().ok()).unwrap_or(3000);
+        crate::api::start_server(self, port).await
+    }
+
     /// Shut down the kernel gracefully.
     pub async fn shutdown(&self) -> SovereignResult<()> {
         info!("Sovereign Kernel shutting down...");

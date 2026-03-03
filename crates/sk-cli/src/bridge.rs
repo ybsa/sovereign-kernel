@@ -114,10 +114,11 @@ impl ChannelBridgeHandle for SovereignBridge {
         let user_msg_lower = message.trim().to_lowercase();
         if user_msg_lower == "approve" || user_msg_lower == "yes" {
             if self.safety.approve_last_for_agent(&agent_id) {
-                // We inject a system message into the conversation to let the LLM know
-                // that the human approved its action, and it should run the tool again.
-                // But for now, just let the "approve" message go to the LLM naturally.
-                // The LLM will see "approve" and re-try because the gate is open.
+                // Approved
+            }
+        } else if user_msg_lower == "deny" || user_msg_lower == "no" {
+            if self.safety.deny_last_for_agent(&agent_id) {
+                // Denied
             }
         }
 
@@ -130,6 +131,7 @@ impl ChannelBridgeHandle for SovereignBridge {
             driver.as_ref(),
             system_prompt,
             model_name,
+            Arc::new(self.kernel.config.clone()),
             self.kernel.memory.clone(),
             browser_manager.clone(), // Pass browser_manager here
             agent_id.clone(),

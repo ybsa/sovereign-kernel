@@ -9,6 +9,7 @@
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
+mod audit;
 mod bridge;
 mod chat;
 mod daemon;
@@ -52,6 +53,15 @@ enum Commands {
         #[arg(trailing_var_arg = true)]
         args: Vec<String>,
     },
+    /// Audit Trail commands
+    Audit {
+        /// Action: logs, verify
+        #[arg(default_value = "logs")]
+        action: String,
+        /// Additional arguments
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    }
 }
 
 #[tokio::main]
@@ -92,6 +102,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Status => daemon::status().await?,
         Commands::Stop => daemon::stop().await?,
         Commands::Hands { action, args } => hands::run(&action, &args).await?,
+        Commands::Audit { action, args } => audit::run(config, &action, &args).await?,
     }
 
     Ok(())

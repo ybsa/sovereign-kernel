@@ -28,6 +28,8 @@ reqwest = "0.12"
 futures = "0.3"
 subtle = "2.5"
 dirs = "5.0"
+axum = { workspace = true, features = ["json"] }
+tower-http = { version = "0.6.8", features = ["cors", "trace"] }
 
 [dev-dependencies]
 tokio-test = { workspace = true }

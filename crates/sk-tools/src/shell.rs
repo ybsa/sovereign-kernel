@@ -8,7 +8,37 @@ pub fn shell_exec_tool() -> ToolDefinition {
     }
 }
 
-pub fn handle_shell_exec(command: &str) -> Result<String, sk_types::SovereignError> {
+pub fn handle_shell_exec(
+    policy: &sk_types::config::ExecPolicy,
+    command: &str,
+) -> Result<String, sk_types::SovereignError> {
+    use sk_types::config::ExecSecurityMode;
+
+    match policy.mode {
+        ExecSecurityMode::Deny => {
+            return Err(sk_types::SovereignError::ToolExecutionError(
+                "🛡️ SECURITY POLICY: Shell execution is disabled.".into(),
+            ));
+        }
+        ExecSecurityMode::Allowlist => {
+            let binary = command.split_whitespace().next().unwrap_or("");
+            let binary_name = std::path::Path::new(binary)
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(binary);
+
+            if !policy.allowed_commands.contains(&binary.to_string())
+                && !policy.safe_bins.contains(&binary_name.to_string())
+            {
+                return Err(sk_types::SovereignError::ToolExecutionError(format!(
+                    "🛡️ SECURITY VIOLATION: Command '{}' is not in the allowlist.",
+                    binary
+                )));
+            }
+        }
+        ExecSecurityMode::Full => {}
+    }
+
     let output = if cfg!(target_os = "windows") {
         std::process::Command::new("cmd")
             .args(["/C", command])

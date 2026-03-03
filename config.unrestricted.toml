@@ -1,0 +1,15 @@
+# Sovereign Kernel - Unrestricted Configuration
+# High power, full host access.
+
+# WARNING: Use with caution. This mode allows the agent to execute any command 
+# and modify any file without approval.
+
+execution_mode = "unrestricted"
+log_level = "debug"
+
+[exec_policy]
+mode = "full"
+
+[approval]
+# No automatic approval required for local automation
+require_approval = []

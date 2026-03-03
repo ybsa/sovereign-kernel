@@ -3,6 +3,7 @@
 //! Composes structured, semantic, knowledge, and session stores behind
 //! a single API backed by a shared SQLite connection.
 
+use crate::audit::AuditStore;
 use crate::bm25::Bm25Index;
 use crate::knowledge::KnowledgeStore;
 use crate::semantic::SemanticStore;
@@ -29,6 +30,8 @@ pub struct MemorySubstrate {
     pub knowledge: KnowledgeStore,
     /// Session persistence.
     pub sessions: SessionStore,
+    /// Cryptographic audit trail.
+    pub audit: AuditStore,
     /// BM25 full-text search index.
     pub bm25: Bm25Index,
     /// Memory decay rate for temporal scoring.
@@ -51,6 +54,7 @@ impl MemorySubstrate {
         let semantic = SemanticStore::new(Arc::clone(&conn));
         let knowledge = KnowledgeStore::new(Arc::clone(&conn));
         let sessions = SessionStore::new(Arc::clone(&conn));
+        let audit = AuditStore::new(Arc::clone(&conn));
         let bm25 = Bm25Index::new(Arc::clone(&conn));
 
         let substrate = Self {
@@ -59,6 +63,7 @@ impl MemorySubstrate {
             semantic,
             knowledge,
             sessions,
+            audit,
             bm25,
             decay_rate,
         };
@@ -83,6 +88,7 @@ impl MemorySubstrate {
         let semantic = SemanticStore::new(Arc::clone(&conn));
         let knowledge = KnowledgeStore::new(Arc::clone(&conn));
         let sessions = SessionStore::new(Arc::clone(&conn));
+        let audit = AuditStore::new(Arc::clone(&conn));
         let bm25 = Bm25Index::new(Arc::clone(&conn));
 
         let substrate = Self {
@@ -91,6 +97,7 @@ impl MemorySubstrate {
             semantic,
             knowledge,
             sessions,
+            audit,
             bm25,
             decay_rate,
         };
@@ -180,6 +187,19 @@ impl MemorySubstrate {
                 memory_id UNINDEXED,
                 tokenize='porter unicode61'
             );
+
+            -- Cryptographic Audit Trail (Merkle Chain)
+            CREATE TABLE IF NOT EXISTS audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_id TEXT NOT NULL,
+                execution_mode TEXT NOT NULL,
+                action_type TEXT NOT NULL,
+                action_data TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                hash TEXT NOT NULL,
+                previous_hash TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_audit_agent ON audit_logs(agent_id);
             ",
         )
         .map_err(|e| SovereignError::Memory(format!("Schema init failed: {e}")))?;

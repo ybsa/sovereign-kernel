@@ -941,6 +941,17 @@ impl Default for ThinkingConfig {
     }
 }
 
+/// Execution security mode for the kernel.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionMode {
+    /// Sandbox mode — restricted access, required approvals.
+    #[default]
+    Sandbox,
+    /// Unrestricted mode — full host access, no approval gates.
+    Unrestricted,
+}
+
 /// Top-level kernel configuration.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -971,6 +982,9 @@ pub struct KernelConfig {
     /// Kernel operating mode (stable, default, dev).
     #[serde(default)]
     pub mode: KernelMode,
+    /// Execution security mode (sandbox, unrestricted).
+    #[serde(default)]
+    pub execution_mode: ExecutionMode,
     /// Language/locale for CLI and messages (default: "en").
     #[serde(default = "default_language")]
     pub language: String,
@@ -1176,6 +1190,7 @@ impl Default for KernelConfig {
             channels: ChannelsConfig::default(),
             api_key: String::new(),
             mode: KernelMode::default(),
+            execution_mode: ExecutionMode::default(),
             language: "en".to_string(),
             users: Vec::new(),
             mcp_servers: Vec::new(),
@@ -1251,6 +1266,7 @@ impl std::fmt::Debug for KernelConfig {
                 },
             )
             .field("mode", &self.mode)
+            .field("execution_mode", &self.execution_mode)
             .field("language", &self.language)
             .field("users", &format!("{} user(s)", self.users.len()))
             .field(

@@ -2,6 +2,7 @@
 //!
 //! Based on OpenFang's openfang-kernel.
 
+pub mod api;
 pub mod approval;
 pub mod audit;
 pub mod auth;

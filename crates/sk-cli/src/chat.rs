@@ -10,8 +10,16 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
     println!("═══════════════════════════════════════════════════════");
     println!("  ⚡ Sovereign Kernel v{}", env!("CARGO_PKG_VERSION"));
     println!("  Type 'exit' or 'quit' to leave, 'clear' to reset");
-    println!("═══════════════════════════════════════════════════════");
-    println!();
+    
+    match config.execution_mode {
+        sk_types::config::ExecutionMode::Sandbox => {
+            println!("  [🛡️ Mode: SANDBOX - File and command safety enabled]");
+        }
+        sk_types::config::ExecutionMode::Unrestricted => {
+            println!("  [🚨 Mode: UNRESTRICTED - WARNING: Agent has full system access!]");
+        }
+    }
+    println!("═══════════════════════════════════════════════════════\n");
 
     // Clone browser config before config is moved into kernel
     let browser_config = config.browser.clone();
@@ -97,6 +105,12 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
 
     let browser_manager = Arc::new(BrowserManager::new(browser_config));
 
+    // Initialize SafetyGate
+    let safety_enabled = std::env::var("SOVEREIGN_UNSAFE")
+        .map(|v| v != "1")
+        .unwrap_or(true);
+    let safety_gate = Arc::new(crate::safety::SafetyGate::new(safety_enabled));
+
     // Load OpenClaw skills
     let skills_path = std::env::current_dir()?
         .join("crates")
@@ -113,7 +127,29 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
         std::io::stdout().flush()?;
 
         let mut input = String::new();
-        std::io::stdin().read_line(&mut input)?;
+        
+        if safety_gate.has_pending(&agent_id) {
+            println!("  [⏱️ Waiting for approval... default deny in 60s]");
+            let res = tokio::time::timeout(std::time::Duration::from_secs(60), async {
+                tokio::task::spawn_blocking(|| {
+                    let mut s = String::new();
+                    let _ = std::io::stdin().read_line(&mut s);
+                    s
+                }).await.unwrap_or_default()
+            }).await;
+
+            match res {
+                Ok(s) => input = s,
+                Err(_) => {
+                    println!("\n  [⏱️ Timeout reached! Auto-denying action.]\n");
+                    safety_gate.deny_last_for_agent(&agent_id);
+                    input = "deny".to_string(); // Feed deny back to the loop
+                }
+            }
+        } else {
+            std::io::stdin().read_line(&mut input)?;
+        }
+
         let input = input.trim();
 
         if input.is_empty() {
@@ -130,6 +166,16 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
                 println!("Session cleared.\n");
                 continue;
             }
+            "approve" | "yes" | "y" => {
+                if safety_gate.approve_last_for_agent(&agent_id) {
+                    println!("🛡️ Action approved. Re-submitting to Sovereign...");
+                }
+            }
+            "deny" | "no" | "n" => {
+                if safety_gate.deny_last_for_agent(&agent_id) {
+                    println!("🛡️ Action denied. Blocked signature cleared.");
+                }
+            }
             _ => {}
         }
 
@@ -140,12 +186,13 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
                 d.as_ref(),
                 system_prompt.clone(),
                 model_name.clone(),
+                Arc::new(kernel.config.clone()),
                 kernel_ref,
                 browser_manager.clone(),
                 agent_id.clone(),
                 skill_registry.clone(),
-                false, // Safety warnings bypassed for local interactive CLI
-                None,
+                safety_enabled,
+                Some(safety_gate.clone()),
             );
 
             match sk_engine::agent_loop::run_agent_loop(config, &mut session, input).await {

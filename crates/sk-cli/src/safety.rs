@@ -200,6 +200,18 @@ impl SafetyGate {
         }
     }
 
+    /// Deny (clear) the last blocked action for a specific agent.
+    pub fn deny_last_for_agent(&self, agent_id: &AgentId) -> bool {
+        let mut blocked = self.last_blocked.lock().unwrap();
+        blocked.remove(agent_id).is_some()
+    }
+
+    /// Check if there is a pending action waiting for human approval.
+    pub fn has_pending(&self, agent_id: &AgentId) -> bool {
+        let blocked = self.last_blocked.lock().unwrap();
+        blocked.contains_key(agent_id)
+    }
+
     /// Approve a specific tool call.
     pub fn approve(&self, tool_name: &str, args: &serde_json::Value) {
         let sig = make_signature(tool_name, args);

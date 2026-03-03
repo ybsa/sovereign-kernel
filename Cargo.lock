@@ -2877,6 +2877,7 @@ dependencies = [
 name = "sk-kernel"
 version = "0.1.0"
 dependencies = [
+ "axum",
  "chrono",
  "dashmap",
  "dirs 5.0.1",
@@ -2898,6 +2899,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "toml",
+ "tower-http",
  "tracing",
  "uuid",
 ]
@@ -2925,6 +2927,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",
@@ -3511,6 +3514,7 @@ dependencies = [
  "tower",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]

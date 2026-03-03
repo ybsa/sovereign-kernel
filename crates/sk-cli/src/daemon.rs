@@ -11,6 +11,14 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
     // Initialize kernel
     let kernel = Arc::new(SovereignKernel::init(config).await?);
 
+    // Start the API Bridge server
+    let k_server = kernel.clone();
+    tokio::spawn(async move {
+        if let Err(e) = k_server.start_api_server().await {
+            tracing::error!("Failed to start API Bridge: {}", e);
+        }
+    });
+
     // Initialize the bridge
     let handle = Arc::new(crate::bridge::SovereignBridge::new(kernel.clone()));
     let router = Arc::new(sk_channels::router::AgentRouter::new());

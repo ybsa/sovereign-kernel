@@ -1,6 +1,5 @@
 //! Browser automation tools.
 
-use sk_types::security::Capability;
 use sk_types::ToolDefinition;
 
 /// Returns the suite of browser automation tools.

@@ -9,6 +9,7 @@
 //! - **Hybrid ranking**: Combined BM25 + vector + MMR (from OpenClaw)
 //! - **Temporal decay**: Time-weighted relevance scoring (from OpenClaw)
 
+pub mod audit;
 pub mod bm25;
 pub mod consolidation;
 pub mod embedding;

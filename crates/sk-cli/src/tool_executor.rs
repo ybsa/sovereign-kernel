@@ -7,6 +7,7 @@ pub fn create_agent_config<'a>(
     driver: &'a dyn sk_engine::llm_driver::LlmDriver,
     system_prompt: String,
     model_name: String,
+    kernel_config: Arc<sk_types::config::KernelConfig>,
     kernel_memory: Arc<sk_memory::MemorySubstrate>,
     browser_manager: Arc<sk_engine::media::browser::BrowserManager>,
     agent_id: AgentId,
@@ -32,6 +33,7 @@ pub fn create_agent_config<'a>(
     let k = kernel_memory;
     let b = browser_manager;
     let aid = agent_id;
+    let kc = kernel_config;
 
     AgentLoopConfig {
         driver,
@@ -46,9 +48,13 @@ pub fn create_agent_config<'a>(
             let aid = aid.clone();
             let skills = skill_registry.clone();
             let agent_id_str = aid.to_string();
+            let config = kc.clone();
+            let mode = config.execution_mode;
 
             // Safety check
-            if safety_enabled {
+            let safety_check_needed = mode == sk_types::config::ExecutionMode::Sandbox && safety_enabled;
+
+            if safety_check_needed {
                 let args = tool_call.input.clone();
 
                 // If we have a specific gate, use it
@@ -66,6 +72,20 @@ pub fn create_agent_config<'a>(
                 };
 
                 if blocked {
+                    // Log the blocked action
+                    let mode_str = match mode {
+                        sk_types::config::ExecutionMode::Sandbox => "Sandbox",
+                        sk_types::config::ExecutionMode::Unrestricted => "Unrestricted",
+                    };
+                    let payload = serde_json::json!({
+                        "tool": tool_call.name,
+                        "args": args,
+                        "reason": "Safety Block",
+                    });
+                    if let Err(e) = kernel.audit.append_log(&aid, mode_str, "tool_call_blocked", &payload) {
+                        tracing::warn!("Failed to append to audit log: {}", e);
+                    }
+
                     // Try to get specific error message from check
                     let err_msg = if let Some(gate) = &safety_gate {
                         match gate.check(&tool_call.name, &args, Some(&aid)) {
@@ -84,6 +104,19 @@ pub fn create_agent_config<'a>(
 
                     return Err(sk_types::SovereignError::ToolExecutionError(err_msg));
                 }
+            }
+
+            // Log the approved/safe action execution
+            let mode_str = match mode {
+                sk_types::config::ExecutionMode::Sandbox => "Sandbox",
+                sk_types::config::ExecutionMode::Unrestricted => "Unrestricted",
+            };
+            let payload = serde_json::json!({
+                "tool": tool_call.name,
+                "args": tool_call.input,
+            });
+            if let Err(e) = kernel.audit.append_log(&aid, mode_str, "tool_call", &payload) {
+                tracing::warn!("Failed to append to audit log: {}", e);
             }
 
             match tool_call.name.as_str() {
@@ -146,7 +179,7 @@ pub fn create_agent_config<'a>(
                 "read_file" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::file_ops::handle_read_file(path)
+                        sk_tools::file_ops::handle_read_file(&config.effective_workspaces_dir(), path)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -157,7 +190,11 @@ pub fn create_agent_config<'a>(
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::file_ops::handle_write_file(path, content)
+                        sk_tools::file_ops::handle_write_file(
+                            &config.effective_workspaces_dir(),
+                            path,
+                            content,
+                        )
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -167,7 +204,7 @@ pub fn create_agent_config<'a>(
                 "list_dir" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-                        sk_tools::file_ops::handle_list_dir(path)
+                        sk_tools::file_ops::handle_list_dir(&config.effective_workspaces_dir(), path)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -177,7 +214,7 @@ pub fn create_agent_config<'a>(
                 "shell_exec" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::shell::handle_shell_exec(command)
+                        sk_tools::shell::handle_shell_exec(&config.exec_policy, command)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
