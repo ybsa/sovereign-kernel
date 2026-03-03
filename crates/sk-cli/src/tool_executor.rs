@@ -49,9 +49,7 @@ pub fn create_agent_config<'a>(
 
             // Safety check
             if safety_enabled {
-                let args = tool_call
-                    .input
-                    .clone();
+                let args = tool_call.input.clone();
 
                 // If we have a specific gate, use it
                 let blocked = if let Some(gate) = &safety_gate {
@@ -92,11 +90,7 @@ pub fn create_agent_config<'a>(
                 "remember" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::memory_tools::handle_remember(
-                            &kernel,
-                            aid.clone(),
-                            content,
-                        )
+                        sk_tools::memory_tools::handle_remember(&kernel, aid.clone(), content)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -308,9 +302,7 @@ pub fn create_agent_config<'a>(
                         ))
                     }
                 }
-                "list_skills" => {
-                    Ok(sk_tools::skills::handle_list_skills(&skills))
-                }
+                "list_skills" => Ok(sk_tools::skills::handle_list_skills(&skills)),
                 _ => Err(sk_types::SovereignError::ToolExecutionError(format!(
                     "Unknown tool: {}",
                     tool_call.name

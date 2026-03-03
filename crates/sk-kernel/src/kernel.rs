@@ -49,18 +49,24 @@ impl SovereignKernel {
         info!(has_soul = !soul.is_empty(), "Soul loaded");
 
         // Open memory substrate
-        let db_path = config.memory.sqlite_path.clone().unwrap_or_else(|| config.data_dir.join("memory.db"));
+        let db_path = config
+            .memory
+            .sqlite_path
+            .clone()
+            .unwrap_or_else(|| config.data_dir.join("memory.db"));
         if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| {
-                SovereignError::Config(format!("Failed to create data dir: {e}"))
-            })?;
+            std::fs::create_dir_all(parent)
+                .map_err(|e| SovereignError::Config(format!("Failed to create data dir: {e}")))?;
         }
-        let memory = Arc::new(MemorySubstrate::open(db_path.as_path(), config.memory.decay_rate)?);
+        let memory = Arc::new(MemorySubstrate::open(
+            db_path.as_path(),
+            config.memory.decay_rate,
+        )?);
         info!(path = %db_path.display(), "Memory substrate opened");
 
         // Connect MCP servers
         let mut mcp = McpRegistry::new();
-        
+
         let mut mcp_servers_map = std::collections::HashMap::new();
         for server in &config.mcp_servers {
             let entry = sk_types::config::McpServerEntry {
@@ -69,14 +75,20 @@ impl SovereignKernel {
                     sk_types::config::McpTransportEntry::Sse { .. } => "sse".to_string(),
                 },
                 command: match &server.transport {
-                    sk_types::config::McpTransportEntry::Stdio { command, .. } => Some(command.clone()),
+                    sk_types::config::McpTransportEntry::Stdio { command, .. } => {
+                        Some(command.clone())
+                    }
                     _ => None,
                 },
                 args: match &server.transport {
                     sk_types::config::McpTransportEntry::Stdio { args, .. } => args.clone(),
                     _ => Vec::new(),
                 },
-                env: server.env.iter().map(|k| (k.clone(), std::env::var(k).unwrap_or_default())).collect(),
+                env: server
+                    .env
+                    .iter()
+                    .map(|k| (k.clone(), std::env::var(k).unwrap_or_default()))
+                    .collect(),
                 url: match &server.transport {
                     sk_types::config::McpTransportEntry::Sse { url, .. } => Some(url.clone()),
                     _ => None,
@@ -84,7 +96,7 @@ impl SovereignKernel {
             };
             mcp_servers_map.insert(server.name.clone(), entry);
         }
-        
+
         mcp.connect_all(&mcp_servers_map).await?;
         info!(
             servers = mcp.server_count(),

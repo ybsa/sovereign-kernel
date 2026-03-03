@@ -218,7 +218,10 @@ fn host_fs_write(state: &GuestState, params: &serde_json::Value) -> serde_json::
         Some(c) => c,
         None => return json!({"error": "Missing 'content' parameter"}),
     };
-    if let Err(e) = check_capability(&state.capabilities, &Capability::FileWrite(path.to_string())) {
+    if let Err(e) = check_capability(
+        &state.capabilities,
+        &Capability::FileWrite(path.to_string()),
+    ) {
         return e;
     }
     // SECURITY: Reject path traversal after capability gate
@@ -278,7 +281,10 @@ fn host_net_fetch(state: &GuestState, params: &serde_json::Value) -> serde_json:
         return e;
     }
 
-    if let Err(e) = check_capability(&state.capabilities, &Capability::NetConnect(url.to_string())) {
+    if let Err(e) = check_capability(
+        &state.capabilities,
+        &Capability::NetConnect(url.to_string()),
+    ) {
         return e;
     }
 
@@ -328,7 +334,10 @@ fn host_shell_exec(state: &GuestState, params: &serde_json::Value) -> serde_json
         Some(c) => c,
         None => return json!({"error": "Missing 'command' parameter"}),
     };
-    if let Err(e) = check_capability(&state.capabilities, &Capability::ShellExec(command.to_string())) {
+    if let Err(e) = check_capability(
+        &state.capabilities,
+        &Capability::ShellExec(command.to_string()),
+    ) {
         return e;
     }
 
@@ -383,7 +392,10 @@ fn host_kv_get(state: &GuestState, params: &serde_json::Value) -> serde_json::Va
         Some(k) => k,
         None => return json!({"error": "Missing 'key' parameter"}),
     };
-    if let Err(e) = check_capability(&state.capabilities, &Capability::MemoryRead(key.to_string())) {
+    if let Err(e) = check_capability(
+        &state.capabilities,
+        &Capability::MemoryRead(key.to_string()),
+    ) {
         return e;
     }
     let kernel = match &state.kernel {
@@ -406,7 +418,10 @@ fn host_kv_set(state: &GuestState, params: &serde_json::Value) -> serde_json::Va
         Some(v) => v.clone(),
         None => return json!({"error": "Missing 'value' parameter"}),
     };
-    if let Err(e) = check_capability(&state.capabilities, &Capability::MemoryWrite(key.to_string())) {
+    if let Err(e) = check_capability(
+        &state.capabilities,
+        &Capability::MemoryWrite(key.to_string()),
+    ) {
         return e;
     }
     let kernel = match &state.kernel {
@@ -432,7 +447,10 @@ fn host_agent_send(state: &GuestState, params: &serde_json::Value) -> serde_json
         Some(m) => m,
         None => return json!({"error": "Missing 'message' parameter"}),
     };
-    if let Err(e) = check_capability(&state.capabilities, &Capability::AgentMessage(target.to_string())) {
+    if let Err(e) = check_capability(
+        &state.capabilities,
+        &Capability::AgentMessage(target.to_string()),
+    ) {
         return e;
     }
     let kernel = match &state.kernel {

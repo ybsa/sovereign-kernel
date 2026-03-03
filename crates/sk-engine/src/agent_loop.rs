@@ -217,7 +217,7 @@ pub async fn run_agent_loop(
                                 tool_use_id: tool_call.id.clone(),
                                 content: result,
                                 is_error: false,
-                            }
+                            },
                         ]),
                     };
                     messages.push(tool_msg.clone());

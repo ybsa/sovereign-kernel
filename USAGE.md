@@ -53,7 +53,8 @@ Your agents come equipped with:
 - **ShellExec**: Execute terminal commands safely.
 - **FileSystem**: Read/Write files within the workspace.
 - **WebBrowser**: Search and scrape the web.
-- **Memory**: Persistent vector-based long-term memory.
+- **Memory**: Persistent vector-based long-term memory (Hybrid SQLite + BM25).
+- **Skills**: 52 dynamic expert skills (use `list_skills` and `get_skill`).
 - **MCP**: Support for the Model Context Protocol.
 
 ## 📊 Monitoring & Audits

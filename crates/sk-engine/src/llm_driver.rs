@@ -240,10 +240,10 @@ impl LlmDriver for OpenAICompatDriver {
                 tool_calls.push(sk_types::ToolCall {
                     id: tc["id"].as_str().unwrap_or("").to_string(),
                     name: tc["function"]["name"].as_str().unwrap_or("").to_string(),
-                    input: serde_json::from_str(tc["function"]["arguments"]
-                        .as_str()
-                        .unwrap_or("{}"))
-                        .unwrap_or(serde_json::json!({})),
+                    input: serde_json::from_str(
+                        tc["function"]["arguments"].as_str().unwrap_or("{}"),
+                    )
+                    .unwrap_or(serde_json::json!({})),
                 });
             }
         }

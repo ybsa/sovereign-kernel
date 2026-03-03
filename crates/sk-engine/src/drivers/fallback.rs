@@ -61,7 +61,7 @@ impl LlmDriver for FallbackDriver {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::llm_driver::{CompletionResponse, TokenUsage, StopReason};
+    use crate::llm_driver::{CompletionResponse, StopReason, TokenUsage};
 
     struct FailDriver;
 

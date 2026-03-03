@@ -394,10 +394,7 @@ pub async fn wait_or_kill_with_idle(
         if tokio::time::Instant::now() >= deadline {
             tracing::warn!("Process hit absolute timeout after {:?}", absolute_timeout);
             kill_child_tree(child, grace_ms).await?;
-            return Ok((
-                sk_types::config::TerminationReason::AbsoluteTimeout,
-                output,
-            ));
+            return Ok((sk_types::config::TerminationReason::AbsoluteTimeout, output));
         }
 
         // Check idle timeout
@@ -408,10 +405,7 @@ pub async fn wait_or_kill_with_idle(
                     no_output_timeout
                 );
                 kill_child_tree(child, grace_ms).await?;
-                return Ok((
-                    sk_types::config::TerminationReason::NoOutputTimeout,
-                    output,
-                ));
+                return Ok((sk_types::config::TerminationReason::NoOutputTimeout, output));
             }
         }
 

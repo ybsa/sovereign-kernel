@@ -11,8 +11,8 @@
 //! Workflows are defined as Rust structs or loaded from JSON.
 
 use chrono::{DateTime, Utc};
-use sk_types::agent::AgentId;
 use serde::{Deserialize, Serialize};
+use sk_types::agent::AgentId;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;

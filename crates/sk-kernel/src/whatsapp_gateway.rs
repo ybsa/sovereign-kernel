@@ -24,7 +24,9 @@ const RESTART_DELAYS: [u64; 3] = [5, 10, 20];
 
 /// Fallback home directory resolution (copied from sk-types as it's private there).
 fn sk_home() -> PathBuf {
-    dirs::home_dir().unwrap_or_else(std::env::temp_dir).join(".sovereign")
+    dirs::home_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join(".sovereign")
 }
 
 /// Get the gateway installation directory.
@@ -72,8 +74,8 @@ async fn ensure_gateway_installed() -> Result<PathBuf, String> {
     let package_path = dir.join("package.json");
 
     // Write files only if content changed (avoids unnecessary npm install)
-    let index_changed =
-        write_if_changed(&index_path, GATEWAY_INDEX_JS).map_err(|e| format!("Write index.js: {e}"))?;
+    let index_changed = write_if_changed(&index_path, GATEWAY_INDEX_JS)
+        .map_err(|e| format!("Write index.js: {e}"))?;
     let package_changed = write_if_changed(&package_path, GATEWAY_PACKAGE_JSON)
         .map_err(|e| format!("Write package.json: {e}"))?;
 

@@ -10,8 +10,8 @@
 //! - Session limits: max concurrent, idle timeout, 1 per agent
 
 use dashmap::DashMap;
-use sk_types::config::BrowserConfig;
 use serde::{Deserialize, Serialize};
+use sk_types::config::BrowserConfig;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, ChildStdout, Stdio};

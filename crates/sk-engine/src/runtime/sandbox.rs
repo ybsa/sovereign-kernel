@@ -23,8 +23,8 @@
 //! `host_call` reads a JSON request `{"method": "...", "params": {...}}`
 //! and returns a packed pointer to JSON `{"ok": ...}` or `{"error": "..."}`.
 
-use crate::host_functions;
 use super::kernel_handle::KernelHandle;
+use crate::host_functions;
 use sk_types::capability::Capability;
 use std::sync::Arc;
 use tracing::debug;

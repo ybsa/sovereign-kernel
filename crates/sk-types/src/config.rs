@@ -1215,12 +1215,10 @@ impl KernelConfig {
         if !path.exists() {
             return Ok(Self::default());
         }
-        let content = std::fs::read_to_string(path).map_err(|e| {
-            crate::SovereignError::Config(format!("Failed to read config: {}", e))
-        })?;
-        toml::from_str(&content).map_err(|e| {
-            crate::SovereignError::Config(format!("Failed to parse config: {}", e))
-        })
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| crate::SovereignError::Config(format!("Failed to read config: {}", e)))?;
+        toml::from_str(&content)
+            .map_err(|e| crate::SovereignError::Config(format!("Failed to parse config: {}", e)))
     }
 
     /// Resolved workspaces root directory.

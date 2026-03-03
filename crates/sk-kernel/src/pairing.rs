@@ -4,8 +4,8 @@
 //! push notifications via ntfy.sh or gotify.
 
 use dashmap::DashMap;
-use sk_types::config::PairingConfig;
 use serde::{Deserialize, Serialize};
+use sk_types::config::PairingConfig;
 use tracing::{debug, warn};
 
 /// Maximum concurrent pairing requests (prevent token flooding).

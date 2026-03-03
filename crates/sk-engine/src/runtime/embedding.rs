@@ -5,11 +5,11 @@
 //! Groq, Together, Fireworks, Ollama, etc.).
 
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use sk_types::model_catalog::{
     FIREWORKS_BASE_URL, GROQ_BASE_URL, LMSTUDIO_BASE_URL, MISTRAL_BASE_URL, OLLAMA_BASE_URL,
     OPENAI_BASE_URL, TOGETHER_BASE_URL, VLLM_BASE_URL,
 };
-use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 use zeroize::Zeroizing;
 

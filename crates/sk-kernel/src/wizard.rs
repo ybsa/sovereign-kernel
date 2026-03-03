@@ -4,10 +4,10 @@
 //! an agent to do, extracts structured intent, and generates a complete
 //! agent manifest (TOML config) ready to spawn.
 
+use serde::{Deserialize, Serialize};
 use sk_types::agent::{
     AgentManifest, ManifestCapabilities, ModelConfig, Priority, ResourceQuota, ScheduleMode,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// The extracted intent from a user's natural language description.

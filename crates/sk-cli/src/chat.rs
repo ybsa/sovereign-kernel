@@ -98,7 +98,10 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
     let browser_manager = Arc::new(BrowserManager::new(browser_config));
 
     // Load OpenClaw skills
-    let skills_path = std::env::current_dir()?.join("crates").join("sk-tools").join("skills");
+    let skills_path = std::env::current_dir()?
+        .join("crates")
+        .join("sk-tools")
+        .join("skills");
     let skill_registry = Arc::new(SkillRegistry::load_from_dir(skills_path));
     info!(skills = skill_registry.list().len(), "Skills loaded");
 

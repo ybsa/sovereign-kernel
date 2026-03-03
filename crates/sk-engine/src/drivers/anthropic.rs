@@ -136,9 +136,7 @@ impl LlmDriver for AnthropicDriver {
                     for block in b {
                         match block {
                             sk_types::message::ContentBlock::Text { text } => {
-                                blocks.push(ApiContentBlock::Text {
-                                    text: text.clone(),
-                                });
+                                blocks.push(ApiContentBlock::Text { text: text.clone() });
                             }
                             sk_types::message::ContentBlock::ToolUse { id, name, input } => {
                                 blocks.push(ApiContentBlock::ToolUse {

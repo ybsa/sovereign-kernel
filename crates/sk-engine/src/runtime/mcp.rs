@@ -6,8 +6,8 @@
 //!
 //! All MCP tools are namespaced with `mcp_{server}_{tool}` to prevent collisions.
 
-use sk_types::tool::ToolDefinition;
 use serde::{Deserialize, Serialize};
+use sk_types::tool::ToolDefinition;
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tracing::{debug, info};

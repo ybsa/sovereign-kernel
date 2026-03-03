@@ -6,8 +6,8 @@
 //! This module provides a reusable handler function — the CLI team
 //! wires it into a stdio transport.
 
-use sk_types::tool::ToolDefinition;
 use serde_json::json;
+use sk_types::tool::ToolDefinition;
 
 /// MCP protocol version supported by this server.
 const PROTOCOL_VERSION: &str = "2024-11-05";

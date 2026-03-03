@@ -959,8 +959,6 @@ mod tests {
         assert!(limiter.check("telegram", "user2", 3).is_ok());
     }
 
-
-
     #[test]
     fn test_channel_type_str() {
         assert_eq!(channel_type_str(&ChannelType::Telegram), "telegram");

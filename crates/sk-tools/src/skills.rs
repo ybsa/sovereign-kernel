@@ -107,7 +107,9 @@ pub fn get_skill_tool() -> ToolDefinition {
 pub fn list_skills_tool() -> ToolDefinition {
     ToolDefinition {
         name: "list_skills".to_string(),
-        description: "List all available expert skills/capabilities that can be loaded via 'get_skill'.".to_string(),
+        description:
+            "List all available expert skills/capabilities that can be loaded via 'get_skill'."
+                .to_string(),
         input_schema: serde_json::json!({
             "type": "object",
             "properties": {}
@@ -121,12 +123,13 @@ pub fn handle_get_skill(registry: &SkillRegistry, name: &str) -> String {
         Some(skill) => {
             format!(
                 "# Skill: {}\n\n{}\n\n---\n\n## Instructions\n\n{}",
-                skill.metadata.name,
-                skill.metadata.description,
-                skill.content
+                skill.metadata.name, skill.metadata.description, skill.content
             )
         }
-        None => format!("Skill '{}' not found. Use 'list_skills' to see available capabilities.", name),
+        None => format!(
+            "Skill '{}' not found. Use 'list_skills' to see available capabilities.",
+            name
+        ),
     }
 }
 

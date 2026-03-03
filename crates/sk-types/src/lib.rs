@@ -28,15 +28,14 @@ pub mod session;
 
 pub use agent::{
     AgentEntry, AgentId, AgentManifest, AgentMode, AgentState, AutonomousConfig, HookEvent,
-    ModelConfig, ModelRoutingConfig, Priority, ResourceQuota, ScheduleMode,
-    ToolProfile, UserId,
+    ModelConfig, ModelRoutingConfig, Priority, ResourceQuota, ScheduleMode, ToolProfile, UserId,
 };
 pub use approval::{
     ApprovalDecision, ApprovalPolicy, ApprovalRequest, ApprovalResponse, RiskLevel,
 };
 pub use config::{KernelConfig, McpServerEntry};
 pub use error::{SovereignError, SovereignResult};
-pub use message::{Message, Role, MessageContent, ContentBlock, TokenUsage};
+pub use message::{ContentBlock, Message, MessageContent, Role, TokenUsage};
 pub use scheduler::{CronAction, CronDelivery, CronJob, CronJobId, CronSchedule};
 pub use session::{Session, SessionId};
 pub use tool::{ToolCall, ToolDefinition, ToolResult};

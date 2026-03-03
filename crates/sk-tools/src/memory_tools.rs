@@ -56,9 +56,7 @@ pub fn handle_remember(
     // For now we use a newly generated Uuid for BM25 since exact semantic embeddings are missing
     let memory_id = Uuid::new_v4().to_string();
     substrate.bm25.index(agent_id, &memory_id, content)?;
-    Ok(format!(
-        "Successfully remembered with ID: {memory_id}"
-    ))
+    Ok(format!("Successfully remembered with ID: {memory_id}"))
 }
 
 pub fn handle_recall(

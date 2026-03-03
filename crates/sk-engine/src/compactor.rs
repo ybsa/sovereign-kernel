@@ -11,10 +11,10 @@
 //! 3. Minimal fallback without LLM (when summarization is unavailable)
 
 use crate::llm_driver::{CompletionRequest, LlmDriver};
-use sk_types::Session;
+use serde::Serialize;
 use sk_types::message::{ContentBlock, Message, MessageContent, Role};
 use sk_types::tool::ToolDefinition;
-use serde::Serialize;
+use sk_types::Session;
 use std::sync::Arc;
 use tracing::{info, warn};
 
@@ -386,7 +386,8 @@ fn build_conversation_text(messages: &[Message], config: &CompactionConfig) -> S
                         } => {
                             let status = if *is_error { "ERROR" } else { "OK" };
                             // Strip base64 blobs and injection markers before compaction
-                            let cleaned = crate::runtime::session_repair::strip_tool_result_details(content);
+                            let cleaned =
+                                crate::runtime::session_repair::strip_tool_result_details(content);
                             let preview = if cleaned.len() > 2000 {
                                 format!("{}...", &cleaned[..2000])
                             } else {
@@ -437,7 +438,7 @@ async fn summarize_messages(
 
     let mut request_messages = vec![Message::system(
         "You are a conversation summarizer. Produce a concise summary that captures \
-         all key facts, decisions, and context from the conversation."
+         all key facts, decisions, and context from the conversation.",
     )];
     request_messages.push(Message {
         role: Role::User,
@@ -555,7 +556,7 @@ async fn summarize_in_chunks(
 
     let mut messages_to_send = vec![Message::system(
         "You are a conversation summarizer. Merge the provided partial summaries \
-         into a single cohesive summary."
+         into a single cohesive summary.",
     )];
     messages_to_send.push(Message {
         role: Role::User,

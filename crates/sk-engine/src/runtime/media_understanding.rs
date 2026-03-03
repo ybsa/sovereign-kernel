@@ -2,9 +2,7 @@
 //!
 //! Auto-cascades through available providers based on configured API keys.
 
-use sk_types::media::{
-    MediaAttachment, MediaConfig, MediaSource, MediaType, MediaUnderstanding,
-};
+use sk_types::media::{MediaAttachment, MediaConfig, MediaSource, MediaType, MediaUnderstanding};
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tracing::info;

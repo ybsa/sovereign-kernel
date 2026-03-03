@@ -60,8 +60,7 @@ impl SessionStore {
             Ok((id, agent_id, messages_json, label, created_at, updated_at)) => {
                 let messages: Vec<Message> = serde_json::from_str(&messages_json)?;
                 Ok(Some(Session {
-                    id: SessionId::parse(&id)
-                        .map_err(|e| SovereignError::Memory(e.to_string()))?,
+                    id: SessionId::parse(&id).map_err(|e| SovereignError::Memory(e.to_string()))?,
                     agent_id: AgentId::parse(&agent_id)
                         .map_err(|e| SovereignError::Memory(e.to_string()))?,
                     messages,
@@ -110,8 +109,7 @@ impl SessionStore {
 
         let mut results = Vec::new();
         for row in rows {
-            let (id, label, updated) =
-                row.map_err(|e| SovereignError::Memory(e.to_string()))?;
+            let (id, label, updated) = row.map_err(|e| SovereignError::Memory(e.to_string()))?;
             let session_id =
                 SessionId::parse(&id).map_err(|e| SovereignError::Memory(e.to_string()))?;
             results.push((session_id, label, updated));

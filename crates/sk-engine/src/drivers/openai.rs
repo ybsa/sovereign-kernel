@@ -180,7 +180,11 @@ impl LlmDriver for OpenAIDriver {
                     oai_messages.push(OaiMessage {
                         role: "assistant".to_string(),
                         content: text_content,
-                        tool_calls: if tool_calls.is_empty() { None } else { Some(tool_calls) },
+                        tool_calls: if tool_calls.is_empty() {
+                            None
+                        } else {
+                            Some(tool_calls)
+                        },
                         tool_call_id: None,
                     });
                 }
@@ -309,7 +313,8 @@ impl LlmDriver for OpenAIDriver {
                     tool_calls.push(ToolCall {
                         id: call.id,
                         name: call.function.name,
-                        input: serde_json::from_str(&call.function.arguments).unwrap_or(serde_json::json!({})),
+                        input: serde_json::from_str(&call.function.arguments)
+                            .unwrap_or(serde_json::json!({})),
                     });
                 }
             }

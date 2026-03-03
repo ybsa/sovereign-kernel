@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/language-Rust-orange?style=flat-square" alt="Rust" />
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT" />
-  <img src="https://img.shields.io/badge/status-Phase%206%20Complete-green?style=flat-square" alt="Status" />
+  <img src="https://img.shields.io/badge/status-Phase%207%20In%20Progress-blue?style=flat-square" alt="Status" />
   <img src="https://img.shields.io/badge/security-16--Layer%20Audit-brightgreen?style=flat-square" alt="Security" />
 </p>
 
@@ -85,7 +85,10 @@ We believe in radical transparency. Here is how Sovereign Kernel stacks up again
 Sovereign Kernel has completed **Phase 6: Verification**. The core infrastructure, sandboxing, and LLM drivers are fully implemented and tested.
 
 -   **Phase 1-6 (Complete)**: Kernel, Engine, Security, Media, and Advanced Features.
--   **Current Phase**: Phase 7: Execution Modes (Sandbox vs. Unrestricted).
+-   **Phase 7 (Current)**: Execution Modes & Skill Integration.
+    - [x] Port 52 Expert Skills from OpenClaw.
+    - [x] Implement BM25 Search in `sk-memory`.
+    - [/] Refine Execution Modes (Sandbox vs. Unrestricted).
 
 For a deep dive into the 26-week roadmap, see [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
 

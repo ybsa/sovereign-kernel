@@ -22,7 +22,11 @@ impl SovereignBridge {
             .map(|v| v != "1")
             .unwrap_or(true);
 
-        let skills_path = std::env::current_dir().unwrap_or_default().join("crates").join("sk-tools").join("skills");
+        let skills_path = std::env::current_dir()
+            .unwrap_or_default()
+            .join("crates")
+            .join("sk-tools")
+            .join("skills");
         let skills = Arc::new(sk_tools::skills::SkillRegistry::load_from_dir(skills_path));
 
         Self {
