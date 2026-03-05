@@ -1,4 +1,4 @@
-//! Discord Gateway adapter for the OpenFang channel bridge.
+//! Discord Gateway adapter for the Sovereign Kernel channel bridge.
 //!
 //! Uses Discord Gateway WebSocket (v10) for receiving messages and the REST API
 //! for sending responses. No external Discord crate — just `tokio-tungstenite` + `reqwest`.
@@ -264,8 +264,8 @@ impl ChannelAdapter for DiscordAdapter {
                                         "intents": intents,
                                         "properties": {
                                             "os": "linux",
-                                            "browser": "openfang",
-                                            "device": "openfang"
+                                            "browser": "Sovereign Kernel",
+                                            "device": "Sovereign Kernel"
                                         }
                                     }
                                 })
@@ -493,7 +493,7 @@ async fn parse_discord_message(
         sender: ChannelUser {
             platform_id: channel_id.to_string(),
             display_name,
-            openfang_user: None,
+            sk_user: None,
         },
         content,
         target_agent: None,
@@ -540,7 +540,7 @@ mod tests {
             "content": "My own message",
             "author": {
                 "id": "bot123",
-                "username": "openfang",
+                "username": "Sovereign Kernel",
                 "discriminator": "0"
             },
             "timestamp": "2024-01-01T00:00:00+00:00"

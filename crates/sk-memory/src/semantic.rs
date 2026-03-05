@@ -172,7 +172,7 @@ impl SemanticStore {
 }
 
 // ---------------------------------------------------------------------------
-// Vector math utilities (from OpenFang embedding.rs)
+// Vector math utilities (from Sovereign Kernel embedding.rs)
 // ---------------------------------------------------------------------------
 
 /// Compute cosine similarity between two vectors.

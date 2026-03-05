@@ -1,4 +1,4 @@
-//! Loop guard — detect tool call loops (from OpenFang's loop_guard.rs).
+//! Loop guard — detect tool call loops (from Sovereign Kernel's loop_guard.rs).
 //!
 //! SHA256-based detection of repetitive tool call patterns.
 

@@ -18,6 +18,16 @@ pub struct SovereignKernel {
     pub memory: Arc<MemorySubstrate>,
     /// MCP server registry.
     pub mcp: McpRegistry,
+    /// Conversational safety gate.
+    pub safety: Arc<crate::approval::SafetyGate>,
+    /// Global LLM driver.
+    pub driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+    /// Global LLM model name.
+    pub model_name: String,
+    /// Browser session manager.
+    pub browser: Arc<sk_engine::media::browser::BrowserManager>,
+    /// Skill registry.
+    pub skills: Arc<sk_tools::skills::SkillRegistry>,
 }
 
 impl SovereignKernel {
@@ -104,12 +114,81 @@ impl SovereignKernel {
             "MCP registry initialized"
         );
 
+        // Initialize LLM Driver from environment
+        let mut model_name = String::new();
+        let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = if let Some(key) = std::env::var("ANTHROPIC_API_KEY").ok() {
+            model_name = "claude-3-5-sonnet-20241022".to_string();
+            Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(key, "https://api.anthropic.com".to_string()))
+        } else if let Some(key) = std::env::var("OPENAI_API_KEY").ok() {
+            model_name = "gpt-4o".to_string();
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(key, "https://api.openai.com/v1".to_string()))
+        } else if let Some(key) = std::env::var("GITHUB_TOKEN").ok() {
+            model_name = "gpt-4o".to_string();
+            Arc::new(sk_engine::drivers::copilot::CopilotDriver::new(key, "".to_string()))
+        } else if let Some(key) = std::env::var("GROQ_API_KEY").ok() {
+            model_name = "llama3-70b-8192".to_string();
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(key, "https://api.groq.com/openai/v1".to_string()))
+        } else if let Some(key) = std::env::var("GEMINI_API_KEY").ok() {
+            model_name = "gemini-2.0-flash-lite".to_string();
+            Arc::new(sk_engine::drivers::gemini::GeminiDriver::new(key, "https://generativelanguage.googleapis.com".to_string()))
+        } else {
+            model_name = "claude-3-5-sonnet-20241022".to_string();
+            // Default to Anthropic if no keys found (will fail at runtime, but kernel can still boot)
+            Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new("".to_string(), "https://api.anthropic.com".to_string()))
+        };
+
+        // Initialize Browser Manager
+        let browser = Arc::new(sk_engine::media::browser::BrowserManager::new(config.browser.clone()));
+
+        // Initialize Skills Registry
+        let skills_path = std::env::current_dir()
+            .unwrap_or_default()
+            .join("crates")
+            .join("sk-tools")
+            .join("skills");
+        let skills = Arc::new(sk_tools::skills::SkillRegistry::load_from_dir(skills_path));
+
         Ok(Self {
             config,
             soul,
             memory,
             mcp,
+            safety: Arc::new(crate::approval::SafetyGate::new(true)),
+            driver,
+            model_name,
+            browser,
+            skills,
         })
+    }
+
+    /// Run a complete agent loop for a given session and user input.
+    pub async fn run_agent(
+        self: &Arc<Self>,
+        session: &mut sk_types::Session,
+        input: &str,
+    ) -> SovereignResult<sk_engine::agent_loop::AgentLoopResult> {
+        let system_prompt = self.soul.to_system_prompt_fragment();
+
+        let agent_config = crate::executor::create_agent_config(
+            self.clone(),
+            self.driver.as_ref(), // needs to be &dyn LlmDriver
+            system_prompt,
+            self.model_name.clone(),
+            session.agent_id.clone(),
+            self.browser.clone(),
+            self.skills.clone(),
+        );
+
+        let result = sk_engine::agent_loop::run_agent_loop(agent_config, session, input)
+            .await
+            .map_err(|e| sk_types::error::SovereignError::Internal(e.to_string()))?;
+
+        // Save after every turn
+        if let Err(e) = self.memory.sessions.save(session) {
+            tracing::warn!("Failed to save session across run_agent: {e}");
+        }
+
+        Ok(result)
     }
 
     /// Start the API bridge server if enabled in configuration.

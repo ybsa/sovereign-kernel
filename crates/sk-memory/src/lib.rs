@@ -5,9 +5,9 @@
 //! - **Semantic store** (SQLite BLOB vectors): Vector similarity search
 //! - **Knowledge graph** (SQLite): Entity-relation triples
 //! - **Session store**: Conversation persistence
-//! - **BM25 full-text search**: Keyword-based retrieval (from OpenClaw QMD)
-//! - **Hybrid ranking**: Combined BM25 + vector + MMR (from OpenClaw)
-//! - **Temporal decay**: Time-weighted relevance scoring (from OpenClaw)
+//! - **BM25 full-text search**: Keyword-based retrieval (from Sovereign Kernel QMD)
+//! - **Hybrid ranking**: Combined BM25 + vector + MMR (from Sovereign Kernel)
+//! - **Temporal decay**: Time-weighted relevance scoring (from Sovereign Kernel)
 
 pub mod audit;
 pub mod bm25;

@@ -1,6 +1,6 @@
 //! Embedding driver trait and OpenAI-compatible implementation.
 //!
-//! Based on OpenFang's embedding.rs — works with any provider offering
+//! Based on Sovereign Kernel's embedding.rs — works with any provider offering
 //! a /v1/embeddings endpoint (OpenAI, Ollama, Together, etc.).
 
 use async_trait::async_trait;

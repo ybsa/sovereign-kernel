@@ -1,6 +1,6 @@
 //! Temporal decay — time-weighted relevance scoring.
 //!
-//! Ported from OpenClaw's temporal-decay.ts. Memories that haven't been
+//! Ported from Sovereign Kernel's temporal-decay.ts. Memories that haven't been
 //! accessed recently are gradually deprioritized, simulating natural forgetting.
 
 /// Apply temporal decay to a relevance score.

@@ -1,4 +1,4 @@
-//! Event types for the OpenFang internal event bus.
+//! Event types for the Sovereign Kernel internal event bus.
 //!
 //! All inter-agent and system communication flows through events.
 
@@ -279,7 +279,7 @@ pub enum SystemEvent {
     },
 }
 
-/// A complete event in the OpenFang event system.
+/// A complete event in the Sovereign Kernel event system.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
     /// Unique event ID.

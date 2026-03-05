@@ -1,8 +1,8 @@
-//! Shared error types for the OpenFang system.
+//! Shared error types for the Sovereign Kernel system.
 
 use thiserror::Error;
 
-/// Top-level error type for the OpenFang system.
+/// Top-level error type for the Sovereign Kernel system.
 #[derive(Error, Debug)]
 pub enum SovereignError {
     /// The requested agent was not found.

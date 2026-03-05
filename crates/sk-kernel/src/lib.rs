@@ -1,6 +1,6 @@
 //! Kernel orchestration — the supervisor that ties everything together.
 //!
-//! Based on OpenFang's openfang-kernel.
+//! Based on Sovereign Kernel's Sovereign Kernel-kernel.
 
 pub mod api;
 pub mod approval;
@@ -14,6 +14,7 @@ pub mod config_reload;
 pub mod cron;
 pub mod error;
 pub mod event_bus;
+pub mod executor;
 pub mod heartbeat;
 pub mod kernel;
 pub mod metering;

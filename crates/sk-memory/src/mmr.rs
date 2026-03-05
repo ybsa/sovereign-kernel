@@ -1,6 +1,6 @@
 //! Maximal Marginal Relevance (MMR) for diversity-aware result re-ranking.
 //!
-//! Ported from OpenClaw's mmr.ts. MMR balances relevance with diversity
+//! Ported from Sovereign Kernel's mmr.ts. MMR balances relevance with diversity
 //! by penalizing results that are too similar to already selected results.
 
 use crate::semantic::cosine_similarity;

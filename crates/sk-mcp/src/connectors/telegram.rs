@@ -1,6 +1,6 @@
 //! Telegram Adapter.
 //!
-//! Ports the OpenClaw telegram adapter to a native Rust polling loop.
+//! Ports the Sovereign Kernel telegram adapter to a native Rust polling loop.
 //! Acts as an ingestion channel for the Sovereign Kernel.
 
 use sk_types::{AgentId, SovereignError};

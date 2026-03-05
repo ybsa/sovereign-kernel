@@ -18,8 +18,6 @@ mod hands;
 mod init;
 mod middleware;
 mod openai_compat;
-mod safety;
-mod tool_executor;
 
 #[derive(Parser)]
 #[command(name = "sovereign", version, about = "Sovereign Kernel — Agentic OS")]

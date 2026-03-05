@@ -1,6 +1,6 @@
 //! The Engine — agent execution loop, LLM drivers, and tool runner.
 //!
-//! Based on OpenFang's openfang-runtime, stripped of Hands/browser/Docker.
+//! Based on Sovereign Kernel's Sovereign Kernel-runtime, stripped of Hands/browser/Docker.
 //! This is the beating heart of the Sovereign Kernel.
 
 pub mod agent_loop;

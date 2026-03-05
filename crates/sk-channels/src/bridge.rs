@@ -1,6 +1,6 @@
-//! Channel bridge — connects channel adapters to the OpenFang kernel.
+//! Channel bridge — connects channel adapters to the Sovereign Kernel kernel.
 //!
-//! Defines `ChannelBridgeHandle` (implemented by openfang-api on the kernel) and
+//! Defines `ChannelBridgeHandle` (implemented by Sovereign Kernel-api on the kernel) and
 //! `BridgeManager` which owns running adapters and dispatches messages.
 
 use crate::router::AgentRouter;
@@ -17,8 +17,8 @@ use tracing::{error, warn};
 
 /// Kernel operations needed by channel adapters.
 ///
-/// Defined here to avoid circular deps (openfang-channels can't depend on openfang-kernel).
-/// Implemented in openfang-api on the actual kernel.
+/// Defined here to avoid circular deps (Sovereign Kernel-channels can't depend on Sovereign Kernel-kernel).
+/// Implemented in Sovereign Kernel-api on the actual kernel.
 #[async_trait]
 pub trait ChannelBridgeHandle: Send + Sync {
     /// Send a message to an agent and get the text response.
@@ -468,7 +468,7 @@ async fn dispatch_message(
     let agent_id = router.resolve(
         &message.channel,
         &message.sender.platform_id,
-        message.sender.openfang_user.as_deref(),
+        message.sender.sk_user.as_deref(),
     );
 
     let agent_id = match agent_id {
@@ -548,7 +548,7 @@ async fn handle_command(
     match name {
         "start" => {
             let agents = handle.list_agents().await.unwrap_or_default();
-            let mut msg = "Welcome to OpenFang! I connect you to AI agents.\n\nAvailable agents:\n"
+            let mut msg = "Welcome to Sovereign Kernel! I connect you to AI agents.\n\nAvailable agents:\n"
                 .to_string();
             if agents.is_empty() {
                 msg.push_str("  (none running)\n");
@@ -560,7 +560,7 @@ async fn handle_command(
             msg.push_str("\nCommands:\n/agents - list agents\n/agent <name> - select an agent\n/help - show this help");
             msg
         }
-        "help" => "OpenFang Bot Commands:\n\
+        "help" => "Sovereign Kernel Bot Commands:\n\
              \n\
              Session:\n\
              /agents - list running agents\n\
@@ -644,7 +644,7 @@ async fn handle_command(
             let agent_id = router.resolve(
                 &crate::types::ChannelType::CLI,
                 &sender.platform_id,
-                sender.openfang_user.as_deref(),
+                sender.sk_user.as_deref(),
             );
             match agent_id {
                 Some(aid) => handle
@@ -658,7 +658,7 @@ async fn handle_command(
             let agent_id = router.resolve(
                 &crate::types::ChannelType::CLI,
                 &sender.platform_id,
-                sender.openfang_user.as_deref(),
+                sender.sk_user.as_deref(),
             );
             match agent_id {
                 Some(aid) => handle
@@ -672,7 +672,7 @@ async fn handle_command(
             let agent_id = router.resolve(
                 &crate::types::ChannelType::CLI,
                 &sender.platform_id,
-                sender.openfang_user.as_deref(),
+                sender.sk_user.as_deref(),
             );
             match agent_id {
                 Some(aid) => {
@@ -696,7 +696,7 @@ async fn handle_command(
             let agent_id = router.resolve(
                 &crate::types::ChannelType::CLI,
                 &sender.platform_id,
-                sender.openfang_user.as_deref(),
+                sender.sk_user.as_deref(),
             );
             match agent_id {
                 Some(aid) => handle
@@ -710,7 +710,7 @@ async fn handle_command(
             let agent_id = router.resolve(
                 &crate::types::ChannelType::CLI,
                 &sender.platform_id,
-                sender.openfang_user.as_deref(),
+                sender.sk_user.as_deref(),
             );
             match agent_id {
                 Some(aid) => handle
@@ -724,7 +724,7 @@ async fn handle_command(
             let agent_id = router.resolve(
                 &crate::types::ChannelType::CLI,
                 &sender.platform_id,
-                sender.openfang_user.as_deref(),
+                sender.sk_user.as_deref(),
             );
             match agent_id {
                 Some(aid) => {
@@ -886,7 +886,7 @@ mod tests {
         let sender = ChannelUser {
             platform_id: "user1".to_string(),
             display_name: "Test".to_string(),
-            openfang_user: None,
+            sk_user: None,
         };
 
         let result = handle_command("agents", &[], &handle, &router, &sender).await;
@@ -906,7 +906,7 @@ mod tests {
         let sender = ChannelUser {
             platform_id: "user1".to_string(),
             display_name: "Test".to_string(),
-            openfang_user: None,
+            sk_user: None,
         };
 
         // Select existing agent

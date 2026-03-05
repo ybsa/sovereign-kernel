@@ -155,7 +155,7 @@ fn make_text_msg(channel: ChannelType, user_id: &str, text: &str) -> ChannelMess
         sender: ChannelUser {
             platform_id: user_id.to_string(),
             display_name: "TestUser".to_string(),
-            openfang_user: None,
+            sk_user: None,
         },
         content: ChannelContent::Text(text.to_string()),
         target_agent: None,
@@ -178,7 +178,7 @@ fn make_command_msg(
         sender: ChannelUser {
             platform_id: user_id.to_string(),
             display_name: "TestUser".to_string(),
-            openfang_user: None,
+            sk_user: None,
         },
         content: ChannelContent::Command {
             name: cmd.to_string(),

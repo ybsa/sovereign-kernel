@@ -1,6 +1,6 @@
 //! Capability-based security types.
 //!
-//! OpenFang uses capability-based security: an agent can only perform actions
+//! Sovereign Kernel uses capability-based security: an agent can only perform actions
 //! that it has been explicitly granted permission to do. Capabilities are
 //! immutable after agent creation and enforced at the kernel level.
 
@@ -54,7 +54,7 @@ pub enum Capability {
     /// Read environment variables matching the pattern.
     EnvRead(String),
 
-    // -- OFP (OpenFang Wire Protocol) --
+    // -- OFP (Sovereign Kernel Wire Protocol) --
     /// Can discover remote agents.
     OfpDiscover,
     /// Can connect to remote peers matching the pattern.

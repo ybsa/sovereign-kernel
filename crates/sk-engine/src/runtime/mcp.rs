@@ -1,6 +1,6 @@
 //! MCP (Model Context Protocol) client — connect to external MCP servers.
 //!
-//! MCP uses JSON-RPC 2.0 over stdio or HTTP+SSE. This module lets OpenFang
+//! MCP uses JSON-RPC 2.0 over stdio or HTTP+SSE. This module lets Sovereign Kernel
 //! agents use tools from any MCP server (100+ available: GitHub, filesystem,
 //! databases, APIs, etc.).
 //!
@@ -159,7 +159,7 @@ impl McpConnection {
             "protocolVersion": "2024-11-05",
             "capabilities": {},
             "clientInfo": {
-                "name": "openfang",
+                "name": "Sovereign Kernel",
                 "version": env!("CARGO_PKG_VERSION")
             }
         });
@@ -536,7 +536,7 @@ mod tests {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
                 "clientInfo": {
-                    "name": "openfang",
+                    "name": "Sovereign Kernel",
                     "version": "0.1.0"
                 }
             })),
@@ -544,7 +544,7 @@ mod tests {
         let json = serde_json::to_string(&request).unwrap();
         assert!(json.contains("initialize"));
         assert!(json.contains("protocolVersion"));
-        assert!(json.contains("openfang"));
+        assert!(json.contains("Sovereign Kernel"));
     }
 
     #[test]

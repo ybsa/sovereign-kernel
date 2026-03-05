@@ -1,6 +1,6 @@
 //! Process supervision — graceful shutdown, signal handling, and health monitoring.
 //!
-//! Ported from OpenFang's openfang-kernel/src/supervisor.rs — complete with
+//! Ported from Sovereign Kernel's Sovereign Kernel-kernel/src/supervisor.rs — complete with
 //! shutdown signals, per-agent restart limits, panic tracking, and health reports.
 
 use dashmap::DashMap;

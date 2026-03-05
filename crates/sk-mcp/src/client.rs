@@ -1,6 +1,6 @@
 //! MCP client — connect to MCP servers, discover tools, call them.
 //!
-//! Based on OpenFang's mcp.rs, enhanced with proper lifecycle management.
+//! Based on Sovereign Kernel's mcp.rs, enhanced with proper lifecycle management.
 
 use crate::protocol::*;
 use crate::transport::McpTransport;

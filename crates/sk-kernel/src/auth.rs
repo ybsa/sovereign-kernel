@@ -2,7 +2,7 @@
 //!
 //! The AuthManager maps platform user identities (Telegram ID, Discord ID, etc.)
 //! to kernel users with roles, then enforces permission checks on actions.
-//! Ported directly from OpenFang's openfang-kernel/src/auth.rs
+//! Ported directly from Sovereign Kernel's Sovereign Kernel-kernel/src/auth.rs
 
 use dashmap::DashMap;
 use sk_types::agent::UserId;

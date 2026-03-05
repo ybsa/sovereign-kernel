@@ -1,6 +1,6 @@
 //! Agent scheduler — manages agent execution and resource tracking.
 //!
-//! Ported from OpenFang's openfang-kernel/src/scheduler.rs — complete with
+//! Ported from Sovereign Kernel's Sovereign Kernel-kernel/src/scheduler.rs — complete with
 //! rolling hourly usage windows, resource quota enforcement, and task abort.
 
 use dashmap::DashMap;

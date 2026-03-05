@@ -1,6 +1,6 @@
 //! Metering engine — tracks LLM cost and enforces spending quotas.
 //!
-//! Ported from OpenFang's openfang-kernel/src/metering.rs — complete with
+//! Ported from Sovereign Kernel's Sovereign Kernel-kernel/src/metering.rs — complete with
 //! cost estimation for 30+ model families, budget status snapshots, and
 //! hourly/daily/monthly quota enforcement.
 

@@ -94,13 +94,27 @@ async fn chat_handler(
 
     info!(agent = %agent_id, "API Chat Request: {}", payload.message);
 
-    // Note: In a real implementation, we would need to handle driver initialization etc.
-    // For now, we perform a mock response or bridge to a default driver if configured.
-    // Integration with the actual sk_engine::agent_loop will be the next step.
-    
-    // For now, return a placeholder to verify the bridge works.
+    // Load existing session or create new one
+    let mut session = if let Ok(entries) = state.kernel.memory.sessions.list_for_agent(agent_id.clone()) {
+        if let Some((latest_id, _, _)) = entries.first() {
+            if let Ok(Some(loaded_session)) = state.kernel.memory.sessions.load(*latest_id) {
+                loaded_session
+            } else {
+                sk_types::Session::new(agent_id.clone())
+            }
+        } else {
+            sk_types::Session::new(agent_id.clone())
+        }
+    } else {
+        sk_types::Session::new(agent_id.clone())
+    };
+
+    let result = state.kernel.run_agent(&mut session, &payload.message)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Agent execution error: {}", e)))?;
+
     Ok(Json(ChatResponse {
-        response: format!("Sovereign (API): I received your message: '{}'", payload.message),
+        response: result.response,
         agent_id: agent_id.to_string(),
     }))
 }

@@ -68,7 +68,7 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
         println!("⚡ Channel Bridge is running.");
     }
 
-    // Start the Live Canvas dashboard (following OpenFang's run_daemon pattern)
+    // Start the Live Canvas dashboard (following Sovereign Kernel's run_daemon pattern)
     let dashboard_state = Arc::new(crate::dashboard::AppState {
         hand_registry: {
             let mut reg = sk_hands::registry::HandRegistry::new();
@@ -104,7 +104,7 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
         std::process::id()
     );
 
-    // Config hot-reload watcher (from OpenFang's server.rs)
+    // Config hot-reload watcher (from Sovereign Kernel's server.rs)
     {
         let env_path = std::path::PathBuf::from(".env");
         tokio::spawn(async move {
@@ -122,7 +122,7 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
         });
     }
 
-    // Graceful shutdown on Ctrl+C (from OpenFang)
+    // Graceful shutdown on Ctrl+C (from Sovereign Kernel)
     tokio::signal::ctrl_c()
         .await
         .expect("Failed to install Ctrl+C handler");

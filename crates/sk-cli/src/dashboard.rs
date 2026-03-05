@@ -1,9 +1,9 @@
 //! Live Canvas — embedded web dashboard for Sovereign Kernel.
 //!
-//! Follows the OpenFang pattern: compile-time embedded HTML/CSS/JS via
+//! Follows the Sovereign Kernel pattern: compile-time embedded HTML/CSS/JS via
 //! `include_str!()` and `include_bytes!()` for single-binary deployment.
 //!
-//! Features (from OpenFang):
+//! Features (from Sovereign Kernel):
 //! - Alpine.js SPA with hash-based routing
 //! - Dark/light theme toggle with system preference detection
 //! - Responsive layout with collapsible sidebar
@@ -328,7 +328,7 @@ async fn api_audit() -> axum::Json<Vec<AuditEntry>> {
 
 // ─── Router builder ──────────────────────────────────────────────────────────
 
-/// Build the full dashboard router with all routes + state (follows OpenFang's `build_router`).
+/// Build the full dashboard router with all routes + state (follows Sovereign Kernel's `build_router`).
 pub fn build_router(state: Arc<AppState>) -> Router {
     Router::new()
         // Static assets
@@ -346,18 +346,18 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route("/api/hands/active", get(api_list_hand_instances))
         // Channels
         .route("/api/channels", get(api_list_channels))
-        // Usage tracking (from OpenFang)
+        // Usage tracking (from Sovereign Kernel)
         .route("/api/usage", get(api_usage))
         .route("/api/usage/summary", get(api_usage))
-        // Audit log (from OpenFang)
+        // Audit log (from Sovereign Kernel)
         .route("/api/audit/recent", get(api_audit))
-        // OpenAI-compatible API (from OpenFang)
+        // OpenAI-compatible API (from Sovereign Kernel)
         .route(
             "/v1/chat/completions",
             axum::routing::post(crate::openai_compat::chat_completions),
         )
         .route("/v1/models", get(crate::openai_compat::list_models))
-        // Middleware (from OpenFang)
+        // Middleware (from Sovereign Kernel)
         .layer(axum::middleware::from_fn(crate::middleware::auth))
         .layer(axum::middleware::from_fn(
             crate::middleware::security_headers,

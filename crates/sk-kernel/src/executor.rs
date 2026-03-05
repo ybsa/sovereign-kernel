@@ -2,18 +2,17 @@ use sk_engine::agent_loop::AgentLoopConfig;
 use sk_types::AgentId;
 use std::sync::Arc;
 
+use crate::SovereignKernel;
+
 /// Creates a standardized AgentLoopConfig with all default tools registered.
 pub fn create_agent_config<'a>(
+    kernel: Arc<SovereignKernel>,
     driver: &'a dyn sk_engine::llm_driver::LlmDriver,
     system_prompt: String,
     model_name: String,
-    kernel_config: Arc<sk_types::config::KernelConfig>,
-    kernel_memory: Arc<sk_memory::MemorySubstrate>,
-    browser_manager: Arc<sk_engine::media::browser::BrowserManager>,
     agent_id: AgentId,
+    browser_manager: Arc<sk_engine::media::browser::BrowserManager>,
     skill_registry: Arc<sk_tools::skills::SkillRegistry>,
-    safety_enabled: bool,
-    safety_gate: Option<Arc<crate::safety::SafetyGate>>,
 ) -> AgentLoopConfig<'a> {
     let mut tools = vec![
         sk_tools::memory_tools::remember_tool(),
@@ -24,16 +23,19 @@ pub fn create_agent_config<'a>(
         sk_tools::file_ops::read_file_tool(),
         sk_tools::file_ops::write_file_tool(),
         sk_tools::file_ops::list_dir_tool(),
+        sk_tools::file_ops::delete_file_tool(),
+        sk_tools::file_ops::move_file_tool(),
+        sk_tools::file_ops::copy_file_tool(),
         sk_tools::shell::shell_exec_tool(),
+        sk_tools::code_exec::code_exec_tool(),
     ];
     tools.extend(sk_tools::browser_tools::browser_tools());
     tools.push(sk_tools::skills::get_skill_tool());
     tools.push(sk_tools::skills::list_skills_tool());
 
-    let k = kernel_memory;
     let b = browser_manager;
     let aid = agent_id;
-    let kc = kernel_config;
+    let k = kernel;
 
     AgentLoopConfig {
         driver,
@@ -48,61 +50,22 @@ pub fn create_agent_config<'a>(
             let aid = aid.clone();
             let skills = skill_registry.clone();
             let agent_id_str = aid.to_string();
-            let config = kc.clone();
+            let config = kernel.config.clone();
             let mode = config.execution_mode;
 
-            // Safety check
-            let safety_check_needed = mode == sk_types::config::ExecutionMode::Sandbox && safety_enabled;
-
-            if safety_check_needed {
-                let args = tool_call.input.clone();
-
-                // If we have a specific gate, use it
-                let blocked = if let Some(gate) = &safety_gate {
-                    let enabled = gate.enabled && !gate.is_trust_all();
-                    if enabled {
-                        gate.check(&tool_call.name, &args, Some(&aid)).is_err()
-                    } else {
-                        false
-                    }
-                } else {
-                    // Default safety check if no gate provided
-                    crate::safety::classify_tool(&tool_call.name, &args)
-                        == crate::safety::RiskLevel::Dangerous
-                };
-
-                if blocked {
+            // Enforce conversational SafetyGate in Sandbox mode
+            if mode == sk_types::config::ExecutionMode::Sandbox {
+                if let Err(detail) = kernel.safety.check(&tool_call.name, &tool_call.input, Some(&aid)) {
                     // Log the blocked action
-                    let mode_str = match mode {
-                        sk_types::config::ExecutionMode::Sandbox => "Sandbox",
-                        sk_types::config::ExecutionMode::Unrestricted => "Unrestricted",
-                    };
                     let payload = serde_json::json!({
                         "tool": tool_call.name,
-                        "args": args,
+                        "args": tool_call.input,
                         "reason": "Safety Block",
                     });
-                    if let Err(e) = kernel.audit.append_log(&aid, mode_str, "tool_call_blocked", &payload) {
+                    if let Err(e) = kernel.memory.audit.append_log(&aid, "Sandbox", "tool_call_blocked", &payload) {
                         tracing::warn!("Failed to append to audit log: {}", e);
                     }
-
-                    // Try to get specific error message from check
-                    let err_msg = if let Some(gate) = &safety_gate {
-                        match gate.check(&tool_call.name, &args, Some(&aid)) {
-                            Err(e) => e,
-                            _ => format!(
-                                "🛡️ SAFETY BLOCK: Tool '{}' requires approval.",
-                                tool_call.name
-                            ),
-                        }
-                    } else {
-                        format!("🛡️ SAFETY BLOCK: Tool '{}' was blocked because it could be destructive. \
-                                 The user needs to approve this action. \
-                                 Tell the user what you want to do and ask them to reply 'approve' to allow it.",
-                                 tool_call.name)
-                    };
-
-                    return Err(sk_types::SovereignError::ToolExecutionError(err_msg));
+                    return Err(sk_types::SovereignError::ToolExecutionError(detail));
                 }
             }
 
@@ -115,7 +78,7 @@ pub fn create_agent_config<'a>(
                 "tool": tool_call.name,
                 "args": tool_call.input,
             });
-            if let Err(e) = kernel.audit.append_log(&aid, mode_str, "tool_call", &payload) {
+            if let Err(e) = kernel.memory.audit.append_log(&aid, mode_str, "tool_call", &payload) {
                 tracing::warn!("Failed to append to audit log: {}", e);
             }
 
@@ -123,7 +86,7 @@ pub fn create_agent_config<'a>(
                 "remember" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::memory_tools::handle_remember(&kernel, aid.clone(), content)
+                        sk_tools::memory_tools::handle_remember(&kernel.memory, aid.clone(), content)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -138,7 +101,7 @@ pub fn create_agent_config<'a>(
                             .and_then(|v| v.as_u64())
                             .map(|v| v as usize)
                             .unwrap_or(5);
-                        sk_tools::memory_tools::handle_recall(&kernel, aid.clone(), query, limit)
+                        sk_tools::memory_tools::handle_recall(&kernel.memory, aid.clone(), query, limit)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -149,7 +112,7 @@ pub fn create_agent_config<'a>(
                     if let Some(args) = tool_call.input.as_object() {
                         let memory_id =
                             args.get("memory_id").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::memory_tools::handle_forget(&kernel, memory_id)
+                        sk_tools::memory_tools::handle_forget(&kernel.memory, memory_id)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -169,7 +132,10 @@ pub fn create_agent_config<'a>(
                 "web_fetch" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::web_fetch::handle_web_fetch(url)
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current()
+                                .block_on(sk_tools::web_fetch::handle_web_fetch(url))
+                        })
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -190,10 +156,12 @@ pub fn create_agent_config<'a>(
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+                        let append = args.get("append").and_then(|v| v.as_bool()).unwrap_or(false);
                         sk_tools::file_ops::handle_write_file(
                             &config.effective_workspaces_dir(),
                             path,
                             content,
+                            append,
                         )
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
@@ -211,10 +179,74 @@ pub fn create_agent_config<'a>(
                         ))
                     }
                 }
+                "delete_file" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                        sk_tools::file_ops::handle_delete_file(&config.effective_workspaces_dir(), path)
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "move_file" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let source = args.get("source").and_then(|v| v.as_str()).unwrap_or("");
+                        let dest = args.get("destination").and_then(|v| v.as_str()).unwrap_or("");
+                        sk_tools::file_ops::handle_move_file(&config.effective_workspaces_dir(), source, dest)
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "copy_file" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let source = args.get("source").and_then(|v| v.as_str()).unwrap_or("");
+                        let dest = args.get("destination").and_then(|v| v.as_str()).unwrap_or("");
+                        sk_tools::file_ops::handle_copy_file(&config.effective_workspaces_dir(), source, dest)
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
                 "shell_exec" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::shell::handle_shell_exec(&config.exec_policy, command)
+                        let working_dir = args.get("working_dir").and_then(|v| v.as_str());
+                        let timeout_secs = args.get("timeout_secs").and_then(|v| v.as_u64());
+                        
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(
+                                sk_tools::shell::handle_shell_exec(
+                                    &config.exec_policy,
+                                    command,
+                                    working_dir,
+                                    timeout_secs,
+                                )
+                            )
+                        })
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "code_exec" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let language = args.get("language").and_then(|v| v.as_str()).unwrap_or("");
+                        let code = args.get("code").and_then(|v| v.as_str()).unwrap_or("");
+                        
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(
+                                sk_tools::code_exec::handle_code_exec(
+                                    &config.exec_policy,
+                                    language,
+                                    code,
+                                )
+                            )
+                        })
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),

@@ -1,6 +1,6 @@
 //! Heartbeat monitor — detects unresponsive agents for 24/7 autonomous operation.
 //!
-//! Ported from OpenFang's openfang-kernel/src/heartbeat.rs — complete with
+//! Ported from Sovereign Kernel's Sovereign Kernel-kernel/src/heartbeat.rs — complete with
 //! quiet hours support, configurable timeouts, per-agent heartbeat intervals,
 //! and aggregate health summaries.
 

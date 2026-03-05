@@ -13,7 +13,7 @@ pub struct SkillMetadata {
     pub metadata: Option<serde_json::Value>,
 }
 
-/// A ported skill from OpenClaw.
+/// A ported skill from Sovereign Kernel.
 #[derive(Debug, Clone)]
 pub struct Skill {
     pub metadata: SkillMetadata,

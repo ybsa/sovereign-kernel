@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
-description = "Core types for the Sovereign Kernel"
+description = "Core types for the sk"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -21,3 +21,4 @@ async-trait = { workspace = true }
 hex = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
+rmp-serde = { workspace = true }

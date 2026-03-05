@@ -32,7 +32,7 @@ pub struct PairingRequest {
 }
 
 /// Persistence callback — kernel injects this so PairingManager can save without
-/// taking a direct dependency on openfang-memory.
+/// taking a direct dependency on Sovereign Kernel-memory.
 pub type PersistFn = Box<dyn Fn(&PairedDevice, PersistOp) + Send + Sync>;
 
 /// Persistence operation kind.

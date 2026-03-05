@@ -33,8 +33,8 @@ pub struct ChannelUser {
     pub platform_id: String,
     /// Human-readable display name.
     pub display_name: String,
-    /// Optional mapping to an OpenFang user identity.
-    pub openfang_user: Option<String>,
+    /// Optional mapping to an Sovereign Kernel user identity.
+    pub sk_user: Option<String>,
 }
 
 /// Content types that can be received from a channel.
@@ -204,7 +204,7 @@ pub struct ChannelStatus {
 
 /// Trait that every channel adapter must implement.
 ///
-/// A channel adapter bridges a messaging platform to the OpenFang kernel by converting
+/// A channel adapter bridges a messaging platform to the Sovereign Kernel kernel by converting
 /// platform-specific messages into `ChannelMessage` events and sending responses back.
 #[async_trait]
 pub trait ChannelAdapter: Send + Sync {
@@ -300,7 +300,7 @@ mod tests {
             sender: ChannelUser {
                 platform_id: "user1".to_string(),
                 display_name: "Alice".to_string(),
-                openfang_user: None,
+                sk_user: None,
             },
             content: ChannelContent::Text("Hello!".to_string()),
             target_agent: None,

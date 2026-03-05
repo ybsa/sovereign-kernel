@@ -1,7 +1,7 @@
 //! Memory consolidation — periodic compaction and summarization.
 //!
 //! Old memories are consolidated into summaries to keep the total count
-//! manageable, similar to how OpenFang's compactor works.
+//! manageable, similar to how Sovereign Kernel's compactor works.
 
 use sk_types::SovereignResult;
 

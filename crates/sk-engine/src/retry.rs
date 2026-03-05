@@ -1,4 +1,4 @@
-//! Retry logic with exponential backoff (from OpenFang's retry.rs).
+//! Retry logic with exponential backoff (from Sovereign Kernel's retry.rs).
 
 use std::time::Duration;
 

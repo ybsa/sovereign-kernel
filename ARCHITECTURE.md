@@ -9,7 +9,7 @@ Defines shared data structures including `Message`, `ToolCall`, `AgentManifest`,
 
 ### 2. `sk-engine` (The Brain)
 Manages the agent logic loop, LLM driver integration (OpenAI, Copilot, Fallback), and tool execution.
-- **Runtime Engine**: Houses **32 modules** ported from OpenFang, including `browser_tools`, `docker_sandbox`, `web_fetch`, `media_understanding`, and LLM-based `compactor`.
+- **Runtime Engine**: Houses **32 modules** ported from Sovereign Kernel, including `browser_tools`, `docker_sandbox`, `web_fetch`, `media_understanding`, and LLM-based `compactor`.
 - **Loop Guards**: Implements `loop_guard`, `tool_policy`, and `session_repair` to prevent autonomous runaway.
 
 ### 3. `sk-kernel` (The Supervisor)
@@ -26,8 +26,11 @@ A native Rust implementation of the Model Context Protocol (MCP). Allows the ker
 
 ### 7. `sk-tools` (The Hands)
 Provides the interface between the agent and the host system.
-- **Native Tools**: High-performance Rust implementations for filesystem, shell, and browser management.
-- **Skills System**: A dynamic registry of **52 expert skills** (Obsidian, GitHub, Weather) ported from OpenClaw. Parsed from `SKILL.md` files to provide on-demand instructions without prompt bloat.
+- **Shell Hand** (`shell.rs`): Executes commands with per-tool timeout, working directory scoping, and separate stdout/stderr capture. Enforces an `ExecPolicy` allowlist in Sandbox mode.
+- **File Hand** (`file_ops.rs`): Full filesystem operations — read (1MB limit), write, append, delete, move, copy, list (with rich metadata). Path validation prevents traversal outside the workspace root in Sandbox mode.
+- **Web Hand** (`web_fetch.rs`): Fetches web pages using `reqwest` with automatic HTML-to-text stripping and response truncation.
+- **Code Hand** (`code_exec.rs`): Sandboxed script runner for Python, Node.js, and Bash, with configurable timeouts and security policy gating.
+- **Skills System**: A dynamic registry of **52 expert skills** (Obsidian, GitHub, Weather) parsed from `SKILL.md` files to provide on-demand instructions without prompt bloat.
 
 ### 8. `sk-cli` (The Shell)
 The user interface. Provides the entry point for starting the kernel daemon and interacting via a terminal REPL.

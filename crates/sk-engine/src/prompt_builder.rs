@@ -1,7 +1,7 @@
 //! System prompt builder — assembles the system prompt with Soul + Persona + Memories.
 //!
-//! This module fuses OpenFang's structured, multi-section prompt system with
-//! OpenClaw's dynamic persona and memory elements.
+//! This module fuses Sovereign Kernel's structured, multi-section prompt system with
+//! Sovereign Kernel's dynamic persona and memory elements.
 
 use chrono::Local;
 use sk_soul::{Persona, SoulIdentity};
@@ -11,8 +11,8 @@ use sk_types::ToolDefinition;
 ///
 /// Layers:
 /// 1. Identity (from SOUL.md / Manifest)
-/// 2. Tooling & Tool Call Behavior (OpenFang DNA)
-/// 3. Workspace & Runtime (OpenClaw DNA)
+/// 2. Tooling & Tool Call Behavior (Sovereign Kernel DNA)
+/// 3. Workspace & Runtime (Sovereign Kernel DNA)
 /// 4. Operational Guidelines & Safety
 /// 5. Recalled Memories (Continuity)
 pub fn build_system_prompt(
@@ -40,11 +40,11 @@ pub fn build_system_prompt(
         parts.push(format!("## Instructions\n\n{base_instructions}"));
     }
 
-    // 2. Tooling (OpenFang DNA)
+    // 2. Tooling (Sovereign Kernel DNA)
     parts.push(build_tools_section(granted_tools));
     parts.push(TOOL_CALL_BEHAVIOR.to_string());
 
-    // 3. Workspace & Runtime Context (OpenClaw DNA)
+    // 3. Workspace & Runtime Context (Sovereign Kernel DNA)
     let now = Local::now();
     let time_str = now.format("%Y-%m-%d %H:%M:%S %z").to_string();
 

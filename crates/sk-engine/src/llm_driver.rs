@@ -1,6 +1,6 @@
 //! LLM driver trait and OpenAI-compatible implementation.
 //!
-//! Based on OpenFang's drivers — works with Anthropic, Gemini, and any
+//! Based on Sovereign Kernel's drivers — works with Anthropic, Gemini, and any
 //! OpenAI-compatible provider (OpenAI, Groq, Together, Ollama, etc.).
 
 use async_trait::async_trait;

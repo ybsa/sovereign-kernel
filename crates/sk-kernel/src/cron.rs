@@ -1,6 +1,6 @@
 //! Cron job scheduler engine for the Sovereign Kernel.
 //!
-//! Ported from OpenFang's openfang-kernel/src/cron.rs — complete with
+//! Ported from Sovereign Kernel's Sovereign Kernel-kernel/src/cron.rs — complete with
 //! job persistence, CRUD, due-job querying, one-shot/recurring modes,
 //! auto-disable on repeated failures, and global/per-agent limits.
 

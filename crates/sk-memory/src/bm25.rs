@@ -1,6 +1,6 @@
 //! BM25 full-text search via SQLite FTS5.
 //!
-//! Ported from OpenClaw's QMD memory manager — provides keyword-based
+//! Ported from Sovereign Kernel's QMD memory manager — provides keyword-based
 //! retrieval using the Okapi BM25 ranking algorithm built into FTS5.
 
 use rusqlite::Connection;

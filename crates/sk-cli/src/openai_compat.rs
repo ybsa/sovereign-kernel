@@ -1,6 +1,6 @@
 //! OpenAI-compatible `/v1/chat/completions` API endpoint.
 //!
-//! Ported from OpenFang's `openai_compat.rs`. Allows any OpenAI-compatible
+//! Ported from Sovereign Kernel's `openai_compat.rs`. Allows any OpenAI-compatible
 //! client library (Python openai, curl, ChatGPT UIs) to talk to Sovereign Kernel.
 //!
 //! The `model` field resolves to the default agent. Supports non-streaming responses.
@@ -13,7 +13,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-// ── Request types (from OpenFang) ──────────────────────────────────────────
+// ── Request types (from Sovereign Kernel) ──────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -58,7 +58,7 @@ pub struct OaiImageUrlRef {
     pub url: String,
 }
 
-// ── Response types (from OpenFang) ──────────────────────────────────────────
+// ── Response types (from Sovereign Kernel) ──────────────────────────────────────────
 
 #[derive(Serialize)]
 struct ChatCompletionResponse {

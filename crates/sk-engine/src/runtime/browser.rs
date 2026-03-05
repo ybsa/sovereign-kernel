@@ -120,7 +120,7 @@ impl BrowserManager {
         if let Some(path) = self.bridge_path.get() {
             return Ok(path);
         }
-        let dir = std::env::temp_dir().join("openfang");
+        let dir = std::env::temp_dir().join("Sovereign Kernel");
         std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create temp dir: {e}"))?;
         let path = dir.join("browser_bridge.py");
         std::fs::write(&path, BRIDGE_SCRIPT)
@@ -432,7 +432,7 @@ pub async fn tool_browser_screenshot(
     let mut image_urls: Vec<String> = Vec::new();
     if !b64.is_empty() {
         use base64::Engine;
-        let upload_dir = std::env::temp_dir().join("openfang_uploads");
+        let upload_dir = std::env::temp_dir().join("sk_uploads");
         let _ = std::fs::create_dir_all(&upload_dir);
         let file_id = uuid::Uuid::new_v4().to_string();
         if let Ok(decoded) = base64::engine::general_purpose::STANDARD.decode(b64) {

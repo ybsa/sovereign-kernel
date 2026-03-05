@@ -3,7 +3,7 @@ name = "sk-channels"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Channel Bridge Layer — pluggable messaging integrations for Sovereign Kernel"
+description = "Channel Bridge Layer — pluggable messaging integrations for sk"
 
 [dependencies]
 sk-types = { path = "../sk-types" }

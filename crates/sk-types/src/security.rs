@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 /// Information flow taint label.
 ///
 /// Labels propagate through execution — secrets are tracked from source to sink.
-/// Inspired by OpenFang's 16-layer security model.
+/// Inspired by Sovereign Kernel's 16-layer security model.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TaintLabel {

@@ -8,7 +8,7 @@ use thiserror::Error;
 pub enum KernelError {
     /// A wrapped SovereignError.
     #[error(transparent)]
-    OpenFang(#[from] SovereignError),
+    SovereignKernel(#[from] SovereignError),
 
     /// The kernel failed to boot.
     #[error("Boot failed: {0}")]

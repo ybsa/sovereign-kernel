@@ -1,4 +1,4 @@
-//! Configuration types for the OpenFang kernel.
+//! Configuration types for the Sovereign Kernel kernel.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -359,7 +359,7 @@ impl Default for WebhookTriggerConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            token_env: "OPENFANG_WEBHOOK_TOKEN".to_string(),
+            token_env: "sk_WEBHOOK_TOKEN".to_string(),
             max_payload_bytes: 65536,
             rate_limit_per_minute: 30,
         }
@@ -477,7 +477,7 @@ pub struct DockerSandboxConfig {
     pub enabled: bool,
     /// Docker image for exec sandbox. Default: "python:3.12-slim".
     pub image: String,
-    /// Container name prefix. Default: "openfang-sandbox".
+    /// Container name prefix. Default: "Sovereign Kernel-sandbox".
     pub container_prefix: String,
     /// Working directory inside container. Default: "/workspace".
     pub workdir: String,
@@ -532,7 +532,7 @@ impl Default for DockerSandboxConfig {
         Self {
             enabled: false,
             image: "python:3.12-slim".to_string(),
-            container_prefix: "openfang-sandbox".to_string(),
+            container_prefix: "Sovereign Kernel-sandbox".to_string(),
             workdir: "/workspace".to_string(),
             network: "none".to_string(),
             memory_limit: "512m".to_string(),
@@ -614,7 +614,7 @@ impl Default for ExtensionsConfig {
 pub struct VaultConfig {
     /// Whether the vault is enabled (auto-detected if vault.enc exists).
     pub enabled: bool,
-    /// Custom vault file path (default: ~/.openfang/vault.enc).
+    /// Custom vault file path (default: ~/.Sovereign Kernel/vault.enc).
     pub path: Option<PathBuf>,
 }
 
@@ -956,9 +956,9 @@ pub enum ExecutionMode {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct KernelConfig {
-    /// OpenFang home directory (default: ~/.openfang).
+    /// Sovereign Kernel home directory (default: ~/.Sovereign Kernel).
     pub home_dir: PathBuf,
-    /// Data directory for databases (default: ~/.openfang/data).
+    /// Data directory for databases (default: ~/.Sovereign Kernel/data).
     pub data_dir: PathBuf,
     /// Log level (trace, debug, info, warn, error).
     pub log_level: String,
@@ -1016,7 +1016,7 @@ pub struct KernelConfig {
     /// Credential vault configuration.
     #[serde(default)]
     pub vault: VaultConfig,
-    /// Root directory for agent workspaces. Default: `~/.openfang/workspaces`
+    /// Root directory for agent workspaces. Default: `~/.Sovereign Kernel/workspaces`
     #[serde(default)]
     pub workspaces_dir: Option<PathBuf>,
     /// Media understanding configuration.
@@ -1177,7 +1177,7 @@ fn default_language() -> String {
 
 impl Default for KernelConfig {
     fn default() -> Self {
-        let home_dir = dirs_next_home().join(".openfang");
+        let home_dir = dirs_next_home().join(".Sovereign Kernel");
         Self {
             data_dir: home_dir.join("data"),
             home_dir,
@@ -1697,7 +1697,7 @@ impl Default for SignalConfig {
 pub struct MatrixConfig {
     /// Matrix homeserver URL (e.g., `"https://matrix.org"`).
     pub homeserver_url: String,
-    /// Bot user ID (e.g., "@openfang:matrix.org").
+    /// Bot user ID (e.g., "@Sovereign Kernel:matrix.org").
     pub user_id: String,
     /// Env var name holding the access token.
     pub access_token_env: String,
@@ -1843,7 +1843,7 @@ pub struct IrcConfig {
     pub nick: String,
     /// Env var name holding the server password (optional).
     pub password_env: Option<String>,
-    /// Channels to join (e.g., `["#openfang", "#general"]`).
+    /// Channels to join (e.g., `["#Sovereign Kernel", "#general"]`).
     pub channels: Vec<String>,
     /// Use TLS (requires tokio-native-tls).
     pub use_tls: bool,
@@ -1859,7 +1859,7 @@ impl Default for IrcConfig {
         Self {
             server: "irc.libera.chat".to_string(),
             port: 6667,
-            nick: "openfang".to_string(),
+            nick: "Sovereign Kernel".to_string(),
             password_env: None,
             channels: vec![],
             use_tls: false,
@@ -1920,7 +1920,7 @@ impl Default for TwitchConfig {
         Self {
             oauth_token_env: "TWITCH_OAUTH_TOKEN".to_string(),
             channels: vec![],
-            nick: "openfang".to_string(),
+            nick: "Sovereign Kernel".to_string(),
             default_agent: None,
             overrides: ChannelOverrides::default(),
         }
@@ -2536,7 +2536,7 @@ impl Default for MumbleConfig {
         Self {
             host: String::new(),
             port: 64738,
-            username: "openfang".to_string(),
+            username: "Sovereign Kernel".to_string(),
             password_env: "MUMBLE_PASSWORD".to_string(),
             channel: String::new(),
             default_agent: None,
@@ -3312,7 +3312,7 @@ mod tests {
     fn test_validate_missing_env_vars() {
         let mut config = KernelConfig::default();
         config.channels.discord = Some(DiscordConfig {
-            bot_token_env: "OPENFANG_TEST_NONEXISTENT_VAR_DC".to_string(),
+            bot_token_env: "sk_TEST_NONEXISTENT_VAR_DC".to_string(),
             ..Default::default()
         });
         let warnings = config.validate();
@@ -3412,7 +3412,7 @@ mod tests {
         let irc = IrcConfig::default();
         assert_eq!(irc.server, "irc.libera.chat");
         assert_eq!(irc.port, 6667);
-        assert_eq!(irc.nick, "openfang");
+        assert_eq!(irc.nick, "Sovereign Kernel");
         assert!(!irc.use_tls);
     }
 
@@ -3427,7 +3427,7 @@ mod tests {
     fn test_twitch_config_defaults() {
         let tw = TwitchConfig::default();
         assert_eq!(tw.oauth_token_env, "TWITCH_OAUTH_TOKEN");
-        assert_eq!(tw.nick, "openfang");
+        assert_eq!(tw.nick, "Sovereign Kernel");
     }
 
     #[test]

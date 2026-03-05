@@ -464,12 +464,12 @@ mod tests {
 
     #[test]
     fn env_var_requirement_check() {
-        std::env::set_var("OPENFANG_TEST_HAND_REQ", "test_value");
+        std::env::set_var("sk_TEST_HAND_REQ", "test_value");
         let req = HandRequirement {
             key: "test".to_string(),
             label: "test".to_string(),
             requirement_type: RequirementType::EnvVar,
-            check_value: "OPENFANG_TEST_HAND_REQ".to_string(),
+            check_value: "sk_TEST_HAND_REQ".to_string(),
             description: None,
             install: None,
         };
@@ -479,11 +479,11 @@ mod tests {
             key: "test".to_string(),
             label: "test".to_string(),
             requirement_type: RequirementType::EnvVar,
-            check_value: "OPENFANG_NONEXISTENT_VAR_12345".to_string(),
+            check_value: "sk_NONEXISTENT_VAR_12345".to_string(),
             description: None,
             install: None,
         };
         assert!(!check_requirement(&req_missing));
-        std::env::remove_var("OPENFANG_TEST_HAND_REQ");
+        std::env::remove_var("sk_TEST_HAND_REQ");
     }
 }

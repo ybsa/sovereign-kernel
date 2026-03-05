@@ -73,7 +73,7 @@ impl NostrAdapter {
     fn build_subscription(&self, pubkey: &str) -> String {
         let filter = serde_json::json!([
             "REQ",
-            "openfang-sub",
+            "Sovereign Kernel-sub",
             {
                 "kinds": [4],
                 "#p": [pubkey],
@@ -216,7 +216,7 @@ impl ChannelAdapter for NostrAdapter {
                     let sub_msg = {
                         let filter = serde_json::json!([
                             "REQ",
-                            "openfang-sub",
+                            "Sovereign Kernel-sub",
                             {
                                 "kinds": [4],
                                 "#p": [&own_pubkey],
@@ -243,7 +243,7 @@ impl ChannelAdapter for NostrAdapter {
                             _ = relay_shutdown_rx.changed() => {
                                 info!("Nostr: relay {relay_url} shutting down");
                                 // Send CLOSE
-                                let close_msg = serde_json::json!(["CLOSE", "openfang-sub"]);
+                                let close_msg = serde_json::json!(["CLOSE", "Sovereign Kernel-sub"]);
                                 let _ = write.send(
                                     tokio_tungstenite::tungstenite::Message::Text(
                                         serde_json::to_string(&close_msg).unwrap_or_default()
@@ -341,7 +341,7 @@ impl ChannelAdapter for NostrAdapter {
                                     "{}...",
                                     &sender_pubkey[..8.min(sender_pubkey.len())]
                                 ),
-                                openfang_user: None,
+                                sk_user: None,
                             },
                             content: msg_content,
                             target_agent: None,
@@ -457,7 +457,7 @@ mod tests {
         let pubkey = adapter.derive_pubkey();
         let sub = adapter.build_subscription(&pubkey);
         assert!(sub.contains("REQ"));
-        assert!(sub.contains("openfang-sub"));
+        assert!(sub.contains("Sovereign Kernel-sub"));
         assert!(sub.contains(&pubkey));
     }
 

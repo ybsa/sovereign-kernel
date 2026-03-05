@@ -444,8 +444,8 @@ mod tests {
 
     #[test]
     fn test_sanitize_container_name_valid() {
-        let result = sanitize_container_name("openfang-sandbox-abc123").unwrap();
-        assert_eq!(result, "openfang-sandbox-abc123");
+        let result = sanitize_container_name("Sovereign Kernel-sandbox-abc123").unwrap();
+        assert_eq!(result, "Sovereign Kernel-sandbox-abc123");
     }
 
     #[test]
@@ -523,7 +523,7 @@ mod tests {
         let config = DockerSandboxConfig::default();
         assert!(!config.enabled);
         assert_eq!(config.image, "python:3.12-slim");
-        assert_eq!(config.container_prefix, "openfang-sandbox");
+        assert_eq!(config.container_prefix, "Sovereign Kernel-sandbox");
         assert_eq!(config.workdir, "/workspace");
         assert_eq!(config.network, "none");
         assert_eq!(config.memory_limit, "512m");

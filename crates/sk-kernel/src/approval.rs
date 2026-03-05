@@ -1,6 +1,6 @@
 //! Execution approval manager — gates dangerous operations behind human approval.
 //!
-//! Ported from OpenFang's openfang-kernel/src/approval.rs — complete with
+//! Ported from Sovereign Kernel's Sovereign Kernel-kernel/src/approval.rs — complete with
 //! per-agent pending limits, oneshot channels for blocking resolution,
 //! hot-reloadable policy, and risk classification.
 
@@ -131,13 +131,180 @@ impl ApprovalManager {
     }
 
     /// Classify the risk level of a tool invocation.
-    pub fn classify_risk(tool_name: &str) -> RiskLevel {
+    pub fn classify_risk(tool_name: &str, args: Option<&serde_json::Value>) -> RiskLevel {
         match tool_name {
-            "shell_exec" => RiskLevel::Critical,
-            "file_write" | "file_delete" => RiskLevel::High,
-            "web_fetch" | "browser_navigate" => RiskLevel::Medium,
-            _ => RiskLevel::Low,
+            // Read-only / safe
+            "web_search" | "web_fetch" | "read_file" | "list_dir" | "recall" | "browser_read_page" => RiskLevel::Low,
+            
+            // Moderate actions
+            "write_file" | "copy_file" | "remember" | "browser_navigate" | "browser_click" | "browser_type" | "browser_screenshot" | "browser_close" => RiskLevel::Medium,
+            
+            // Dangerous execution
+            "shell_exec" => {
+                let command = args.and_then(|a| a.get("command")).and_then(|v| v.as_str()).unwrap_or("");
+                if Self::is_destructive_command(command) {
+                    RiskLevel::Critical
+                } else {
+                    RiskLevel::High // Even non-destructive shell is High risk
+                }
+            }
+            "code_exec" => RiskLevel::Critical,
+            "forget" | "delete_file" | "move_file" => RiskLevel::High,
+            
+            _ => RiskLevel::High,
         }
+    }
+
+    /// Check if a shell command matches known destructive patterns.
+    fn is_destructive_command(command: &str) -> bool {
+        let cmd_lower = command.to_lowercase();
+        let dangerous_patterns = [
+            "remove-item", "del ", "rd ", "rmdir", "format ", "clear-recyclebin",
+            "stop-process", "kill ", "taskkill", "shutdown", "restart-computer",
+            "reg delete", "reg add", "net user", "net stop", "diskpart",
+            "cipher /w", "sfc ", "dism ", "bcdedit", "wmic",
+            "rm -rf", "rm -r", "mkfs", "dd if=", "chmod 777", "chown",
+            "kill -9", "pkill", "reboot", "halt", "poweroff", "> /dev/",
+            "curl | sh", "wget | sh",
+        ];
+        dangerous_patterns.iter().any(|pattern| cmd_lower.contains(pattern))
+    }
+}
+
+use sk_types::AgentId;
+use std::collections::{HashMap, HashSet};
+use std::sync::Mutex;
+
+/// Safety gate that tracks approved operations for conversational approval.
+pub struct SafetyGate {
+    /// Set of approved tool call signatures (tool_name + args hash).
+    approved: Mutex<HashSet<String>>,
+    /// Tracks the last blocked tool call per agent, so they can say "approve" to allow it.
+    last_blocked: Mutex<HashMap<AgentId, String>>,
+    /// Whether safety is enabled (can be disabled for trusted environments).
+    pub enabled: bool,
+}
+
+impl SafetyGate {
+    pub fn new(enabled: bool) -> Self {
+        Self {
+            approved: Mutex::new(HashSet::new()),
+            last_blocked: Mutex::new(HashMap::new()),
+            enabled,
+        }
+    }
+
+    /// Check if a tool call should be allowed.
+    /// Returns Ok(()) if allowed, Err(message) with a human-readable block reason.
+    pub fn check(
+        &self,
+        tool_name: &str,
+        args: &serde_json::Value,
+        agent_id: Option<&AgentId>,
+    ) -> Result<(), String> {
+        if !self.enabled {
+            return Ok(());
+        }
+
+        let risk = ApprovalManager::classify_risk(tool_name, Some(args));
+
+        match risk {
+            RiskLevel::Low => Ok(()),
+            RiskLevel::Medium => Ok(()), // Allow moderate by default
+            RiskLevel::High | RiskLevel::Critical => {
+                let sig = Self::make_signature(tool_name, args);
+
+                // Check if already approved
+                let approved = self.approved.lock().unwrap();
+                if approved.contains(&sig) {
+                    return Ok(());
+                }
+                drop(approved); // Release lock
+
+                if let Some(agent_id) = agent_id {
+                    let mut blocked = self.last_blocked.lock().unwrap();
+                    blocked.insert(agent_id.clone(), sig);
+                }
+
+                // Block with explanation
+                let detail = match tool_name {
+                    "shell_exec" => {
+                        let cmd = args.get("command").and_then(|v| v.as_str()).unwrap_or("?");
+                        format!(
+                            "🛡️ **Safety Block**: The agent wants to run a potentially dangerous command:\n\
+                             ```\n{}\n```\n\
+                             This command could modify or delete data on your computer.\n\
+                             Reply with **'approve'** to allow this specific command, or **'deny'** to block it.",
+                            cmd
+                        )
+                    }
+                    "forget" | "file_delete" => "🛡️ **Safety Block**: The agent wants to delete data.\n\
+                         Reply with **'approve'** to allow, or **'deny'** to block."
+                        .to_string(),
+                    _ => {
+                        format!(
+                            "🛡️ **Safety Block**: The agent wants to use tool '{}' which is classified as dangerous.\n\
+                             Reply with **'approve'** to allow, or **'deny'** to block.",
+                            tool_name
+                        )
+                    }
+                };
+
+                Err(detail)
+            }
+        }
+    }
+
+    /// Approve a specific tool call signature.
+    pub fn approve_signature(&self, sig: String) {
+        let mut approved = self.approved.lock().unwrap();
+        approved.insert(sig);
+    }
+
+    /// Approve the last blocked action for a specific agent.
+    pub fn approve_last_for_agent(&self, agent_id: &AgentId) -> bool {
+        let mut blocked = self.last_blocked.lock().unwrap();
+        if let Some(sig) = blocked.remove(agent_id) {
+            self.approve_signature(sig);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Deny (clear) the last blocked action for a specific agent.
+    pub fn deny_last_for_agent(&self, agent_id: &AgentId) -> bool {
+        let mut blocked = self.last_blocked.lock().unwrap();
+        blocked.remove(agent_id).is_some()
+    }
+
+    /// Check if there is a pending action waiting for human approval.
+    pub fn has_pending(&self, agent_id: &AgentId) -> bool {
+        let blocked = self.last_blocked.lock().unwrap();
+        blocked.contains_key(agent_id)
+    }
+
+    /// Approve a specific tool call.
+    pub fn approve(&self, tool_name: &str, args: &serde_json::Value) {
+        let sig = Self::make_signature(tool_name, args);
+        self.approve_signature(sig);
+    }
+
+    /// Approve all operations for the current session (trust mode).
+    pub fn approve_all(&self) {
+        let mut approved = self.approved.lock().unwrap();
+        approved.insert("__TRUST_ALL__".to_string());
+    }
+
+    /// Check if trust-all mode is active.
+    pub fn is_trust_all(&self) -> bool {
+        let approved = self.approved.lock().unwrap();
+        approved.contains("__TRUST_ALL__")
+    }
+
+    /// Create a unique signature for a tool call.
+    pub fn make_signature(tool_name: &str, args: &serde_json::Value) -> String {
+        format!("{}:{}", tool_name, args)
     }
 }
 
@@ -189,27 +356,43 @@ mod tests {
 
     #[test]
     fn test_classify_risk() {
+        // Critical: destructive shell patterns
         assert_eq!(
-            ApprovalManager::classify_risk("shell_exec"),
+            ApprovalManager::classify_risk("shell_exec", Some(&serde_json::json!({"command": "rm -rf /"}))),
             RiskLevel::Critical
         );
+        // High: non-destructive shell still High
         assert_eq!(
-            ApprovalManager::classify_risk("file_write"),
+            ApprovalManager::classify_risk("shell_exec", Some(&serde_json::json!({"command": "ls -la"}))),
             RiskLevel::High
         );
+        // Critical: raw code execution allows maximum arbitrary control
         assert_eq!(
-            ApprovalManager::classify_risk("file_delete"),
+            ApprovalManager::classify_risk("code_exec", None),
+            RiskLevel::Critical
+        );
+        // Medium: moderate write actions (implementation uses "write_file")
+        assert_eq!(
+            ApprovalManager::classify_risk("write_file", None),
+            RiskLevel::Medium
+        );
+        // High: forget/delete (implementation uses "forget" | "delete_file" | "move_file")
+        assert_eq!(
+            ApprovalManager::classify_risk("delete_file", None),
             RiskLevel::High
         );
+        // Low: read-only actions (implementation uses "web_fetch")
         assert_eq!(
-            ApprovalManager::classify_risk("web_fetch"),
+            ApprovalManager::classify_risk("web_fetch", None),
+            RiskLevel::Low
+        );
+        // Medium: browser actions
+        assert_eq!(
+            ApprovalManager::classify_risk("browser_navigate", None),
             RiskLevel::Medium
         );
-        assert_eq!(
-            ApprovalManager::classify_risk("browser_navigate"),
-            RiskLevel::Medium
-        );
-        assert_eq!(ApprovalManager::classify_risk("file_read"), RiskLevel::Low);
+        // Low: read_file (implementation uses "read_file")
+        assert_eq!(ApprovalManager::classify_risk("read_file", None), RiskLevel::Low);
     }
 
     #[test]

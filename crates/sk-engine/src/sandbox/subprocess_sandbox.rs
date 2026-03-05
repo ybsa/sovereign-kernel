@@ -326,7 +326,7 @@ async fn kill_tree_windows(pid: u32, grace_ms: u64) -> Result<bool, String> {
 /// Kill a tokio child process with tree kill.
 ///
 /// Extracts the PID from the `Child` handle and performs a tree kill.
-/// This is the preferred way to clean up subprocesses spawned by OpenFang.
+/// This is the preferred way to clean up subprocesses spawned by Sovereign Kernel.
 pub async fn kill_child_tree(
     child: &mut tokio::process::Child,
     grace_ms: u64,

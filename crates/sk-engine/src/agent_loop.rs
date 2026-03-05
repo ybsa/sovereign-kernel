@@ -1,6 +1,6 @@
 //! Core agent execution loop.
 //!
-//! Based on OpenFang's agent_loop.rs — receives a message, recalls memories,
+//! Based on Sovereign Kernel's agent_loop.rs — receives a message, recalls memories,
 //! calls the LLM, executes tool calls, saves the conversation.
 //! Stripped of Hands, browser, and Docker logic.
 

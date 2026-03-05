@@ -8,11 +8,11 @@
 # Sovereign Kernel: The Agentic Operating System
 
 > [!WARNING]
-> **Active Development Notice**: Sovereign Kernel is currently highly experimental software. We are actively porting features from OpenFang and OpenClaw into this new Rust architecture. Expect breaking changes.
+> **Active Development Notice**: Sovereign Kernel is currently highly experimental software. We are actively porting features from its industrial predecessors into this new unified Rust architecture. Expect breaking changes.
 
 **Sovereign Kernel** is a virtual operating system for agents that runs on top of real operating systems. 
 
-By merging the indestructible, memory-safe Rust daemon core of **OpenFang** with the expansive integrations and memory systems of **OpenClaw**, we are building the universal infrastructure layer for the next generation of AI. It is not just a framework; it is the mediation layer between Autonomous Entities and the silicon they run on.
+By merging an indestructible, memory-safe Rust daemon core with expansive integrations and sophisticated memory systems, we are building the universal infrastructure layer for the next generation of AI. It is not just a framework; it is the mediation layer between Autonomous Entities and the silicon they run on.
 
 ---
 
@@ -43,16 +43,16 @@ Sovereign Kernel is designed for complex, long-running agentic workflows.
 
 The Sovereign Kernel is a meticulously architected 8-crate workspace that brings together the best of two worlds:
 
-1.  **The Engine (OpenFang DNA)**: Provides the robust, multi-threaded core (`sk-engine`, `sk-kernel`, `sk-types`, `sk-tools`, `sk-cli`). Includes **32 ported runtime modules** for sandboxing, web scraping, media processing, and memory compaction.
+1.  **The Engine (Sovereign Kernel DNA)**: Provides the robust, multi-threaded core (`sk-engine`, `sk-kernel`, `sk-types`, `sk-tools`, `sk-cli`). Includes **32 ported runtime modules** for sandboxing, web scraping, media processing, and memory compaction.
 2.  **The Soul (OpenClaw DNA)**: Supplies the sophisticated "human" elements (`sk-soul`, `sk-memory`, `sk-mcp`). It deeply integrates the 31k line identity logic and a dynamic **52-skill ecosystem** (Obsidian, GitHub, etc.) ported from OpenClaw.
 
 ## 🆚 The Reality Check: Sovereign Kernel vs. Ancestors
 
-Let's be completely rigorous and transparent. While Sovereign Kernel is the *future* of this architecture, its ancestors (**OpenFang** and **OpenClaw**) represent massive engineering efforts with vastly larger feature sets. Sovereign Kernel is an early-stage, clean-slate rewrite that is currently missing most of the advanced infrastructure.
+Let's be completely rigorous and transparent. While Sovereign Kernel is the *future* of this architecture, its ancestors (**Sovereign Kernel** and **OpenClaw**) represent massive engineering efforts with vastly larger feature sets. Sovereign Kernel is an early-stage, clean-slate rewrite that is currently missing most of the advanced infrastructure.
 
 Here is the objective state of the project based on actual codebase metrics:
 
-| Category | OpenFang Has | Sovereign Kernel Has | Gap |
+| Category | Sovereign Kernel Has | Sovereign Kernel Has | Gap |
 | :--- | :--- | :--- | :--- |
 | **Runtime modules** | 32 | 32 | **Ported** |
 | **Skill Integrations** | 52 | 52 | **Ported** |
@@ -67,7 +67,7 @@ Here is the objective state of the project based on actual codebase metrics:
 | **API Bridge** | Advanced Headless API | Axum-based HTTP/JSON API + Webhooks | **Ported** |
 | **Channels** | 40 adapters | 2 (Telegram, Discord) | 38 missing |
 
-*(Sovereign Kernel is currently actively porting legacy features. It has established the core memory representations, execution guardrails, cost metering, and isolation layers, but still lacks full UI and channel ecosystems from OpenFang.)*
+*(Sovereign Kernel is currently actively porting legacy features. It has established the core memory representations, execution guardrails, cost metering, and isolation layers, but still lacks full UI and channel ecosystems from Sovereign Kernel.)*
 
 ## ⚖️ The Honest Comparison (Best vs. Worst)
 
@@ -77,7 +77,7 @@ We believe in radical transparency. Here is how Sovereign Kernel stacks up again
 | :--- | :--- | :--- |
 | **Sovereign Kernel** | **Clean Architecture**: 8-crate modular design.<br>**Blazingly Fast**: 100% Rust engine with minimal bloat. | **Incomplete UI ecosystem**: Missing nearly all advanced web and desktop UI features of its ancestors.<br>**No UI**: Strictly command-line. |
 | **OpenClaw (Node.js)** | **Rich Interfaces**: Incredible macOS app, Canvas, and WebChat UI.<br>**Massive Reach**: Plug-and-play with WhatsApp, Telegram, iMessage, etc. | **Resource Heavy**: Node.js ecosystem consumes significant RAM.<br>**Lower Security**: Lacks process-level WASM sandboxing. |
-| **OpenFang (Rust)** | **Production Ready**: 16-layer security model and highly robust agent loop.<br>**Ecosystem**: 40+ adapters and deep sandbox implementations. | **Legacy Architecture**: Massive, tightly-coupled codebase that is harder to extend safely. |
+| **Sovereign Kernel (Rust)** | **Production Ready**: 16-layer security model and highly robust agent loop.<br>**Ecosystem**: 40+ adapters and deep sandbox implementations. | **Legacy Architecture**: Massive, tightly-coupled codebase that is harder to extend safely. |
 
 *(See [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive into the 8-crate system).*
 

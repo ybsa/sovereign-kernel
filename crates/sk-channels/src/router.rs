@@ -23,7 +23,7 @@ pub struct BindingContext {
 ///
 /// Routing priority: direct routes > user defaults > system default.
 pub struct AgentRouter {
-    /// Default agent per user (keyed by openfang_user or platform_id).
+    /// Default agent per user (keyed by sk_user or platform_id).
     user_defaults: DashMap<String, AgentId>,
     /// Direct routes: (channel_type_key, platform_user_id) -> AgentId.
     direct_routes: DashMap<(String, String), AgentId>,

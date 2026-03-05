@@ -1,14 +1,14 @@
-//! Shared tool name mappings between OpenClaw and OpenFang.
+//! Shared tool name mappings between Sovereign Kernel and Sovereign Kernel.
 //!
 //! These mappings are used by both the migration engine and the skill system
-//! to normalize OpenClaw tool names into OpenFang equivalents.
+//! to normalize Sovereign Kernel tool names into Sovereign Kernel equivalents.
 
-/// Map an OpenClaw tool name to its OpenFang equivalent.
+/// Map an Sovereign Kernel tool name to its Sovereign Kernel equivalent.
 ///
 /// Returns `None` if the name has no known mapping (may already be
-/// an OpenFang tool name — check with [`is_known_openfang_tool`]).
-pub fn map_tool_name(openclaw_name: &str) -> Option<&'static str> {
-    match openclaw_name {
+/// an Sovereign Kernel tool name — check with [`is_known_sk_tool`]).
+pub fn map_tool_name(sk_name: &str) -> Option<&'static str> {
+    match sk_name {
         // Claude-style tool names (capitalized)
         "Read" | "read" | "read_file" => Some("file_read"),
         "Write" | "write" | "write_file" => Some("file_write"),
@@ -28,8 +28,8 @@ pub fn map_tool_name(openclaw_name: &str) -> Option<&'static str> {
     }
 }
 
-/// Check if a tool name is a known OpenFang built-in tool.
-pub fn is_known_openfang_tool(name: &str) -> bool {
+/// Check if a tool name is a known Sovereign Kernel built-in tool.
+pub fn is_known_sk_tool(name: &str) -> bool {
     matches!(
         name,
         "file_read"
@@ -110,7 +110,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_known_openfang_tool() {
+    fn test_is_known_sk_tool() {
         // All 23 built-in tools + location_get
         let known = [
             "file_read",
@@ -139,12 +139,12 @@ mod tests {
             "location_get",
         ];
         for tool in &known {
-            assert!(is_known_openfang_tool(tool), "Expected {tool} to be known");
+            assert!(is_known_sk_tool(tool), "Expected {tool} to be known");
         }
 
         // Unknown
-        assert!(!is_known_openfang_tool("unknown"));
-        assert!(!is_known_openfang_tool("Read"));
-        assert!(!is_known_openfang_tool("Bash"));
+        assert!(!is_known_sk_tool("unknown"));
+        assert!(!is_known_sk_tool("Read"));
+        assert!(!is_known_sk_tool("Bash"));
     }
 }

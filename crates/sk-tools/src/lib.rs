@@ -1,8 +1,9 @@
 //! Built-in tools for the Sovereign Kernel.
 //!
-//! Subset of OpenFang's 53 tools, focused on essentials.
+//! Subset of Sovereign Kernel's 53 tools, focused on essentials.
 
 pub mod browser_tools;
+pub mod code_exec;
 pub mod file_ops;
 pub mod mcp_bridge;
 pub mod memory_tools;

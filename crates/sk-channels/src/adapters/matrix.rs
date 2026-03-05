@@ -22,7 +22,7 @@ const MAX_MESSAGE_LEN: usize = 4096;
 pub struct MatrixAdapter {
     /// Matrix homeserver URL (e.g., `"https://matrix.org"`).
     homeserver_url: String,
-    /// Bot's user ID (e.g., "@openfang:matrix.org").
+    /// Bot's user ID (e.g., "@Sovereign Kernel:matrix.org").
     user_id: String,
     /// SECURITY: Access token is zeroized on drop.
     access_token: Zeroizing<String>,
@@ -251,7 +251,7 @@ impl ChannelAdapter for MatrixAdapter {
                                     sender: ChannelUser {
                                         platform_id: room_id.clone(),
                                         display_name: sender.to_string(),
-                                        openfang_user: None,
+                                        sk_user: None,
                                     },
                                     content: msg_content,
                                     target_agent: None,

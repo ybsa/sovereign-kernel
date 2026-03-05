@@ -79,6 +79,9 @@ rand = "0.8"
 # Lightweight regex
 regex-lite = "0.1"
 
+# MessagePack serialization (for agent manifest round-trips)
+rmp-serde = "1"
+
 # Testing
 tokio-test = "0.4"
 tempfile = "3"

@@ -358,7 +358,7 @@ fn parse_feishu_event(event: &serde_json::Value) -> Option<ChannelMessage> {
         sender: ChannelUser {
             platform_id: chat_id,
             display_name: sender_id,
-            openfang_user: None,
+            sk_user: None,
         },
         content: msg_content,
         target_agent: None,
@@ -478,7 +478,7 @@ impl ChannelAdapter for FeishuAdapter {
                                             sender: ChannelUser {
                                                 platform_id: chat_id,
                                                 display_name: open_id,
-                                                openfang_user: None,
+                                                sk_user: None,
                                             },
                                             content,
                                             target_agent: None,

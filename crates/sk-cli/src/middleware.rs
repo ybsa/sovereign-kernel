@@ -1,6 +1,6 @@
 //! Security middleware — API key auth + rate limiting.
 //!
-//! Ported from OpenFang's `middleware.rs`.
+//! Ported from Sovereign Kernel's `middleware.rs`.
 //! If `SOVEREIGN_API_KEY` env var is set, all `/api/*` and `/v1/*` routes
 //! require the key in either `Authorization: Bearer <key>` or `X-API-Key: <key>`.
 //! Requests to `/` (dashboard), `/logo.png`, `/favicon.ico` are always allowed.
@@ -41,7 +41,7 @@ pub async fn auth(req: Request<Body>, next: Next) -> Result<Response, StatusCode
     }
 }
 
-/// Security headers middleware (from OpenFang).
+/// Security headers middleware (from Sovereign Kernel).
 pub async fn security_headers(req: Request<Body>, next: Next) -> Response {
     let mut response = next.run(req).await;
     let headers = response.headers_mut();

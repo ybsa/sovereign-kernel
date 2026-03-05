@@ -48,7 +48,7 @@ impl WebFetchEngine {
         let resp = self
             .client
             .get(url)
-            .header("User-Agent", "Mozilla/5.0 (compatible; OpenFangAgent/0.1)")
+            .header("User-Agent", "Mozilla/5.0 (compatible; Sovereign KernelAgent/0.1)")
             .send()
             .await
             .map_err(|e| format!("HTTP request failed: {e}"))?;

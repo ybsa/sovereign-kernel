@@ -1,6 +1,6 @@
 //! Hybrid search — combines BM25 keyword search with vector similarity.
 //!
-//! Ported from OpenClaw's hybrid.ts. Uses Reciprocal Rank Fusion (RRF)
+//! Ported from Sovereign Kernel's hybrid.ts. Uses Reciprocal Rank Fusion (RRF)
 //! to merge results from both search backends.
 
 /// A hybrid search result combining BM25 and vector scores.

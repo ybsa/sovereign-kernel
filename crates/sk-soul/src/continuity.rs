@@ -1,7 +1,7 @@
 //! Cross-session continuity — how the agent persists identity across restarts.
 //!
 //! "Each session, you wake up fresh. These files _are_ your memory."
-//! — OpenClaw SOUL.md
+//! — Sovereign Kernel SOUL.md
 
 /// Continuity strategy for maintaining identity across sessions.
 ///

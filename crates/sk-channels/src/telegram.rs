@@ -68,7 +68,7 @@ impl ChannelAdapter for TelegramAdapter {
                             sender: ChannelUser {
                                 platform_id: msg.chat.id.0.to_string(), // Route replies back to this chat
                                 display_name: sender_name,
-                                openfang_user: None,
+                                sk_user: None,
                             },
                             content: ChannelContent::Text(text.to_string()),
                             target_agent: None,
