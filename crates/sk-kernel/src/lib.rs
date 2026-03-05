@@ -10,6 +10,7 @@ pub mod auto_reply;
 pub mod background;
 pub mod capabilities;
 pub mod config;
+pub mod bus;
 pub mod config_reload;
 pub mod cron;
 pub mod error;

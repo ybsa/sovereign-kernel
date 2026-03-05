@@ -28,10 +28,58 @@ pub fn create_agent_config<'a>(
         sk_tools::file_ops::copy_file_tool(),
         sk_tools::shell::shell_exec_tool(),
         sk_tools::code_exec::code_exec_tool(),
+        sk_tools::shared_memory::shared_memory_store_tool(),
+        sk_tools::shared_memory::shared_memory_recall_tool(),
     ];
     tools.extend(sk_tools::browser_tools::browser_tools());
     tools.push(sk_tools::skills::get_skill_tool());
     tools.push(sk_tools::skills::list_skills_tool());
+
+    // Agent-to-Agent message tool
+    tools.push(sk_types::ToolDefinition {
+        name: "agent_message".into(),
+        description: "Send a direct message to another active agent on the system. Use this to coordinate or delegate tasks.".into(),
+        input_schema: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "to_agent_id": {
+                    "type": "string",
+                    "description": "The unique Agent ID of the recipient."
+                },
+                "message": {
+                    "type": "string",
+                    "description": "The contents of the message to send."
+                }
+            },
+            "required": ["to_agent_id", "message"]
+        }),
+    });
+
+    tools.push(sk_types::ToolDefinition {
+        name: "agent_spawn_worker".into(),
+        description: "Dynamically spawn a background worker agent. It will run in Sandbox mode and will ask the user for permission on actions. You can continue working while it runs. Use agent_check_worker to see its status.".into(),
+        input_schema: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "worker_name": { "type": "string", "description": "Name of the worker (e.g. 'researcher')" },
+                "task_description": { "type": "string", "description": "What the worker should do. Provide complete details and goals." },
+                "capabilities": { "type": "array", "items": { "type": "string" }, "description": "Capabilities the worker needs (e.g. 'web', 'file_read', 'browser')" }
+            },
+            "required": ["worker_name", "task_description", "capabilities"]
+        }),
+    });
+
+    tools.push(sk_types::ToolDefinition {
+        name: "agent_check_worker".into(),
+        description: "Check the latest status of a spawned worker agent.".into(),
+        input_schema: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "worker_id": { "type": "string", "description": "The Agent ID of the worker" }
+            },
+            "required": ["worker_id"]
+        })
+    });
 
     let b = browser_manager;
     let aid = agent_id;
@@ -51,7 +99,17 @@ pub fn create_agent_config<'a>(
             let skills = skill_registry.clone();
             let agent_id_str = aid.to_string();
             let config = kernel.config.clone();
-            let mode = config.execution_mode;
+            let default_mode = config.execution_mode;
+            let force_sandbox = kernel.memory.structured.get(aid, "forced_sandbox")
+                .unwrap_or(None)
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            
+            let mode = if force_sandbox {
+                sk_types::config::ExecutionMode::Sandbox
+            } else {
+                default_mode
+            };
 
             // Enforce conversational SafetyGate in Sandbox mode
             if mode == sk_types::config::ExecutionMode::Sandbox {
@@ -83,6 +141,153 @@ pub fn create_agent_config<'a>(
             }
 
             match tool_call.name.as_str() {
+                "agent_message" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let to_agent_id_str = args.get("to_agent_id").and_then(|v| v.as_str()).unwrap_or("");
+                        let message = args.get("message").and_then(|v| v.as_str()).unwrap_or("");
+                        if let Ok(to_id) = std::str::FromStr::from_str(to_agent_id_str) {
+                            match kernel.bus.send(Some(&aid), &to_id, message.to_string()) {
+                                Ok(_) => Ok(format!("Message successfully sent to agent {}", to_id)),
+                                Err(e) => Err(sk_types::SovereignError::ToolExecutionError(e)),
+                            }
+                        } else {
+                            Err(sk_types::SovereignError::ToolExecutionError("Invalid to_agent_id format".into()))
+                        }
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                    }
+                }
+                "agent_spawn_worker" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let worker_name = args.get("worker_name").and_then(|v| v.as_str()).unwrap_or("worker");
+                        let task_desc = args.get("task_description").and_then(|v| v.as_str()).unwrap_or("");
+                        let caps: Vec<String> = args.get("capabilities")
+                            .and_then(|v| v.as_array())
+                            .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                            .unwrap_or_default();
+                        
+                        let intent = crate::wizard::AgentIntent {
+                            name: worker_name.to_string(),
+                            description: format!("Temporary worker for parent {}", aid),
+                            task: task_desc.to_string(),
+                            skills: vec![],
+                            model_tier: "simple".to_string(),
+                            scheduled: false,
+                            schedule: None,
+                            capabilities: caps,
+                        };
+                        
+                        let _plan = crate::wizard::SetupWizard::build_plan(intent);
+                        let worker_id = sk_types::AgentId::new();
+                        
+                        // Per User request, FORCED to Sandbox mode.
+                        let _ = kernel.memory.structured.set(worker_id, "forced_sandbox", serde_json::Value::Bool(true));
+                        
+                        // Create initialization session
+                        let mut worker_session = sk_types::Session::new(worker_id.clone());
+                        let startup_message = format!("You are a spawned worker agent. Your task is: {}\nWhen you finish or need help, use the agent_message tool to message your manager agent ID: {}", task_desc, aid);
+                        worker_session.push_message(sk_types::Message::user(&startup_message));
+                        
+                        let _ = kernel.memory.sessions.save(&worker_session);
+                        
+                        let worker_id_str = worker_id.to_string();
+                        let kernel_clone = kernel.clone();
+                        
+                        // Spawn background worker execution
+                        tokio::spawn(async move {
+                            if let Ok(session) = kernel_clone.memory.sessions.load(worker_session.id) {
+                                if let Some(mut session) = session {
+                                    let _ = kernel_clone.run_agent(&mut session, &startup_message).await;
+                                }
+                            }
+                        });
+                        
+                        Ok(format!("Worker spawned successfully! Worker ID: {}. It is running in Sandbox mode in the background.", worker_id_str))
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                    }
+                }
+                "agent_check_worker" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let worker_id_str = args.get("worker_id").and_then(|v| v.as_str()).unwrap_or("");
+                        if let Ok(worker_id) = std::str::FromStr::from_str(worker_id_str) {
+                            if let Ok(sessions) = kernel.memory.sessions.list_for_agent(worker_id) {
+                                if let Some((session_id, _, _)) = sessions.first() {
+                                    if let Ok(Some(session)) = kernel.memory.sessions.load(*session_id) {
+                                        let last_msg = session.messages.last().map(|m| m.content.clone());
+                                        Ok(format!("Worker latest activity: {:?}", last_msg))
+                                    } else {
+                                        Ok("Worker initialized, but no activity yet.".to_string())
+                                    }
+                                } else {
+                                    Ok("Worker has no active session.".to_string())
+                                }
+                            } else {
+                                Ok("Failed to check worker.".to_string())
+                            }
+                        } else {
+                            Err(sk_types::SovereignError::ToolExecutionError("Invalid worker_id format".into()))
+                        }
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                    }
+                }
+                "shared_memory_store" => {
+                    // Requires SharedMemory capability
+                    let granted = kernel.memory.structured.get(aid.clone(), "capabilities")
+                        .unwrap_or(None)
+                        .map(|v| serde_json::from_value::<Vec<sk_types::capability::Capability>>(v).unwrap_or_default())
+                        .unwrap_or_default();
+                    
+                    // We must check if the agent actually has this Capability
+                    let has_cap = granted.iter().any(|c| sk_types::capability::capability_matches(c, &sk_types::capability::Capability::SharedMemory));
+                    if !has_cap && mode != sk_types::config::ExecutionMode::Unrestricted {
+                        return Err(sk_types::SovereignError::CapabilityDenied("Agent lacks `SharedMemory` capability".into()));
+                    }
+
+                    if let Some(args) = tool_call.input.as_object() {
+                        let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+                        let topic = args.get("topic").and_then(|v| v.as_str()).unwrap_or("");
+                        match kernel.memory.shared.store(aid, content, topic) {
+                            Ok(_) => Ok("Successfully stored fact in shared semantic memory.".to_string()),
+                            Err(e) => Err(sk_types::SovereignError::ToolExecutionError(e.to_string())),
+                        }
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                    }
+                }
+                "shared_memory_recall" => {
+                    // Requires SharedMemory capability
+                    let granted = kernel.memory.structured.get(aid.clone(), "capabilities")
+                        .unwrap_or(None)
+                        .map(|v| serde_json::from_value::<Vec<sk_types::capability::Capability>>(v).unwrap_or_default())
+                        .unwrap_or_default();
+                    
+                    let has_cap = granted.iter().any(|c| sk_types::capability::capability_matches(c, &sk_types::capability::Capability::SharedMemory));
+                    if !has_cap && mode != sk_types::config::ExecutionMode::Unrestricted {
+                        return Err(sk_types::SovereignError::CapabilityDenied("Agent lacks `SharedMemory` capability".into()));
+                    }
+
+                    if let Some(args) = tool_call.input.as_object() {
+                        let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
+                        match kernel.memory.shared.recall(query) {
+                            Ok(results) => {
+                                if results.is_empty() {
+                                    Ok("No relevant shared knowledge found.".to_string())
+                                } else {
+                                    let mut out = String::from("Recalled shared knowledge:\n");
+                                    for (author, content, date) in results {
+                                        out.push_str(&format!("- [{}] (by {}): {}\n", date, author, content));
+                                    }
+                                    Ok(out)
+                                }
+                            }
+                            Err(e) => Err(sk_types::SovereignError::ToolExecutionError(e.to_string())),
+                        }
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                    }
+                }
                 "remember" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");

@@ -21,6 +21,8 @@ The OS monitor that manages agent lifecycles and system-level concerns.
 - Background scheduler (cron-based task triggers)
 - Heartbeat monitor with configurable timeouts
 - Config hot-reload without daemon restart
+- **Inter-Agent Bus** (`bus.rs`): Persistent message routing between agents
+- **Worker Spawning**: Dynamic sub-agent creation with forced Sandbox mode
 - OpenAI-compatible `/v1/chat/completions` API bridge
 - Pairing/auth system for secure remote agent access
 
@@ -32,6 +34,7 @@ A unified memory system for persistent agent state.
 - **SQLite** for sessions, key-value store, and audit logs
 - **BM25 full-text search** for semantic memory recall
 - **Knowledge Graph** for entity-relation storage
+- **Shared Semantic Memory** (`shared.rs`): Global knowledge pool accessible across all authorized agents
 - **Cryptographic Merkle Audit Trail** — every action is SHA-256 chained; any tampering is detectable
 
 ### 6. `sk-mcp` — The Nervous System
@@ -79,6 +82,27 @@ The user-facing binary (`sovereign`) and the embedded terminal web dashboard.
   - Three-pane layout: agents/hands panel | live log stream | command bar
   - REST API: `/api/status`, `/api/hands`, `/api/agents`, `/api/audit/recent`
   - OpenAI-compatible: `/v1/chat/completions`, `/v1/models`
+
+---
+
+## 🤖 Multi-Agent Coordination
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **Inter-Agent Bus** | `sk-kernel/src/bus.rs` | Persistent message routing — messages saved to target agent's SQLite session |
+| **Worker Spawning** | `sk-kernel/src/executor.rs` | Dynamic sub-agent creation via `SetupWizard`, auto-forced to Sandbox mode |
+| **Shared Memory** | `sk-memory/src/shared.rs` | Global `global_knowledge` table accessible by agents with `SharedMemory` capability |
+| **Capability Gate** | `sk-types/src/capability.rs` | `Capability::SharedMemory` controls access to the global knowledge pool |
+
+```
+Manager Agent
+    ├── agent_spawn_worker("researcher", "Find X")
+    │       └── Worker Agent (Sandbox Mode)
+    │           ├── web_search("X")
+    │           └── agent_message(manager_id, "Found X: ...")
+    └── agent_check_worker(worker_id)
+            └── "Status: completed"
+```
 
 ---
 

@@ -28,6 +28,8 @@ pub struct SovereignKernel {
     pub browser: Arc<sk_engine::media::browser::BrowserManager>,
     /// Skill registry.
     pub skills: Arc<sk_tools::skills::SkillRegistry>,
+    /// Agent-to-Agent message bus.
+    pub bus: Arc<crate::bus::InterAgentBus>,
 }
 
 impl SovereignKernel {
@@ -150,6 +152,8 @@ impl SovereignKernel {
             .join("skills");
         let skills = Arc::new(sk_tools::skills::SkillRegistry::load_from_dir(skills_path));
 
+        let bus = Arc::new(crate::bus::InterAgentBus::new(memory.clone()));
+
         Ok(Self {
             config,
             soul,
@@ -160,6 +164,7 @@ impl SovereignKernel {
             model_name,
             browser,
             skills,
+            bus,
         })
     }
 

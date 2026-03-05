@@ -18,6 +18,7 @@ pub mod knowledge;
 pub mod mmr;
 pub mod semantic;
 pub mod session;
+pub mod shared;
 pub mod structured;
 pub mod substrate;
 pub mod temporal_decay;

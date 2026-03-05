@@ -70,6 +70,8 @@ pub enum Capability {
     AgentManage,
     /// Can modify kernel configuration.
     ConfigWrite,
+    /// Can access the global shared semantic memory table.
+    SharedMemory,
     /// Full access (superuser).
     Admin,
 }

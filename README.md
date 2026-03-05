@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/language-Rust-orange?style=flat-square" alt="Rust" />
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT" />
-  <img src="https://img.shields.io/badge/status-Phase%2013%20Complete-brightgreen?style=flat-square" alt="Status" />
+  <img src="https://img.shields.io/badge/status-Phase%2015%20Complete-brightgreen?style=flat-square" alt="Status" />
   <img src="https://img.shields.io/badge/hands-9%20Bundled-brightgreen?style=flat-square" alt="Hands" />
   <img src="https://img.shields.io/badge/security-Merkle%20Audit%20Trail-brightgreen?style=flat-square" alt="Security" />
 </p>
@@ -126,6 +126,22 @@ sovereign dashboard --no-open    # Don't auto-open browser
 
 ---
 
+## 🤖 Multi-Agent Coordination (Phase 15)
+
+Sovereign Kernel now supports **swarm intelligence** — agents can communicate, delegate tasks, and share knowledge.
+
+| Feature | Tool | Description |
+|---------|------|-------------|
+| **Agent Messaging** | `agent_message` | Send direct messages between agents via the Inter-Agent Bus |
+| **Worker Spawning** | `agent_spawn_worker` | Dynamically spawn sandboxed worker agents for parallel tasks |
+| **Worker Status** | `agent_check_worker` | Poll the status and results of spawned workers |
+| **Shared Memory Store** | `shared_memory_store` | Store facts globally for all authorized agents |
+| **Shared Memory Recall** | `shared_memory_recall` | Search the global knowledge pool |
+
+> **Security**: All spawned workers are **forced into Sandbox mode** — they must ask the user for permission on every action, regardless of the parent agent's mode.
+
+---
+
 ## 🏗️ Architecture (9-Crate Workspace)
 
 ```
@@ -154,7 +170,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive.
 | 12 | ✅ Complete | Terminal Web Dashboard (`sovereign dashboard`) |
 | 13 | ✅ Complete | Core Tools Upgrade: Shell, File, Code, Browser Hands |
 | 14 | ✅ Complete | Optional Hands: Web Search, Email |
-| 15 | 🔲 Planned | Multi-Agent Coordination & Orchestration |
+| 15 | ✅ Complete | Multi-Agent Coordination: A2A Bus, Worker Spawning, Shared Memory |
 
 ---
 

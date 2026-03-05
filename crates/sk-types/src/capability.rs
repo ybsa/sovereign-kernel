@@ -47,6 +47,8 @@ pub enum Capability {
     MemoryRead(String),
     /// Write to memory scopes matching the pattern.
     MemoryWrite(String),
+    /// Access the global shared semantic memory table.
+    SharedMemory,
 
     // -- Shell --
     /// Execute shell commands matching the pattern.
@@ -148,6 +150,7 @@ pub fn capability_matches(granted: &Capability, required: &Capability) -> bool {
         (Capability::OfpDiscover, Capability::OfpDiscover) => true,
         (Capability::OfpAdvertise, Capability::OfpAdvertise) => true,
         (Capability::EconEarn, Capability::EconEarn) => true,
+        (Capability::SharedMemory, Capability::SharedMemory) => true,
 
         // Numeric capabilities
         (Capability::NetListen(granted_port), Capability::NetListen(required_port)) => {

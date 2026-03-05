@@ -124,6 +124,11 @@ sovereign --config config.unrestricted.toml chat
 | `knowledge_add_entity` | Add to knowledge graph |
 | `schedule_create` / `schedule_list` | Manage cron-based tasks |
 | `get_skill` / `list_skills` | Access 52 expert skill prompts |
+| `agent_message` | Send a direct message to another active agent |
+| `agent_spawn_worker` | Spawn a sandboxed background worker agent |
+| `agent_check_worker` | Check the status of a spawned worker |
+| `shared_memory_store` | Store facts in global shared memory |
+| `shared_memory_recall` | Search the global shared knowledge pool |
 
 ---
 
@@ -136,6 +141,24 @@ sovereign audit verify            # Verify chain integrity (detects tampering)
 ```
 
 Audit entries include: agent ID, action type, timestamp, and SHA-256 chained hash.
+
+---
+
+## 🤖 Multi-Agent Coordination
+
+Agents can now communicate, delegate tasks, and share knowledge across the swarm.
+
+### Agent Messaging
+Agents send direct messages to each other via the **Inter-Agent Bus**. Messages are persisted in the recipient's session — they'll see them on their next activation.
+
+### Worker Spawning
+A manager agent can spawn a background worker for parallel tasks:
+- Workers are **forced into Sandbox mode** — every action requires your approval
+- Use `agent_check_worker` to poll the worker's progress
+- Workers message results back to the manager via `agent_message`
+
+### Shared Memory
+Agents with the `SharedMemory` capability can store and recall facts from a global knowledge pool, enabling cross-agent context sharing.
 
 ---
 

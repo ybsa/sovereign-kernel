@@ -8,6 +8,7 @@ use crate::bm25::Bm25Index;
 use crate::knowledge::KnowledgeStore;
 use crate::semantic::SemanticStore;
 use crate::session::SessionStore;
+use crate::shared::SharedMemoryStore;
 use crate::structured::StructuredStore;
 use rusqlite::Connection;
 use sk_types::{SovereignError, SovereignResult};
@@ -28,6 +29,8 @@ pub struct MemorySubstrate {
     pub semantic: SemanticStore,
     /// Entity-relation knowledge graph.
     pub knowledge: KnowledgeStore,
+    /// Shared semantic memory across agents.
+    pub shared: SharedMemoryStore,
     /// Session persistence.
     pub sessions: SessionStore,
     /// Cryptographic audit trail.
@@ -53,6 +56,7 @@ impl MemorySubstrate {
         let structured = StructuredStore::new(Arc::clone(&conn));
         let semantic = SemanticStore::new(Arc::clone(&conn));
         let knowledge = KnowledgeStore::new(Arc::clone(&conn));
+        let shared = SharedMemoryStore::new(Arc::clone(&conn));
         let sessions = SessionStore::new(Arc::clone(&conn));
         let audit = AuditStore::new(Arc::clone(&conn));
         let bm25 = Bm25Index::new(Arc::clone(&conn));
@@ -62,6 +66,7 @@ impl MemorySubstrate {
             structured,
             semantic,
             knowledge,
+            shared,
             sessions,
             audit,
             bm25,
@@ -87,6 +92,7 @@ impl MemorySubstrate {
         let structured = StructuredStore::new(Arc::clone(&conn));
         let semantic = SemanticStore::new(Arc::clone(&conn));
         let knowledge = KnowledgeStore::new(Arc::clone(&conn));
+        let shared = SharedMemoryStore::new(Arc::clone(&conn));
         let sessions = SessionStore::new(Arc::clone(&conn));
         let audit = AuditStore::new(Arc::clone(&conn));
         let bm25 = Bm25Index::new(Arc::clone(&conn));
@@ -96,6 +102,7 @@ impl MemorySubstrate {
             structured,
             semantic,
             knowledge,
+            shared,
             sessions,
             audit,
             bm25,
@@ -179,6 +186,16 @@ impl MemorySubstrate {
                 FOREIGN KEY (to_entity) REFERENCES knowledge_entities(id)
             );
             CREATE INDEX IF NOT EXISTS idx_relations_agent ON knowledge_relations(agent_id);
+
+            -- Shared global knowledge graph
+            CREATE TABLE IF NOT EXISTS global_knowledge (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                author_id TEXT NOT NULL,
+                content TEXT NOT NULL,
+                topic TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_global_topic ON global_knowledge(topic);
 
             -- BM25 full-text search
             CREATE VIRTUAL TABLE IF NOT EXISTS fts_memories USING fts5(
