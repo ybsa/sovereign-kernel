@@ -1,11 +1,9 @@
 use async_trait::async_trait;
 use dashmap::DashMap;
 use sk_channels::bridge::ChannelBridgeHandle;
-use sk_engine::media::browser::BrowserManager;
 use sk_kernel::SovereignKernel;
 use sk_types::AgentId;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tracing::{error, info};
 
 pub struct SovereignBridge {

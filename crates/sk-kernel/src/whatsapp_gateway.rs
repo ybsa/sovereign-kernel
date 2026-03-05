@@ -4,10 +4,13 @@
 //! runs `npm install` if needed, and spawns `node index.js` as a managed child process
 //! that auto-restarts on crash.
 
+// Gateway infrastructure is ready for future wiring — suppress unused warnings.
+#![allow(dead_code)]
+
 // use sk_types::config::sk_home; (does not exist, we will use a local fn)
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Gateway source files will need to be properly provided during runtime or packed.
 const GATEWAY_INDEX_JS: &str = "";
@@ -134,7 +137,7 @@ async fn node_available() -> bool {
 /// 5. Monitors the process and restarts on crash (up to 3 times)
 ///
 /// The PID is stored in the kernel's `whatsapp_gateway_pid` for shutdown cleanup.
-pub async fn start_whatsapp_gateway(kernel: &Arc<crate::kernel::SovereignKernel>) {
+pub async fn start_whatsapp_gateway(_kernel: &Arc<crate::kernel::SovereignKernel>) {
     // Note: Config access would be implemented here. For now, we will return.
     return;
 }

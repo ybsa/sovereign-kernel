@@ -1,67 +1,162 @@
-# 📖 Sovereign Kernel Usage Guide
-
-Welcome to the Sovereign Kernel. This guide covers how to set up, configure, and run your autonomous agents.
+# 📖 Sovereign Kernel — Usage Guide
 
 ## 🚀 Quick Start
 
-### 1. Build the Kernel
-Ensure you have the Rust toolchain installed.
+### 1. Build
 ```bash
 cargo build --release
 ```
 
-### 2. Initialize Setup
-Run the CLI to configure your environment and LLM providers.
+### 2. First-Time Setup
 ```bash
-./target/release/sk-cli onboard
+./target/release/sovereign init       # Interactive setup wizard
+```
+Sets up your LLM API key, execution mode, and agent identity.
+
+### 3. Run
+
+| Command | What It Does |
+|---------|-------------|
+| `sovereign chat` | Interactive terminal REPL |
+| `sovereign start` | Start as background daemon |
+| `sovereign status` | Check if daemon is running |
+| `sovereign stop` | Stop the daemon |
+| `sovereign dashboard` | Open terminal web dashboard |
+| `sovereign hands list` | List all 9 bundled hands |
+| `sovereign audit logs` | View cryptographic audit trail |
+
+---
+
+## 🛠️ Setting Your LLM API Key
+
+Add to your `.env` file in the project root (the kernel auto-detects which key is set):
+
+```env
+ANTHROPIC_API_KEY=your-key   # Claude (recommended)
+OPENAI_API_KEY=your-key      # GPT-4o
+GEMINI_API_KEY=your-key      # Google Gemini
+GROQ_API_KEY=your-key        # Llama 3 (free tier)
+GITHUB_TOKEN=your-token      # GitHub Copilot
 ```
 
-### 3. Boot the System
-Start the agent loop and enter the interactive REPL.
+---
+
+## 🖥️ Terminal Web Dashboard
+
 ```bash
-./target/release/sk-cli boot
+sovereign dashboard              # Opens at http://localhost:8080
+sovereign dashboard --port 9090  # Custom port
+sovereign dashboard --no-open    # Don't auto-open browser
 ```
 
-## 🛠️ Configuration
+The dashboard is **fully embedded in the binary** — no Node.js, no npm.
 
-The system is configured via `.env` and `config.toml` in your workspace directory (default: `~/.sovereign/`).
+Features:
+- Live agent and hand status panel
+- Real-time log stream (every tool call and result)
+- Approval queue for risky actions
+- REST API at `/api/status`, `/api/hands`, `/api/agents`
 
-### LLM Providers
-Supported drivers:
-- **OpenAI**: GPT-4o, GPT-3.5-Turbo
-- **Gemini**: Pro 1.5, Flash
-- **Copilot**: Native GitHub Copilot integration
-- **Fallback**: Automatic driver failover if your primary provider is down.
+---
 
-## 🛡️ Security Modes
+## 🖐️ Managing Hands
 
-Sovereign Kernel supports two primary execution modes:
+Hands are autonomous capability agents you can activate:
 
-### 1. Sandbox Mode (Recommended)
-- **Host Isolation**: Tools run in WASM or Docker.
-- **Approvals**: All file/shell actions require Y/N confirmation.
-- **Resource Limits**: Metered CPU/Memory usage.
+```bash
+sovereign hands list                  # Show all 9 hands with requirements
+sovereign hands activate browser      # Start the browser automation hand
+sovereign hands activate web-search   # Start the web research hand
+sovereign hands activate email        # Start the email management hand
+sovereign hands status                # Show all running hand instances
+sovereign hands deactivate <uuid>     # Stop a specific hand
+```
 
-### 2. Unrestricted Mode
-- **Native Execution**: Tools run directly on the host.
-- **Autonomous**: No approval gates.
-- **Power**: Use for trusted local automation.
+### Setting Up the Email Hand
+Add to your `.env`:
+```env
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=you@gmail.com
+SMTP_PASS=your-app-password
+IMAP_HOST=imap.gmail.com
+```
 
-## 🧰 Built-in Tools
+### Setting Up the Web Search Hand
+Add to your `.env`:
+```env
+BRAVE_API_KEY=your-key    # or TAVILY_API_KEY
+```
 
-Your agents come equipped with:
-- **ShellExec**: Execute terminal commands safely.
-- **FileSystem**: Read/Write files within the workspace.
-- **WebBrowser**: Search and scrape the web.
-- **Memory**: Persistent vector-based long-term memory (Hybrid SQLite + BM25).
-- **Skills**: 52 dynamic expert skills (use `list_skills` and `get_skill`).
-- **MCP**: Support for the Model Context Protocol.
+---
 
-## 📊 Monitoring & Audits
+## 🛡️ Execution Modes
 
-- **Logs**: Located in `logs/kernel.log`.
-- **Audit Trails**: See `audit/merkle_chain.db` for serialized, signed history.
-- **REPL Commands**:
-  - `/status`: Show current agent health.
-  - `/history`: Review recent actions.
-  - `/approve`: Manage pending action requests.
+### Sandbox Mode *(Default — Recommended)*
+- All file/shell actions require approval (`config.toml`: `mode = "Sandbox"`)
+- File access restricted to workspace directory
+- Shell commands must be on the allowlist (`exec_policy.allowed_commands`)
+
+### Unrestricted Mode
+- No approval gates — agent acts autonomously
+- Full filesystem and shell access
+- Use `config.unrestricted.toml` for trusted local automation:
+```bash
+sovereign --config config.unrestricted.toml chat
+```
+
+---
+
+## 🧰 Built-In Tools Available to Agents
+
+| Tool | Description |
+|------|-------------|
+| `shell_exec` | Run terminal commands (ExecPolicy enforced in Sandbox) |
+| `file_read` / `file_write` | Read/write files (path-sanitized) |
+| `file_list` / `file_delete` | Browse and manage filesystem |
+| `web_fetch` | Fetch and extract text from URLs |
+| `web_search` | Search the web (requires BRAVE_API_KEY or TAVILY_API_KEY) |
+| `code_exec` | Run Python, Node.js, or Bash scripts |
+| `browser_navigate` | Open URLs in Playwright browser |
+| `browser_click` / `browser_type` | Interact with web pages |
+| `browser_screenshot` | Capture screenshots |
+| `memory_store` / `memory_recall` | Persistent key-value memory |
+| `knowledge_add_entity` | Add to knowledge graph |
+| `schedule_create` / `schedule_list` | Manage cron-based tasks |
+| `get_skill` / `list_skills` | Access 52 expert skill prompts |
+
+---
+
+## 📊 Audit Trail
+
+Every agent action is cryptographically logged in a Merkle chain:
+```bash
+sovereign audit logs              # View recent audit entries
+sovereign audit verify            # Verify chain integrity (detects tampering)
+```
+
+Audit entries include: agent ID, action type, timestamp, and SHA-256 chained hash.
+
+---
+
+## 🧬 Agent Identity
+
+Edit `soul/SOUL.md` to customize your agent's name, personality, and behavioral constraints. The kernel loads this at startup and injects it into every agent's system prompt.
+
+---
+
+## ⚙️ Configuration Reference
+
+`config.toml` (default location: `~/.sovereign/config.toml`):
+
+```toml
+[kernel]
+mode = "Sandbox"          # or "Unrestricted"
+
+[model]
+provider = "anthropic"
+model = "claude-3-5-sonnet-20241022"
+
+[exec_policy]
+allowed_commands = ["git", "cargo", "python", "node", "npm"]
+```

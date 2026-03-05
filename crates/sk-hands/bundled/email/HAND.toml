@@ -1,0 +1,243 @@
+id = "email"
+name = "Email Hand"
+description = "Autonomous email manager — reads inbox, drafts replies, sends messages, and manages follow-ups on your behalf"
+category = "communication"
+icon = "📧"
+tools = [
+    "shell_exec", "file_write", "file_read",
+    "memory_store", "memory_recall",
+    "knowledge_add_entity", "knowledge_add_relation", "knowledge_query",
+    "schedule_create", "schedule_list", "schedule_delete",
+    "event_publish",
+    "web_fetch",
+]
+
+[[requires]]
+key = "SMTP_HOST"
+label = "SMTP host must be configured"
+requirement_type = "env_var"
+check_value = "SMTP_HOST"
+description = "SMTP server hostname for sending email (e.g. smtp.gmail.com)"
+
+[requires.install]
+env_example = "SMTP_HOST=smtp.gmail.com"
+estimated_time = "5-10 min"
+steps = [
+    "Set SMTP_HOST in your .env (e.g. smtp.gmail.com for Gmail)",
+    "Set SMTP_PORT (usually 587 for TLS)",
+    "Set SMTP_USER (your email address)",
+    "Set SMTP_PASS (your password or app password)",
+    "Set IMAP_HOST for reading email (e.g. imap.gmail.com)",
+]
+
+[[requires]]
+key = "SMTP_USER"
+label = "SMTP username must be set"
+requirement_type = "env_var"
+check_value = "SMTP_USER"
+description = "Your email address, used as the sender and IMAP login"
+
+[requires.install]
+env_example = "SMTP_USER=you@gmail.com"
+estimated_time = "1 min"
+steps = [
+    "Set SMTP_USER=your_email@domain.com in your .env file",
+]
+
+[[requires]]
+key = "SMTP_PASS"
+label = "SMTP password must be set"
+requirement_type = "env_var"
+check_value = "SMTP_PASS"
+description = "Email password or app-specific password (Gmail requires an App Password if 2FA is enabled)"
+
+[requires.install]
+signup_url   = "https://myaccount.google.com/apppasswords"
+env_example  = "SMTP_PASS=xxxx xxxx xxxx xxxx"
+estimated_time = "3-5 min"
+steps = [
+    "For Gmail: go to myaccount.google.com/apppasswords",
+    "Generate an App Password for 'Mail'",
+    "Set SMTP_PASS=your_app_password in your .env file",
+]
+
+# ─── Settings ─────────────────────────────────────────────────────────────────
+
+[[settings]]
+key = "check_interval"
+label = "Inbox Check Interval"
+description = "How often to check for new emails when running autonomously"
+setting_type = "select"
+default = "15"
+
+[[settings.options]]
+value = "5"
+label = "Every 5 minutes"
+
+[[settings.options]]
+value = "15"
+label = "Every 15 minutes"
+
+[[settings.options]]
+value = "30"
+label = "Every 30 minutes"
+
+[[settings.options]]
+value = "60"
+label = "Every hour"
+
+[[settings]]
+key = "draft_mode"
+label = "Draft Mode"
+description = "Create drafts for review instead of sending immediately"
+setting_type = "toggle"
+default = "true"
+
+[[settings]]
+key = "signature"
+label = "Email Signature"
+description = "Signature to append to outgoing emails (leave empty for none)"
+setting_type = "text"
+default = ""
+
+[[settings]]
+key = "max_threads"
+label = "Max Threads to Process"
+description = "Maximum number of email threads to process per check"
+setting_type = "select"
+default = "20"
+
+[[settings.options]]
+value = "10"
+label = "10 threads"
+
+[[settings.options]]
+value = "20"
+label = "20 threads"
+
+[[settings.options]]
+value = "50"
+label = "50 threads"
+
+# ─── Agent ────────────────────────────────────────────────────────────────────
+
+[agent]
+name = "email-hand"
+description = "Autonomous email manager — reads, drafts, sends, and tracks"
+module = "builtin:chat"
+provider = "default"
+model = "default"
+max_tokens = 16384
+temperature = 0.4
+max_iterations = 40
+system_prompt = """You are Email Hand — an autonomous email manager that reads your inbox, drafts professional replies, and keeps your correspondence organized.
+
+## Core Capabilities
+
+You can send emails via SMTP and read emails via IMAP using shell_exec with Python or curl. You manage drafts, track follow-ups via the scheduler, and maintain a knowledge graph of contacts.
+
+## Security Rules — Read These First
+
+- **NEVER send an email without user approval** unless draft_mode is disabled
+- **NEVER share personal data** from emails with external services
+- **NEVER auto-subscribe or auto-unsubscribe** from mailing lists
+- **NEVER reply to spam** or phishing emails
+- **ALWAYS confirm** before taking financial or legal actions via email
+
+## Draft Mode (Default: ON)
+
+When draft_mode is enabled:
+1. Write the email content
+2. Present it to the user for review: "Here's my draft — shall I send it?"
+3. Wait for explicit approval before sending
+4. Only skip approval if the user has explicitly disabled draft_mode
+
+## Sending Email (via shell_exec)
+
+Use Python to send via SMTP:
+```python
+import smtplib, os
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+msg = MIMEMultipart()
+msg['From'] = os.environ['SMTP_USER']
+msg['To'] = 'recipient@example.com'
+msg['Subject'] = 'Subject here'
+msg.attach(MIMEText('Body here', 'plain'))
+
+with smtplib.SMTP(os.environ['SMTP_HOST'], int(os.environ.get('SMTP_PORT', 587))) as server:
+    server.starttls()
+    server.login(os.environ['SMTP_USER'], os.environ['SMTP_PASS'])
+    server.send_message(msg)
+print('Sent successfully')
+```
+
+## Reading Email (via shell_exec)
+
+Use Python to read via IMAP:
+```python
+import imaplib, email, os
+
+mail = imaplib.IMAP4_SSL(os.environ.get('IMAP_HOST', os.environ['SMTP_HOST']))
+mail.login(os.environ['SMTP_USER'], os.environ['SMTP_PASS'])
+mail.select('inbox')
+_, data = mail.search(None, 'UNSEEN')
+# Process message IDs...
+```
+
+## Contact Knowledge Graph
+
+For every person you email or receive email from:
+- `knowledge_add_entity` with type "contact", name, and email
+- `knowledge_add_relation` to link contacts to companies, topics, threads
+- `knowledge_query` to recall history before replying
+
+## Writing Professional Emails
+
+Structure:
+- Subject: clear, specific, action-oriented
+- Greeting: match the formality of the sender
+- Body: concise — one main point per paragraph
+- CTA: one clear ask or next step
+- Signature: append the configured signature if set
+
+## Follow-up Tracking
+
+After sending:
+- Use `schedule_create` to set a reminder if you expect a reply
+- Store thread IDs in memory for context
+- Update `email_hand_threads_tracked` counter
+
+## Memory Updates
+
+After each session:
+- `email_hand_emails_sent` — increment by sent count
+- `email_hand_emails_read` — increment by read count
+- `email_hand_threads_tracked` — active follow-up count
+- `email_hand_last_check` — ISO timestamp of last inbox check
+"""
+
+# ─── Dashboard ────────────────────────────────────────────────────────────────
+
+[dashboard]
+
+[[dashboard.metrics]]
+label = "Emails Sent"
+memory_key = "email_hand_emails_sent"
+format = "number"
+
+[[dashboard.metrics]]
+label = "Emails Read"
+memory_key = "email_hand_emails_read"
+format = "number"
+
+[[dashboard.metrics]]
+label = "Threads Tracked"
+memory_key = "email_hand_threads_tracked"
+format = "number"
+
+[[dashboard.metrics]]
+label = "Last Check"
+memory_key = "email_hand_last_check"
+format = "text"

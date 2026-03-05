@@ -40,6 +40,16 @@ pub fn bundled_hands() -> Vec<(&'static str, &'static str, &'static str)> {
             include_str!("../bundled/browser/HAND.toml"),
             include_str!("../bundled/browser/SKILL.md"),
         ),
+        (
+            "web-search",
+            include_str!("../bundled/web-search/HAND.toml"),
+            include_str!("../bundled/web-search/SKILL.md"),
+        ),
+        (
+            "email",
+            include_str!("../bundled/email/HAND.toml"),
+            include_str!("../bundled/email/SKILL.md"),
+        ),
     ]
 }
 
@@ -71,7 +81,7 @@ mod tests {
     #[test]
     fn bundled_hands_count() {
         let hands = bundled_hands();
-        assert_eq!(hands.len(), 7);
+        assert_eq!(hands.len(), 9);
     }
 
     #[test]

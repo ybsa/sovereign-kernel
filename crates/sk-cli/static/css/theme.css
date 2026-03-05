@@ -1,271 +1,245 @@
-/* OpenFang Theme — Premium design system */
+/* Sovereign Kernel — Terminal Theme */
+/* Geist Mono for everything: monospace = terminal DNA */
 
-/* Font imports in index_head.html: Inter (body) + Geist Mono (code) */
+:root {
+  /* ── Core palette ──────────────────────────────── */
+  --bg:            #0a0a0a;
+  --bg-primary:    #0d0d0d;
+  --bg-elevated:   #111111;
+  --surface:       #141414;
+  --surface2:      #1a1a1a;
+  --surface3:      #202020;
+  --border:        #1f1f1f;
+  --border-light:  #2a2a2a;
+  --border-subtle: #181818;
 
-[data-theme="light"], :root {
-  /* Backgrounds — layered depth */
-  --bg: #F5F4F2;
-  --bg-primary: #EDECEB;
-  --bg-elevated: #F8F7F6;
-  --surface: #FFFFFF;
-  --surface2: #F0EEEC;
-  --surface3: #E8E6E3;
-  --border: #D5D2CF;
-  --border-light: #C8C4C0;
-  --border-subtle: #E0DEDA;
+  /* ── Text ──────────────────────────────────────── */
+  --text:          #e2e8f0;
+  --text-secondary:#94a3b8;
+  --text-dim:      #64748b;
+  --text-muted:    #334155;
 
-  /* Text hierarchy */
-  --text: #1A1817;
-  --text-secondary: #3D3935;
-  --text-dim: #6B6560;
-  --text-muted: #9A958F;
+  /* ── Terminal accent colors ────────────────────── */
+  --accent:        #00ff88;     /* terminal green — primary */
+  --accent-light:  #22ffaa;
+  --accent-dim:    #00cc6a;
+  --accent-glow:   rgba(0, 255, 136, 0.12);
+  --accent-subtle: rgba(0, 255, 136, 0.06);
 
-  /* Brand — Orange accent */
-  --accent: #FF5C00;
-  --accent-light: #FF7A2E;
-  --accent-dim: #E05200;
-  --accent-glow: rgba(255, 92, 0, 0.1);
-  --accent-subtle: rgba(255, 92, 0, 0.05);
+  --cyan:          #00ccff;     /* agent status */
+  --cyan-glow:     rgba(0, 204, 255, 0.12);
+  --amber:         #ffaa00;     /* warnings / approvals */
+  --amber-glow:    rgba(255, 170, 0, 0.12);
+  --red:           #ff4455;     /* errors */
+  --red-glow:      rgba(255, 68, 85, 0.12);
 
-  /* Status colors */
-  --success: #22C55E;
-  --success-dim: #16A34A;
-  --success-subtle: rgba(34, 197, 94, 0.08);
-  --error: #EF4444;
-  --error-dim: #DC2626;
-  --error-subtle: rgba(239, 68, 68, 0.06);
-  --warning: #F59E0B;
-  --warning-dim: #D97706;
-  --warning-subtle: rgba(245, 158, 11, 0.08);
-  --info: #3B82F6;
-  --info-dim: #2563EB;
-  --info-subtle: rgba(59, 130, 246, 0.06);
-  --success-muted: rgba(34, 197, 94, 0.15);
-  --error-muted: rgba(239, 68, 68, 0.15);
-  --warning-muted: rgba(245, 158, 11, 0.15);
-  --info-muted: rgba(59, 130, 246, 0.15);
-  --border-strong: #B0ACA8;
-  --card-highlight: rgba(0, 0, 0, 0.02);
+  /* Status mapped to terminal palette */
+  --success:        var(--accent);
+  --success-dim:    var(--accent-dim);
+  --success-subtle: var(--accent-subtle);
+  --error:          var(--red);
+  --error-dim:      #cc2233;
+  --error-subtle:   var(--red-glow);
+  --warning:        var(--amber);
+  --warning-dim:    #cc8800;
+  --warning-subtle: var(--amber-glow);
+  --info:           var(--cyan);
+  --info-dim:       #0099cc;
+  --info-subtle:    var(--cyan-glow);
 
-  /* Chat-specific */
-  --agent-bg: #F5F4F2;
-  --user-bg: #FFF3E6;
+  /* ── Layout ────────────────────────────────────── */
+  --sidebar-width:     220px;
+  --sidebar-collapsed: 48px;
+  --header-height:     40px;
+  --input-height:      40px;
 
-  /* Layout */
-  --sidebar-width: 240px;
-  --sidebar-collapsed: 56px;
-  --header-height: 48px;
+  /* ── Sharp corners everywhere — terminals don't round ── */
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
 
-  /* Radius — slightly larger for premium feel */
-  --radius-xs: 4px;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  /* ── Shadows — just glow, no blur-radius softness ── */
+  --shadow-xs:     0 0 0 1px var(--border);
+  --shadow-sm:     0 0 0 1px var(--border);
+  --shadow-md:     0 0 0 1px var(--border-light);
+  --shadow-lg:     0 0 0 1px var(--border-light);
+  --shadow-xl:     0 0 0 1px var(--border-light);
+  --shadow-glow:   0 0 24px var(--accent-glow);
+  --shadow-accent: 0 0 16px var(--accent-glow);
+  --shadow-inset:  inset 0 1px 0 rgba(255,255,255,0.03);
 
-  /* Shadows — 6-level depth system */
-  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
-  --shadow-lg: 0 12px 28px rgba(0,0,0,0.08), 0 4px 10px rgba(0,0,0,0.05);
-  --shadow-xl: 0 20px 40px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.06);
-  --shadow-glow: 0 0 40px rgba(0,0,0,0.05);
-  --shadow-accent: 0 4px 16px rgba(255, 92, 0, 0.12);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.5);
+  /* ── Typography — all mono ─────────────────────── */
+  --font-sans: 'Geist Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', monospace;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', monospace;
 
-  /* Typography — dual font system */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-mono: 'Geist Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+  /* ── Motion — fast and sharp ───────────────────── */
+  --ease-spring:   cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-smooth:   cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out:      cubic-bezier(0, 0, 0.2, 1);
+  --ease-in:       cubic-bezier(0.4, 0, 1, 1);
+  --transition-fast:   0.1s var(--ease-smooth);
+  --transition-normal: 0.18s var(--ease-smooth);
+  --transition-spring: 0.28s var(--ease-spring);
 
-  /* Motion — spring curves for premium feel */
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --ease-in: cubic-bezier(0.4, 0, 1, 1);
-  --transition-fast: 0.15s var(--ease-smooth);
-  --transition-normal: 0.25s var(--ease-smooth);
-  --transition-spring: 0.4s var(--ease-spring);
+  /* ── Chat ──────────────────────────────────────── */
+  --agent-bg: #111111;
+  --user-bg:  #0a1a0f;
+
+  /* ── Misc ──────────────────────────────────────── */
+  --border-strong:    #333333;
+  --card-highlight:   rgba(255,255,255,0.02);
+  --success-muted:    rgba(0, 255, 136, 0.15);
+  --error-muted:      rgba(255, 68, 85, 0.15);
+  --warning-muted:    rgba(255, 170, 0, 0.15);
+  --info-muted:       rgba(0, 204, 255, 0.15);
 }
 
-[data-theme="dark"] {
-  --bg: #080706;
-  --bg-primary: #0F0E0E;
-  --bg-elevated: #161413;
-  --surface: #1F1D1C;
-  --surface2: #2A2725;
-  --surface3: #1A1817;
-  --border: #2D2A28;
-  --border-light: #3D3A38;
-  --border-subtle: #232120;
-  --text: #F0EFEE;
-  --text-secondary: #C4C0BC;
-  --text-dim: #8A8380;
-  --text-muted: #5C5754;
-  --accent: #FF5C00;
-  --accent-light: #FF7A2E;
-  --accent-dim: #E05200;
-  --accent-glow: rgba(255, 92, 0, 0.15);
-  --accent-subtle: rgba(255, 92, 0, 0.08);
-  --success: #4ADE80;
-  --success-dim: #22C55E;
-  --success-subtle: rgba(74, 222, 128, 0.1);
-  --error: #EF4444;
-  --error-dim: #B91C1C;
-  --error-subtle: rgba(239, 68, 68, 0.1);
-  --warning: #F59E0B;
-  --warning-dim: #D97706;
-  --warning-subtle: rgba(245, 158, 11, 0.1);
-  --info: #3B82F6;
-  --info-dim: #2563EB;
-  --info-subtle: rgba(59, 130, 246, 0.1);
-  --success-muted: rgba(74, 222, 128, 0.25);
-  --error-muted: rgba(239, 68, 68, 0.25);
-  --warning-muted: rgba(245, 158, 11, 0.25);
-  --info-muted: rgba(59, 130, 246, 0.25);
-  --border-strong: #4A4644;
-  --card-highlight: rgba(255, 255, 255, 0.04);
-  --agent-bg: #1A1817;
-  --user-bg: #2A1A08;
-  --shadow-xs: 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3);
-  --shadow-lg: 0 12px 28px rgba(0,0,0,0.35), 0 4px 10px rgba(0,0,0,0.3);
-  --shadow-xl: 0 20px 40px rgba(0,0,0,0.4), 0 8px 16px rgba(0,0,0,0.3);
-  --shadow-glow: 0 0 80px rgba(0,0,0,0.6);
-  --shadow-accent: 0 4px 16px rgba(255, 92, 0, 0.2);
-  --shadow-inset: inset 0 1px 0 rgba(255,255,255,0.03);
-}
+/* No light theme override — terminal is always dark */
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   background: var(--bg);
   color: var(--text);
   height: 100vh;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-size: 14px;
-  line-height: 1.5;
-  letter-spacing: -0.01em;
+  font-size: 13px;
+  line-height: 1.6;
+  letter-spacing: 0;
 }
 
-/* Mono text utility — only for code/data */
-.font-mono, code, pre, .tool-pre, .tool-card-name, .detail-value,
-.stat-value, .conn-badge, .version { font-family: var(--font-mono); }
+/* All text is mono — this IS a terminal */
+.font-mono, code, pre { font-family: var(--font-mono); }
 
-/* Scrollbar — Webkit (Chrome, Edge, Safari) */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+/* Scrollbar — minimal terminal style */
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 0; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-dim); }
 
-/* Scrollbar — Firefox */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--border-light) transparent;
 }
 
 ::selection {
   background: var(--accent);
-  color: var(--bg-primary);
+  color: var(--bg);
 }
 
-/* Theme transition — smooth switch between light/dark */
-body {
-  transition: background-color 0.3s ease, color 0.3s ease;
-}
-.sidebar, .main-content, .card, .modal, .tool-card, .toast, .page-header {
-  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+/* Theme transition */
+body, .sidebar, .main-content, .card, .modal {
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-/* Tighter letter spacing for headings */
-h1, h2, h3, .card-header, .stat-value, .page-header h2 { letter-spacing: -0.02em; }
-.nav-section-title, .badge, th { letter-spacing: 0.04em; }
+/* Headings — slightly brighter */
+h1, h2, h3 { letter-spacing: -0.01em; color: var(--text); }
+.nav-section-title, .badge, th { letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.75em; }
 
-/* Focus styles — accessible double-ring with glow */
+/* Focus — terminal green ring */
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--accent-glow);
-}
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 4px var(--accent-glow);
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
-/* Entrance animations */
+/* Terminal cursor blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+.cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1em;
+  background: var(--accent);
+  animation: blink 1s step-end infinite;
+  vertical-align: text-bottom;
+  margin-left: 2px;
+}
+
+/* Entrance animations — quick fades */
 @keyframes fadeIn {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes pulse-ring {
-  0% { box-shadow: 0 0 0 0 currentColor; }
-  70% { box-shadow: 0 0 0 4px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-/* Staggered card entry animation */
-@keyframes cardEntry {
-  from { opacity: 0; transform: translateY(12px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+/* Log line entry */
+@keyframes logEntry {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-.animate-entry { animation: cardEntry 0.35s var(--ease-spring) both; }
-.stagger-1 { animation-delay: 0.05s; }
-.stagger-2 { animation-delay: 0.10s; }
-.stagger-3 { animation-delay: 0.15s; }
-.stagger-4 { animation-delay: 0.20s; }
-.stagger-5 { animation-delay: 0.25s; }
-.stagger-6 { animation-delay: 0.30s; }
 
-/* Skeleton loading animation */
+.animate-entry { animation: slideUp 0.2s var(--ease-out) both; }
+.log-entry-new { animation: logEntry 0.15s var(--ease-out) both; }
+
+/* Stagger helpers */
+.stagger-1 { animation-delay: 0.03s; }
+.stagger-2 { animation-delay: 0.06s; }
+.stagger-3 { animation-delay: 0.09s; }
+.stagger-4 { animation-delay: 0.12s; }
+.stagger-5 { animation-delay: 0.15s; }
+.stagger-6 { animation-delay: 0.18s; }
+
+/* Skeleton loading */
 .skeleton {
   background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
 }
-
-.skeleton-text { height: 14px; margin-bottom: 8px; }
+.skeleton-text    { height: 13px; margin-bottom: 6px; }
 .skeleton-text:last-child { width: 60%; }
-.skeleton-heading { height: 20px; width: 40%; margin-bottom: 12px; }
-.skeleton-card { height: 100px; border-radius: var(--radius-lg); }
-.skeleton-avatar { width: 32px; height: 32px; border-radius: 50%; }
+.skeleton-heading { height: 18px; width: 40%; margin-bottom: 10px; }
+.skeleton-card    { height: 80px; }
+.skeleton-avatar  { width: 28px; height: 28px; border-radius: 0; }
 
-/* Print styles */
-@media print {
-  .sidebar, .sidebar-overlay, .mobile-menu-btn, .toast-container, .btn { display: none !important; }
-  .main-content { margin: 0; max-width: 100%; }
-  body { background: #fff; color: #000; }
+/* Terminal scanlines overlay — optional retro feel */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
 }
 
 @media (prefers-reduced-motion: reduce) {

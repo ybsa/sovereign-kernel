@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
-use sk_types::{ContentBlock, Message, MessageContent, ToolDefinition};
+use sk_types::ToolDefinition;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tracing::{debug, warn};
 
 /// Metadata for a skill parsed from SKILL.md frontmatter.

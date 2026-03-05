@@ -115,6 +115,8 @@ impl SovereignKernel {
         );
 
         // Initialize LLM Driver from environment
+        // model_name is built up through if-else branches then moved into the struct.
+        #[allow(unused_assignments)]
         let mut model_name = String::new();
         let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = if let Some(key) = std::env::var("ANTHROPIC_API_KEY").ok() {
             model_name = "claude-3-5-sonnet-20241022".to_string();

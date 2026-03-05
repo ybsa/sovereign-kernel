@@ -4,7 +4,7 @@
 //! endpoints for external integration.
 
 use axum::{
-    extract::{Path, State},
+    extract::State,
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},

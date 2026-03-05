@@ -1,10 +1,13 @@
 //! Sovereign Kernel CLI — the single entry point.
 //!
 //! Commands:
-//! - `sovereign chat`  — interactive REPL
-//! - `sovereign init`  — first-run setup
-//! - `sovereign start` — start as daemon (future)
-//! - `sovereign status` — check kernel status (future)
+//! - `sovereign chat`      — interactive REPL
+//! - `sovereign init`      — first-run setup
+//! - `sovereign start`     — start as daemon
+//! - `sovereign status`    — check kernel status
+//! - `sovereign dashboard` — open the terminal web dashboard
+//! - `sovereign hands`     — manage autonomous hands
+//! - `sovereign audit`     — view audit logs
 
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
@@ -59,7 +62,16 @@ enum Commands {
         /// Additional arguments
         #[arg(trailing_var_arg = true)]
         args: Vec<String>,
-    }
+    },
+    /// Open the terminal web dashboard at http://localhost:PORT
+    Dashboard {
+        /// Port to listen on
+        #[arg(short, long, default_value = "8080")]
+        port: u16,
+        /// Do not open browser automatically
+        #[arg(long)]
+        no_open: bool,
+    },
 }
 
 #[tokio::main]
@@ -101,6 +113,24 @@ async fn main() -> anyhow::Result<()> {
         Commands::Stop => daemon::stop().await?,
         Commands::Hands { action, args } => hands::run(&action, &args).await?,
         Commands::Audit { action, args } => audit::run(config, &action, &args).await?,
+        Commands::Dashboard { port, no_open } => {
+            let state = std::sync::Arc::new(dashboard::AppState {
+                hand_registry: std::sync::Mutex::new({
+                    let mut reg = sk_hands::registry::HandRegistry::new();
+                    reg.load_bundled();
+                    reg
+                }),
+                started_at: std::time::Instant::now(),
+                telegram_connected: false,
+            });
+            let url = format!("http://localhost:{port}");
+            println!("⚡ Sovereign Kernel Dashboard → {url}");
+            println!("   Press Ctrl+C to stop.");
+            if !no_open {
+                let _ = open::that(&url);
+            }
+            dashboard::start_server(state, port).await;
+        }
     }
 
     Ok(())

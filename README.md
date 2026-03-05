@@ -1,146 +1,177 @@
 <p align="center">
   <img src="https://img.shields.io/badge/language-Rust-orange?style=flat-square" alt="Rust" />
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT" />
-  <img src="https://img.shields.io/badge/status-Industrial%20Core%20Complete-brightgreen?style=flat-square" alt="Status" />
-  <img src="https://img.shields.io/badge/security-16--Layer%20Audit-brightgreen?style=flat-square" alt="Security" />
+  <img src="https://img.shields.io/badge/status-Phase%2013%20Complete-brightgreen?style=flat-square" alt="Status" />
+  <img src="https://img.shields.io/badge/hands-9%20Bundled-brightgreen?style=flat-square" alt="Hands" />
+  <img src="https://img.shields.io/badge/security-Merkle%20Audit%20Trail-brightgreen?style=flat-square" alt="Security" />
 </p>
 
 # Sovereign Kernel: The Agentic Operating System
 
 > [!WARNING]
-> **Active Development Notice**: Sovereign Kernel is currently highly experimental software. We are actively porting features from its industrial predecessors into this new unified Rust architecture. Expect breaking changes.
+> **Active Development**: Sovereign Kernel is experimental software under active development. Expect breaking changes between versions.
 
-**Sovereign Kernel** is a virtual operating system for agents that runs on top of real operating systems. 
+**Sovereign Kernel** is a virtual operating system for AI agents, built entirely in Rust. It merges a memory-safe daemon core with a sophisticated memory substrate, 9 bundled autonomous capability packages (Hands), and a built-in terminal web dashboard.
 
-By merging an indestructible, memory-safe Rust daemon core with expansive integrations and sophisticated memory systems, we are building the universal infrastructure layer for the next generation of AI. It is not just a framework; it is the mediation layer between Autonomous Entities and the silicon they run on.
-
----
-
-## 🎯 Capabilities & Use Cases
-
-Sovereign Kernel is designed for complex, long-running agentic workflows.
-
-### Core Capabilities
-*   **Persistent Execution**: Agents run as background OS daemons that don't sleep unless told to.
-*   **Tool Orchestration**: Agents seamlessly juggle the filesystem, local terminals, and web browsers.
-*   **Infinite Memory**: Recalls past conversations and tool outputs via hybrid SQLite + BM25 Vector search.
-
-### Primary Use Cases
-*   **Local Automations**: Have an agent monitor a specific folder, read new PDFs, summarize them, and move them—all strictly on your local machine with zero data exfiltration.
-*   **Safe Code Execution**: Run an agent that writes, compiles, and tests code inside a constrained WASM Sandbox without risking your real OS.
-*   **Custom Research Assistants**: Give an agent a goal (e.g., "Find the latest papers on Q-Star"), and let it crawl the web, parse the data, and build you a comprehensive report independently over the next 3 hours.
+It is not just a framework — it is the mediation layer between Autonomous Entities and the silicon they run on.
 
 ---
 
-## 🚀 Key Features
+## 🎯 What It Does
 
-*   **24/7 Rust Daemon**: Runs silently in the background of your OS (Windows, Mac, or Linux) with minimal RAM overhead.
-*   **Hardware Offloading**: Designed for local-first execution. Includes native drivers with RTX 40-series GPU offloading (CUDA) via `mistral.rs` and `llama-cpp-rs`.
-*   **Infinite Memory**: Combines SQLite, BM25 full-text search, and native vector embeddings. Your agent remembers everything across sessions indefinitely.
-*   **Native MCP Support**: Built-in Model Context Protocol (MCP) Nervous System. Natively connect to any app (Telegram, SQL, filesystems) with Rust-level performance.
+- **Runs agents 24/7** as background OS daemons with heartbeat monitoring and auto-restart
+- **Executes tools safely** — shell, file, code, web, browser — with capability gates and sandbox policy
+- **Remembers everything** via a hybrid SQLite + BM25 vector memory substrate across sessions
+- **Ships 9 autonomous Hands** — pre-built capability packs for browser automation, research, email, lead generation, and more
+- **Streams a terminal dashboard** at `http://localhost:8080` — manage agents, monitor live logs, approve actions
+- **Integrates 30+ channels** — Telegram, Discord, WhatsApp, Signal, Slack, and more via the Channel Bridge
 
-## 🧬 Architecture: The DNA Merge
+---
 
-The Sovereign Kernel is a meticulously architected 8-crate workspace that brings together the best of two worlds:
+## 🚀 Quick Start
 
-1.  **The Engine (Sovereign Kernel DNA)**: Provides the robust, multi-threaded core (`sk-engine`, `sk-kernel`, `sk-types`, `sk-tools`, `sk-cli`). Includes **32 ported runtime modules** for sandboxing, web scraping, media processing, and memory compaction.
-2.  **The Soul (OpenClaw DNA)**: Supplies the sophisticated "human" elements (`sk-soul`, `sk-memory`, `sk-mcp`). It deeply integrates the 31k line identity logic and a dynamic **52-skill ecosystem** (Obsidian, GitHub, etc.) ported from OpenClaw.
+### Requirements
+- Rust `1.80.0+`
+- An API key for at least one LLM provider
 
-## 🆚 The Reality Check: Sovereign Kernel vs. Ancestors
-
-Let's be completely rigorous and transparent. While Sovereign Kernel is the *future* of this architecture, its ancestors (**Sovereign Kernel** and **OpenClaw**) represent massive engineering efforts with vastly larger feature sets. Sovereign Kernel is an early-stage, clean-slate rewrite that is currently missing most of the advanced infrastructure.
-
-Here is the objective state of the project based on actual codebase metrics:
-
-| Category | Sovereign Kernel Has | Sovereign Kernel Has | Gap |
-| :--- | :--- | :--- | :--- |
-| **Runtime modules** | 32 | 32 | **Ported** |
-| **Skill Integrations** | 52 | 52 | **Ported** |
-| **Kernel modules** | 22 | 15 | 7 missing |
-| **Agent loop LOC** | 2,854 | 1,217 | 2x smaller (Refined) |
-| **Metering LOC** | 693 | 494 | **Ported** |
-| **Supervisor LOC** | 228 | 231 | **Ported** |
-| **Scheduler LOC** | 169 | 251 | **Ported** |
-| **LLM Drivers** | 5 (OpenAI, Anthropic, Gemini, Copilot, Fallback) | 5 (OpenAI, Anthropic, Gemini, Copilot, Fallback) | **Ported** |
-| **Security** | 16 layers (WASM, Docker, shell_bleed, taint, audit) | Wasmtime + Shell Bleed + Taint + Merkle Audit Trail | **Ported** |
-| **Browser** | Full Playwright CDP bridge | Ported BrowserManager + CDP Bridge | **Ported** |
-| **API Bridge** | Advanced Headless API | Axum-based HTTP/JSON API + Webhooks | **Ported** |
-| **Channels** | 40 adapters | 2 (Telegram, Discord) | 38 missing |
-
-*(Sovereign Kernel is currently actively porting legacy features. It has established the core memory representations, execution guardrails, cost metering, and isolation layers, but still lacks full UI and channel ecosystems from Sovereign Kernel.)*
-
-## ⚖️ The Honest Comparison (Best vs. Worst)
-
-We believe in radical transparency. Here is how Sovereign Kernel stacks up against its predecessors and the broader market:
-
-| Platform | The Best Things 🏆 | The Worst Things ⚠️ |
-| :--- | :--- | :--- |
-| **Sovereign Kernel** | **Clean Architecture**: 8-crate modular design.<br>**Blazingly Fast**: 100% Rust engine with minimal bloat. | **Incomplete UI ecosystem**: Missing nearly all advanced web and desktop UI features of its ancestors.<br>**No UI**: Strictly command-line. |
-| **OpenClaw (Node.js)** | **Rich Interfaces**: Incredible macOS app, Canvas, and WebChat UI.<br>**Massive Reach**: Plug-and-play with WhatsApp, Telegram, iMessage, etc. | **Resource Heavy**: Node.js ecosystem consumes significant RAM.<br>**Lower Security**: Lacks process-level WASM sandboxing. |
-| **Sovereign Kernel (Rust)** | **Production Ready**: 16-layer security model and highly robust agent loop.<br>**Ecosystem**: 40+ adapters and deep sandbox implementations. | **Legacy Architecture**: Massive, tightly-coupled codebase that is harder to extend safely. |
-
-*(See [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive into the 8-crate system).*
-
-## 🗺️ Project Status & Roadmap
-
--   **Phase 1-6 (Complete)**: Kernel, Engine, Security, Media, and Advanced Features.
--   **Phase 7-11 (Complete)**: Industrial Core & Skill Integration.
-    - [x] Port 52 Expert Skills from OpenClaw.
-    - [x] Implement BM25 Search in `sk-memory`.
-    - [x] Cryptographic Merkle Audit Trail.
-    - [x] Headless API Bridge & Webhook Triggers.
-
-For a deep dive into the 26-week roadmap, see [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
-
-## 📚 Documentation
-
--   [ARCHITECTURE.md](ARCHITECTURE.md) — Technical overview of the 8-crate system.
--   [SECURITY.md](SECURITY.md) — Security principles, sandboxing, and privacy.
--   [USAGE.md](USAGE.md) — Detailed guide on running and configuring agents.
--   [VISION.md](VISION.md) — The long-term goal of the AI Operating System.
-
-## 📦 Installation (Pre-compiled Binaries)
-
-You do **not** need to install Rust to run the Sovereign Kernel! 
-
-We provide pre-built, ready-to-run executables for Windows, macOS, and Linux.
-1. Go to the [GitHub Releases](https://github.com/ybsa/sovereign-kernel/releases) page.
-2. Download the `.zip` or `.tar.gz` for your operating system.
-3. Extract the archive and run the `sovereign` binary directly from your terminal!
-
-## ⚡ Quick Start (Building from Source)
-
-### 1. Requirements
-
-*   Rust (`1.80.0+`)
-*   *(Optional)* CUDA Toolkit for local GPU acceleration
-
-### 2. Configuration
-
-Define your agent's identity by modifying `./soul/SOUL.md`.
-
-### 3. Run the OS
-
-Set your preferred API keys (if using cloud models for complex reasoning):
+### Run from source
 
 **Windows (PowerShell):**
 ```powershell
 $env:GEMINI_API_KEY="your-key"
-cargo run -p sk-cli -- chat   # Interactive Terminal
-cargo run -p sk-cli -- start  # Background Daemon
+cargo run -p sk-cli -- init        # First-time setup wizard
+cargo run -p sk-cli -- chat        # Interactive terminal chat
+cargo run -p sk-cli -- dashboard   # Terminal web dashboard → http://localhost:8080
+cargo run -p sk-cli -- hands list  # Show all 9 bundled hands
 ```
 
 **Linux / macOS:**
 ```bash
 export GEMINI_API_KEY="your-key"
-cargo run -p sk-cli -- chat   # Interactive Terminal
-cargo run -p sk-cli -- start  # Background Daemon
+cargo run -p sk-cli -- init
+cargo run -p sk-cli -- chat
+cargo run -p sk-cli -- dashboard
+cargo run -p sk-cli -- hands list
 ```
+
+### Supported LLM Providers (auto-detected from env)
+| Provider | Env Variable |
+|----------|-------------|
+| Anthropic Claude | `ANTHROPIC_API_KEY` |
+| OpenAI GPT-4o | `OPENAI_API_KEY` |
+| Google Gemini | `GEMINI_API_KEY` |
+| Groq (Llama 3) | `GROQ_API_KEY` |
+| GitHub Copilot | `GITHUB_TOKEN` |
+
+---
+
+## ⚡ CLI Commands
+
+```
+sovereign init                       # First-run setup wizard
+sovereign chat                       # Interactive agent REPL
+sovereign start                      # Start as background daemon
+sovereign status                     # Check daemon status
+sovereign stop                       # Stop the daemon
+sovereign dashboard [--port 8080]    # Open terminal web dashboard
+sovereign hands list                 # List all 9 bundled hands
+sovereign hands activate <name>      # Start a hand's autonomous agent
+sovereign hands status               # Show running hand instances
+sovereign hands deactivate <id>      # Stop a hand instance
+sovereign audit logs                 # View cryptographic audit trail
+sovereign audit verify               # Verify Merkle chain integrity
+```
+
+---
+
+## 🖐️ Bundled Hands (9 Included)
+
+Hands are autonomous capability packages — each one is a pre-configured agent with specific tools, prompts, and dashboard metrics.
+
+| Hand | Category | What It Does |
+|------|----------|-------------|
+| **browser** | Automation | Playwright-based web browser automation |
+| **researcher** | Research | Multi-source deep research with citation tracking |
+| **web-search** | Research | Brave/Tavily web search + intelligence reports |
+| **clip** | Content | Clipboard-to-note capture and organization |
+| **collector** | Data | Structured data collection and archival |
+| **lead** | Sales | Autonomous lead research and qualification |
+| **predictor** | Analytics | Trend analysis and forecasting |
+| **email** | Communication | SMTP/IMAP email management with draft mode |
+| **twitter** | Social | Twitter/X monitoring and engagement |
+
+```bash
+sovereign hands list           # See all hands with requirements
+sovereign hands activate email # Start the email hand
+sovereign hands status         # Monitor running hands
+```
+
+---
+
+## 🖥️ Terminal Web Dashboard
+
+Run `sovereign dashboard` to open a **terminal-aesthetic web UI** at `http://localhost:8080`.
+
+- **Embedded in the binary** — no Node.js, no npm, zero extra dependencies
+- **Three-pane layout**: agents/hands panel | live log stream | command bar
+- **Real-time monitoring**: uptime, active hands, approval queue
+- **Live log stream**: every tool call and agent action in real-time
+- **Command input**: type `sovereign` commands directly in the UI
+
+```bash
+sovereign dashboard              # Opens at http://localhost:8080
+sovereign dashboard --port 9090  # Custom port
+sovereign dashboard --no-open    # Don't auto-open browser
+```
+
+---
+
+## 🏗️ Architecture (9-Crate Workspace)
+
+```
+sk-types    → Shared types, capability gates, taint tracking
+sk-engine   → Agent loop, LLM drivers, tool execution
+sk-kernel   → Daemon lifecycle, scheduling, heartbeat
+sk-soul     → Agent identity from SOUL.md
+sk-memory   → SQLite + BM25 vector memory substrate
+sk-mcp      → Model Context Protocol (MCP) nervous system
+sk-tools    → Shell, file, web, code, browser tool implementations
+sk-hands    → 9 bundled autonomous capability packages
+sk-channels → 30+ channel adapters (Telegram, Discord, WhatsApp...)
+sk-cli      → sovereign binary + terminal dashboard server
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive.
+
+---
+
+## 🗺️ Roadmap
+
+| Phase | Status | Milestone |
+|-------|--------|-----------|
+| 1–6 | ✅ Complete | Kernel, Engine, Security, Media, LLM Drivers |
+| 7–11 | ✅ Complete | Industrial Core: 52 skills, BM25, Audit Trail, API Bridge |
+| 12 | ✅ Complete | Terminal Web Dashboard (`sovereign dashboard`) |
+| 13 | ✅ Complete | Core Tools Upgrade: Shell, File, Code, Browser Hands |
+| 14 | ✅ Complete | Optional Hands: Web Search, Email |
+| 15 | 🔲 Planned | Multi-Agent Coordination & Orchestration |
+
+---
+
+## 📚 Documentation
+
+- [ARCHITECTURE.md](ARCHITECTURE.md) — 9-crate workspace deep dive
+- [SECURITY.md](SECURITY.md) — Security model, sandboxing, audit trail
+- [USAGE.md](USAGE.md) — Hands, dashboard, channels, and agent configuration
+- [VISION.md](VISION.md) — The long-term AI Operating System vision
+- [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) — Full 26-week development roadmap
+
+---
 
 ## 🤝 Contributing
 
-We are building a global standard. See [CONTRIBUTING.md](CONTRIBUTING.md) to learn how to inject your own MCP tools and enhance the Sovereign Kernel.
+See [CONTRIBUTING.md](CONTRIBUTING.md) to learn how to add new Hands, MCP tools, and channel adapters.
 
 ## ⚖️ License
 
-MIT License. Open Source, for the world.
+MIT License. Open source, for the world.
