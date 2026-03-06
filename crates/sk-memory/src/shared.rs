@@ -88,7 +88,7 @@ mod tests {
 
         // Agent A stores something
         store
-            .store(agent_a.clone(), "The password is 'banana'", "secrets")
+            .store(agent_a, "The password is 'banana'", "secrets")
             .unwrap();
 
         // Recall by content

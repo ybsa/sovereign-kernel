@@ -42,11 +42,11 @@ impl SoulIdentity {
         // Strip YAML frontmatter if present
         let body = strip_frontmatter(content);
 
-        let title = extract_heading(&body);
-        let core_truths = extract_section(&body, "Core Truths");
-        let boundaries = extract_section(&body, "Boundaries");
-        let vibe = extract_section(&body, "Vibe");
-        let continuity = extract_section(&body, "Continuity");
+        let title = extract_heading(body);
+        let core_truths = extract_section(body, "Core Truths");
+        let boundaries = extract_section(body, "Boundaries");
+        let vibe = extract_section(body, "Vibe");
+        let continuity = extract_section(body, "Continuity");
 
         Self {
             raw: content.to_string(),

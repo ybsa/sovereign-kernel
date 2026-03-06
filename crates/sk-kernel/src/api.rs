@@ -108,19 +108,19 @@ async fn chat_handler(
         .kernel
         .memory
         .sessions
-        .list_for_agent(agent_id.clone())
+        .list_for_agent(agent_id)
     {
         if let Some((latest_id, _, _)) = entries.first() {
             if let Ok(Some(loaded_session)) = state.kernel.memory.sessions.load(*latest_id) {
                 loaded_session
             } else {
-                sk_types::Session::new(agent_id.clone())
+                sk_types::Session::new(agent_id)
             }
         } else {
-            sk_types::Session::new(agent_id.clone())
+            sk_types::Session::new(agent_id)
         }
     } else {
-        sk_types::Session::new(agent_id.clone())
+        sk_types::Session::new(agent_id)
     };
 
     let result = state

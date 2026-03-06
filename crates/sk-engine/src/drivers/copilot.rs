@@ -123,14 +123,14 @@ pub async fn exchange_copilot_token(github_token: &str) -> Result<CachedToken, S
     if !base_url.starts_with("https://") {
         warn!(url = %base_url, "Copilot proxy-ep is not HTTPS, using default");
         return Ok(CachedToken {
-            token: String::from(raw_token.to_string()),
+            token: raw_token.to_string(),
             expires_at: Instant::now() + Duration::from_secs(ttl_secs),
             base_url: GITHUB_COPILOT_BASE_URL.to_string(),
         });
     }
 
     Ok(CachedToken {
-        token: String::from(raw_token.to_string()),
+        token: raw_token.to_string(),
         expires_at: Instant::now() + Duration::from_secs(ttl_secs),
         base_url,
     })
@@ -170,7 +170,7 @@ pub struct CopilotDriver {
 impl CopilotDriver {
     pub fn new(github_token: String, _base_url: String) -> Self {
         Self {
-            github_token: String::from(github_token),
+            github_token,
             token_cache: CopilotTokenCache::new(),
         }
     }
@@ -187,7 +187,7 @@ impl CopilotDriver {
         let token = exchange_copilot_token(&self.github_token)
             .await
             .map_err(|e| crate::llm_driver::LlmError::ApiError {
-                status: 401 as u16,
+                status: 401_u16,
                 message: format!("Copilot token exchange failed: {e }"),
             })?;
 
@@ -260,7 +260,7 @@ mod tests {
     fn test_token_cache_set_get() {
         let cache = CopilotTokenCache::new();
         let token = CachedToken {
-            token: String::from("test-token".to_string()),
+            token: "test-token".to_string(),
             expires_at: Instant::now() + Duration::from_secs(3600),
             base_url: GITHUB_COPILOT_BASE_URL.to_string(),
         };
@@ -274,7 +274,7 @@ mod tests {
     fn test_token_validity_check() {
         // Valid token (expires in 1 hour)
         let valid = CachedToken {
-            token: String::from("t".to_string()),
+            token: "t".to_string(),
             expires_at: Instant::now() + Duration::from_secs(3600),
             base_url: GITHUB_COPILOT_BASE_URL.to_string(),
         };
@@ -282,7 +282,7 @@ mod tests {
 
         // Token that expires in < 5 min should be considered expired
         let almost_expired = CachedToken {
-            token: String::from("t".to_string()),
+            token: "t".to_string(),
             expires_at: Instant::now() + Duration::from_secs(60),
             base_url: GITHUB_COPILOT_BASE_URL.to_string(),
         };

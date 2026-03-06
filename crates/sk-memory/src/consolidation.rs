@@ -87,7 +87,6 @@ mod tests {
             threshold: 5,
             target_count: 3,
             min_age_hours: 1.0,
-            ..Default::default()
         };
         let memories = vec![
             ("a".into(), 200.0, 1u32), // Old, rarely accessed

@@ -98,7 +98,7 @@ pub fn create_agent_config<'a>(
         tool_executor: Box::new(move |tool_call| {
             let kernel = k.clone();
             let browser = b.clone();
-            let aid = aid.clone();
+            let aid = aid;
             let skills = skill_registry.clone();
             let agent_id_str = aid.to_string();
             let config = kernel.config.clone();
@@ -227,7 +227,7 @@ pub fn create_agent_config<'a>(
                         );
 
                         // Create initialization session
-                        let mut worker_session = sk_types::Session::new(worker_id.clone());
+                        let mut worker_session = sk_types::Session::new(worker_id);
                         let startup_message = format!("You are a spawned worker agent. Your task is: {}\nWhen you finish or need help, use the agent_message tool to message your manager agent ID: {}", task_desc, aid);
                         worker_session.push_message(sk_types::Message::user(&startup_message));
 
@@ -238,14 +238,12 @@ pub fn create_agent_config<'a>(
 
                         // Spawn background worker execution
                         tokio::spawn(async move {
-                            if let Ok(session) =
+                            if let Ok(Some(mut session)) =
                                 kernel_clone.memory.sessions.load(worker_session.id)
                             {
-                                if let Some(mut session) = session {
-                                    let _ = kernel_clone
-                                        .run_agent(&mut session, &startup_message)
-                                        .await;
-                                }
+                                let _ = kernel_clone
+                                    .run_agent(&mut session, &startup_message)
+                                    .await;
                             }
                         });
 
@@ -294,7 +292,7 @@ pub fn create_agent_config<'a>(
                     let granted = kernel
                         .memory
                         .structured
-                        .get(aid.clone(), "capabilities")
+                        .get(aid, "capabilities")
                         .unwrap_or(None)
                         .map(|v| {
                             serde_json::from_value::<Vec<sk_types::capability::Capability>>(v)
@@ -338,7 +336,7 @@ pub fn create_agent_config<'a>(
                     let granted = kernel
                         .memory
                         .structured
-                        .get(aid.clone(), "capabilities")
+                        .get(aid, "capabilities")
                         .unwrap_or(None)
                         .map(|v| {
                             serde_json::from_value::<Vec<sk_types::capability::Capability>>(v)
@@ -434,7 +432,7 @@ pub fn create_agent_config<'a>(
 
                         let job = sk_types::scheduler::CronJob {
                             id: sk_types::scheduler::CronJobId::new(),
-                            agent_id: aid.clone(),
+                            agent_id: aid,
                             name: name.to_string(),
                             enabled: true,
                             schedule,
@@ -468,7 +466,7 @@ pub fn create_agent_config<'a>(
                     }
                 }
                 "schedule_list" => {
-                    let jobs = kernel.cron.list_jobs(aid.clone());
+                    let jobs = kernel.cron.list_jobs(aid);
                     if jobs.is_empty() {
                         Ok("You have no scheduled jobs.".to_string())
                     } else {
@@ -511,7 +509,7 @@ pub fn create_agent_config<'a>(
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::memory_tools::handle_remember(
                             &kernel.memory,
-                            aid.clone(),
+                            aid,
                             content,
                         )
                     } else {
@@ -530,7 +528,7 @@ pub fn create_agent_config<'a>(
                             .unwrap_or(5);
                         sk_tools::memory_tools::handle_recall(
                             &kernel.memory,
-                            aid.clone(),
+                            aid,
                             query,
                             limit,
                         )
@@ -722,7 +720,7 @@ pub fn create_agent_config<'a>(
                                 ),
                             )
                         })
-                        .map_err(|e| sk_types::SovereignError::ToolExecutionError(e))
+                        .map_err(sk_types::SovereignError::ToolExecutionError)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -740,7 +738,7 @@ pub fn create_agent_config<'a>(
                                 ),
                             )
                         })
-                        .map_err(|e| sk_types::SovereignError::ToolExecutionError(e))
+                        .map_err(sk_types::SovereignError::ToolExecutionError)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -758,7 +756,7 @@ pub fn create_agent_config<'a>(
                                 ),
                             )
                         })
-                        .map_err(|e| sk_types::SovereignError::ToolExecutionError(e))
+                        .map_err(sk_types::SovereignError::ToolExecutionError)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -776,7 +774,7 @@ pub fn create_agent_config<'a>(
                                 ),
                             )
                         })
-                        .map_err(|e| sk_types::SovereignError::ToolExecutionError(e))
+                        .map_err(sk_types::SovereignError::ToolExecutionError)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -794,7 +792,7 @@ pub fn create_agent_config<'a>(
                                 ),
                             )
                         })
-                        .map_err(|e| sk_types::SovereignError::ToolExecutionError(e))
+                        .map_err(sk_types::SovereignError::ToolExecutionError)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -812,7 +810,7 @@ pub fn create_agent_config<'a>(
                                 ),
                             )
                         })
-                        .map_err(|e| sk_types::SovereignError::ToolExecutionError(e))
+                        .map_err(sk_types::SovereignError::ToolExecutionError)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),

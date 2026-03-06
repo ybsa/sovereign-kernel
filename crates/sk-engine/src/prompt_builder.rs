@@ -134,9 +134,7 @@ mod tests {
         let tools = vec![ToolDefinition {
             name: "file_read".to_string(),
             description: "Read a file".to_string(),
-            parameters: Default::default(),
-            source: "test".to_string(),
-            required_capabilities: vec![],
+            input_schema: serde_json::json!({}),
         }];
 
         let prompt = build_system_prompt(

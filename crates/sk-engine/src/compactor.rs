@@ -256,8 +256,8 @@ pub fn format_context_report(report: &ContextReport) -> String {
     let bar_len: usize = 20;
     let filled = ((report.usage_percent / 100.0) * bar_len as f64).round() as usize;
     let empty = bar_len.saturating_sub(filled);
-    let bar: String = std::iter::repeat_n('█', filled)
-        .chain(std::iter::repeat_n('░', empty))
+    let bar: String = std::iter::repeat('█').take(filled)
+        .chain(std::iter::repeat('░').take(empty))
         .collect();
 
     format!(
@@ -705,17 +705,12 @@ pub async fn compact_session(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sk_types::message::TokenUsage;
+    // removed unused TokenUsage import
 
     #[test]
     fn test_needs_compaction_below_threshold() {
-        let session = Session {
-            id: sk_types::agent::SessionId::new(),
-            agent_id: sk_types::agent::AgentId::new(),
-            messages: vec![Message::user("hello")],
-            context_window_tokens: 0,
-            label: None,
-        };
+        let mut session = Session::new(sk_types::AgentId::new());
+        session.messages = vec![Message::user("hello")];
         let config = CompactionConfig::default();
         assert!(!needs_compaction(&session, &config));
     }
@@ -725,13 +720,8 @@ mod tests {
         let messages: Vec<Message> = (0..100)
             .map(|i| Message::user(format!("msg {i}")))
             .collect();
-        let session = Session {
-            id: sk_types::agent::SessionId::new(),
-            agent_id: sk_types::agent::AgentId::new(),
-            messages,
-            context_window_tokens: 0,
-            label: None,
-        };
+        let mut session = Session::new(sk_types::AgentId::new());
+        session.messages = messages;
         let config = CompactionConfig::default();
         assert!(needs_compaction(&session, &config));
     }
@@ -755,31 +745,27 @@ mod tests {
 
         #[async_trait]
         impl LlmDriver for FakeDriver {
+            fn provider(&self) -> &str { "fake" }
+
             async fn complete(
                 &self,
                 _req: CompletionRequest,
             ) -> Result<CompletionResponse, LlmError> {
                 Ok(CompletionResponse {
-                    content: vec![ContentBlock::Text {
-                        text: "Summary of conversation".to_string(),
-                    }],
-                    stop_reason: sk_types::message::StopReason::EndTurn,
+                    content: "Summary of conversation".to_string(),
+                    stop_reason: crate::llm_driver::StopReason::EndTurn,
                     tool_calls: vec![],
-                    usage: TokenUsage {
-                        input_tokens: 100,
-                        output_tokens: 50,
+                    usage: crate::llm_driver::TokenUsage {
+                        prompt_tokens: 100,
+                        completion_tokens: 50,
+                        total_tokens: 150,
                     },
                 })
             }
         }
 
-        let session = Session {
-            id: sk_types::agent::SessionId::new(),
-            agent_id: sk_types::agent::AgentId::new(),
-            messages: vec![Message::user("hello"), Message::assistant("hi")],
-            context_window_tokens: 0,
-            label: None,
-        };
+        let mut session = Session::new(sk_types::AgentId::new());
+        session.messages = vec![Message::user("hello"), Message::assistant("hi")];
         let config = CompactionConfig {
             threshold: 30,
             keep_recent: 10,
@@ -806,12 +792,14 @@ mod tests {
 
         #[async_trait]
         impl LlmDriver for FakeDriver {
+            fn provider(&self) -> &str { "fake" }
+
             async fn complete(
                 &self,
                 req: CompletionRequest,
             ) -> Result<CompletionResponse, LlmError> {
                 // Verify the input includes tool call information
-                let input_text = req.messages[0].content.text_content();
+                let input_text = req.messages[1].content.text_content();
                 assert!(
                     input_text.contains("web_search"),
                     "Should include tool name"
@@ -821,14 +809,13 @@ mod tests {
                     "Should include tool result"
                 );
                 Ok(CompletionResponse {
-                    content: vec![ContentBlock::Text {
-                        text: "Summary with tools".to_string(),
-                    }],
-                    stop_reason: sk_types::message::StopReason::EndTurn,
+                    content: "Summary with tools".to_string(),
+                    stop_reason: crate::llm_driver::StopReason::EndTurn,
                     tool_calls: vec![],
-                    usage: TokenUsage {
-                        input_tokens: 100,
-                        output_tokens: 50,
+                    usage: crate::llm_driver::TokenUsage {
+                        prompt_tokens: 100,
+                        completion_tokens: 50,
+                        total_tokens: 150,
                     },
                 })
             }
@@ -857,13 +844,8 @@ mod tests {
             }]),
         };
 
-        let session = Session {
-            id: sk_types::agent::SessionId::new(),
-            agent_id: sk_types::agent::AgentId::new(),
-            messages,
-            context_window_tokens: 0,
-            label: None,
-        };
+        let mut session = Session::new(sk_types::AgentId::new());
+        session.messages = messages;
         let config = CompactionConfig {
             threshold: 5,
             keep_recent: 3,
@@ -906,19 +888,20 @@ mod tests {
 
         #[async_trait]
         impl LlmDriver for FakeDriver {
+            fn provider(&self) -> &str { "fake" }
+
             async fn complete(
                 &self,
                 _req: CompletionRequest,
             ) -> Result<CompletionResponse, LlmError> {
                 Ok(CompletionResponse {
-                    content: vec![ContentBlock::Text {
-                        text: "Summary: discussed topics 0 through 79".to_string(),
-                    }],
-                    stop_reason: sk_types::message::StopReason::EndTurn,
+                    content: "Summary: discussed topics 0 through 79".to_string(),
+                    stop_reason: crate::llm_driver::StopReason::EndTurn,
                     tool_calls: vec![],
-                    usage: TokenUsage {
-                        input_tokens: 500,
-                        output_tokens: 100,
+                    usage: crate::llm_driver::TokenUsage {
+                        prompt_tokens: 500,
+                        completion_tokens: 100,
+                        total_tokens: 600,
                     },
                 })
             }
@@ -927,13 +910,8 @@ mod tests {
         let messages: Vec<Message> = (0..100)
             .map(|i| Message::user(format!("Message about topic {i}")))
             .collect();
-        let session = Session {
-            id: sk_types::agent::SessionId::new(),
-            agent_id: sk_types::agent::AgentId::new(),
-            messages,
-            context_window_tokens: 0,
-            label: None,
-        };
+        let mut session = Session::new(sk_types::AgentId::new());
+        session.messages = messages;
         let config = CompactionConfig {
             threshold: 30,
             keep_recent: 10,
@@ -1043,24 +1021,21 @@ mod tests {
 
         #[async_trait]
         impl LlmDriver for FailingDriver {
+            fn provider(&self) -> &str { "failing" }
+
             async fn complete(
                 &self,
                 _req: CompletionRequest,
             ) -> Result<CompletionResponse, LlmError> {
-                Err(LlmError::Http("connection refused".to_string()))
+                Err(LlmError::NetworkError("connection refused".to_string()))
             }
         }
 
         let messages: Vec<Message> = (0..30)
             .map(|i| Message::user(format!("Message {i}")))
             .collect();
-        let session = Session {
-            id: sk_types::agent::SessionId::new(),
-            agent_id: sk_types::agent::AgentId::new(),
-            messages,
-            context_window_tokens: 0,
-            label: None,
-        };
+        let mut session = Session::new(sk_types::AgentId::new());
+        session.messages = messages;
         let config = CompactionConfig {
             threshold: 10,
             keep_recent: 5,
@@ -1100,20 +1075,21 @@ mod tests {
 
         #[async_trait]
         impl LlmDriver for CountingDriver {
+            fn provider(&self) -> &str { "counting" }
+
             async fn complete(
                 &self,
                 _req: CompletionRequest,
             ) -> Result<CompletionResponse, LlmError> {
                 let n = CALL_COUNT.fetch_add(1, Ordering::SeqCst);
                 Ok(CompletionResponse {
-                    content: vec![ContentBlock::Text {
-                        text: format!("Chunk summary {n}"),
-                    }],
-                    stop_reason: sk_types::message::StopReason::EndTurn,
+                    content: format!("Chunk summary {n}"),
+                    stop_reason: crate::llm_driver::StopReason::EndTurn,
                     tool_calls: vec![],
-                    usage: TokenUsage {
-                        input_tokens: 50,
-                        output_tokens: 20,
+                    usage: crate::llm_driver::TokenUsage {
+                        prompt_tokens: 50,
+                        completion_tokens: 20,
+                        total_tokens: 70,
                     },
                 })
             }

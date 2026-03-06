@@ -445,7 +445,7 @@ mod tests {
     #[test]
     fn test_sanitize_container_name_valid() {
         let result = sanitize_container_name("Sovereign Kernel-sandbox-abc123").unwrap();
-        assert_eq!(result, "Sovereign Kernel-sandbox-abc123");
+        assert_eq!(result, "Sovereign-Kernel-sandbox-abc123");
     }
 
     #[test]

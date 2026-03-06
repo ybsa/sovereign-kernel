@@ -463,7 +463,7 @@ mod tests {
             6667,
             "Sovereign Kernel".to_string(),
             None,
-            vec!["#Sovereign Kernel".to_string()],
+            vec!["#SovereignKernel".to_string()],
             false,
         );
         assert_eq!(adapter.name(), "irc");
@@ -510,10 +510,10 @@ mod tests {
     #[test]
     fn test_parse_irc_line_privmsg() {
         let line =
-            parse_irc_line(":alice!alice@host PRIVMSG #Sovereign Kernel :Hello everyone!").unwrap();
+            parse_irc_line(":alice!alice@host PRIVMSG #SovereignKernel :Hello everyone!").unwrap();
         assert_eq!(line.prefix.as_deref(), Some("alice!alice@host"));
         assert_eq!(line.command, "PRIVMSG");
-        assert_eq!(line.params, vec!["#Sovereign Kernel"]);
+        assert_eq!(line.params, vec!["#SovereignKernel"]);
         assert_eq!(line.trailing.as_deref(), Some("Hello everyone!"));
     }
 
@@ -528,9 +528,9 @@ mod tests {
 
     #[test]
     fn test_parse_irc_line_no_trailing() {
-        let line = parse_irc_line(":alice!alice@host JOIN #Sovereign Kernel").unwrap();
+        let line = parse_irc_line(":alice!alice@host JOIN #SovereignKernel").unwrap();
         assert_eq!(line.command, "JOIN");
-        assert_eq!(line.params, vec!["#Sovereign Kernel"]);
+        assert_eq!(line.params, vec!["#SovereignKernel"]);
         assert!(line.trailing.is_none());
     }
 
@@ -555,14 +555,14 @@ mod tests {
         let line = IrcLine {
             prefix: Some("alice!alice@host".to_string()),
             command: "PRIVMSG".to_string(),
-            params: vec!["#Sovereign Kernel".to_string()],
+            params: vec!["#SovereignKernel".to_string()],
             trailing: Some("Hello from IRC!".to_string()),
         };
 
         let msg = parse_privmsg(&line, "Sovereign Kernel-bot").unwrap();
         assert_eq!(msg.channel, ChannelType::Custom("irc".to_string()));
         assert_eq!(msg.sender.display_name, "alice");
-        assert_eq!(msg.sender.platform_id, "#Sovereign Kernel");
+        assert_eq!(msg.sender.platform_id, "#SovereignKernel");
         assert!(msg.is_group);
         assert!(matches!(msg.content, ChannelContent::Text(ref t) if t == "Hello from IRC!"));
     }
@@ -586,7 +586,7 @@ mod tests {
         let line = IrcLine {
             prefix: Some("Sovereign Kernel-bot!bot@host".to_string()),
             command: "PRIVMSG".to_string(),
-            params: vec!["#Sovereign Kernel".to_string()],
+            params: vec!["#SovereignKernel".to_string()],
             trailing: Some("My own message".to_string()),
         };
 
@@ -599,7 +599,7 @@ mod tests {
         let line = IrcLine {
             prefix: Some("alice!alice@host".to_string()),
             command: "PRIVMSG".to_string(),
-            params: vec!["#Sovereign Kernel".to_string()],
+            params: vec!["#SovereignKernel".to_string()],
             trailing: Some("/agent hello-world".to_string()),
         };
 
@@ -618,7 +618,7 @@ mod tests {
         let line = IrcLine {
             prefix: Some("alice!alice@host".to_string()),
             command: "PRIVMSG".to_string(),
-            params: vec!["#Sovereign Kernel".to_string()],
+            params: vec!["#SovereignKernel".to_string()],
             trailing: Some("".to_string()),
         };
 
@@ -631,7 +631,7 @@ mod tests {
         let line = IrcLine {
             prefix: Some("alice!alice@host".to_string()),
             command: "PRIVMSG".to_string(),
-            params: vec!["#Sovereign Kernel".to_string()],
+            params: vec!["#SovereignKernel".to_string()],
             trailing: None,
         };
 
@@ -644,7 +644,7 @@ mod tests {
         let line = IrcLine {
             prefix: Some("alice!alice@host".to_string()),
             command: "NOTICE".to_string(),
-            params: vec!["#Sovereign Kernel".to_string()],
+            params: vec!["#SovereignKernel".to_string()],
             trailing: Some("Notice text".to_string()),
         };
 

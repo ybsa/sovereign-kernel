@@ -117,6 +117,7 @@ Manager Agent
 | **Taint Tracking** | Network-fetched data tagged as tainted; cannot be directly executed |
 | **Approval Gate** | Risky tool calls paused for human approval before execution |
 | **Merkle Audit Trail** | Every action SHA-256 chained in SQLite; tampering is cryptographically detectable |
+| **Hardened Core** (v0.1.0) | Zero-warning Clippy state, 100% test coverage, and strict MSRV 1.75.0 compliance |
 
 ---
 

@@ -52,7 +52,7 @@ impl LlmDriver for FallbackDriver {
         }
 
         Err(last_error.unwrap_or_else(|| LlmError::ApiError {
-            status: 0 as u16,
+            status: 0_u16,
             message: "No drivers configured in fallback chain".to_string(),
         }))
     }
@@ -72,7 +72,7 @@ mod tests {
         }
         async fn complete(&self, _req: CompletionRequest) -> Result<CompletionResponse, LlmError> {
             Err(LlmError::ApiError {
-                status: 500 as u16,
+                status: 500_u16,
                 message: "Internal error".to_string(),
             })
         }

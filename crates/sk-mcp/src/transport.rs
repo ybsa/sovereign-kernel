@@ -9,7 +9,7 @@ use tracing::{debug, warn};
 pub enum McpTransport {
     /// Subprocess with JSON-RPC over stdin/stdout.
     Stdio {
-        child: Child,
+        child: Box<Child>,
         stdin: ChildStdin,
         stdout: BufReader<ChildStdout>,
     },
@@ -134,7 +134,7 @@ impl McpTransport {
         })?;
 
         Ok(McpTransport::Stdio {
-            child,
+            child: Box::new(child),
             stdin,
             stdout: BufReader::new(stdout),
         })

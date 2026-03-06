@@ -160,15 +160,11 @@ impl McpServer {
             }
         };
 
-        if let Some(id) = req.id {
-            Some(JsonRpcResponse {
-                jsonrpc: "2.0".into(),
-                id: Some(id),
-                result,
-                error: None,
-            })
-        } else {
-            None // No response for notifications
-        }
+        req.id.map(|id| JsonRpcResponse {
+            jsonrpc: "2.0".into(),
+            id: Some(id),
+            result,
+            error: None,
+        })
     }
 }

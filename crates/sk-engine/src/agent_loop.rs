@@ -27,6 +27,9 @@ pub struct AgentLoopResult {
 }
 
 /// Configuration for an agent loop run.
+pub type ToolExecutor = Box<dyn Fn(&ToolCall) -> SovereignResult<String> + Send + Sync>;
+pub type StreamHandler = Box<dyn Fn(&str) + Send + Sync>;
+
 pub struct AgentLoopConfig<'a> {
     /// The LLM driver to use.
     pub driver: &'a dyn LlmDriver,
@@ -41,9 +44,9 @@ pub struct AgentLoopConfig<'a> {
     /// Temperature.
     pub temperature: f32,
     /// Tool executor callback.
-    pub tool_executor: Box<dyn Fn(&ToolCall) -> SovereignResult<String> + Send + Sync>,
+    pub tool_executor: ToolExecutor,
     /// Optional streaming callback to receive tokens as they are generated.
-    pub stream_handler: Option<Box<dyn Fn(&str) + Send + Sync>>,
+    pub stream_handler: Option<StreamHandler>,
 }
 
 use crate::loop_guard::LoopGuard;

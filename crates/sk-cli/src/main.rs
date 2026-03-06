@@ -10,7 +10,7 @@
 //! - `sovereign audit`     — view audit logs
 
 use clap::{Parser, Subcommand};
-use tracing_subscriber::EnvFilter;
+// Removed unused EnvFilter import
 
 mod audit;
 mod bridge;

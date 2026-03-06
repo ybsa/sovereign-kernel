@@ -22,7 +22,7 @@ impl OpenAIDriver {
     /// Create a new OpenAI-compatible driver.
     pub fn new(api_key: String, base_url: String) -> Self {
         Self {
-            api_key: String::from(api_key),
+            api_key,
             base_url,
             client: reqwest::Client::new(),
         }
@@ -231,9 +231,9 @@ impl LlmDriver for OpenAIDriver {
                 .header("content-type", "application/json")
                 .json(&oai_request);
 
-            if !self.api_key.as_str().is_empty() {
+            if !self.api_key.is_empty() {
                 req_builder = req_builder
-                    .header("authorization", format!("Bearer {}", self.api_key.as_str()));
+                    .header("authorization", format!("Bearer {}", self.api_key));
             }
 
             let resp = req_builder
@@ -350,7 +350,7 @@ impl LlmDriver for OpenAIDriver {
         }
 
         Err(LlmError::ApiError {
-            status: 0 as u16,
+            status: 0_u16,
             message: "Max retries exceeded".to_string(),
         })
     }
@@ -477,7 +477,7 @@ mod tests {
         assert_eq!(resp.tool_calls.len(), 1);
         assert_eq!(resp.tool_calls[0].name, "web_fetch");
         assert!(resp.tool_calls[0]
-            .arguments
+            .input
             .to_string()
             .contains("https://example.com"));
     }

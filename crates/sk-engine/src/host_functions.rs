@@ -61,6 +61,23 @@ fn check_capability(
     if capabilities.contains(required) {
         return Ok(());
     }
+    
+    let has_wildcard = capabilities.iter().any(|c| match (c, required) {
+        (Capability::FileRead(c_path), Capability::FileRead(_)) => c_path == "*",
+        (Capability::FileWrite(c_path), Capability::FileWrite(_)) => c_path == "*",
+        (Capability::EnvRead(c_name), Capability::EnvRead(_)) => c_name == "*",
+        (Capability::MemoryRead(c_key), Capability::MemoryRead(_)) => c_key == "*",
+        (Capability::MemoryWrite(c_key), Capability::MemoryWrite(_)) => c_key == "*",
+        (Capability::NetConnect(c_url), Capability::NetConnect(_)) => c_url == "*",
+        (Capability::ShellExec(c_cmd), Capability::ShellExec(_)) => c_cmd == "*",
+        (Capability::AgentMessage(c_target), Capability::AgentMessage(_)) => c_target == "*",
+        _ => false,
+    });
+
+    if has_wildcard {
+        return Ok(());
+    }
+
     Err(json!({"error": format!("Capability denied: {required:?}")}))
 }
 

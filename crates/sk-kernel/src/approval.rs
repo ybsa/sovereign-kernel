@@ -258,7 +258,7 @@ impl SafetyGate {
 
                 if let Some(agent_id) = agent_id {
                     let mut blocked = self.last_blocked.lock().unwrap();
-                    blocked.insert(agent_id.clone(), sig);
+                    blocked.insert(*agent_id, sig);
                 }
 
                 // Block with explanation

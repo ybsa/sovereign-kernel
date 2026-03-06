@@ -139,7 +139,6 @@ async fn node_available() -> bool {
 /// The PID is stored in the kernel's `whatsapp_gateway_pid` for shutdown cleanup.
 pub async fn start_whatsapp_gateway(_kernel: &Arc<crate::kernel::SovereignKernel>) {
     // Note: Config access would be implemented here. For now, we will return.
-    return;
 }
 // This function was stubbed out.
 

@@ -176,7 +176,7 @@ impl AuditStore {
         let mut expected_prev_hash =
             "0000000000000000000000000000000000000000000000000000000000000000".to_string();
 
-        for (_i, item) in iter.enumerate() {
+        for item in iter {
             let entry = item.map_err(|e| SovereignError::Memory(e.to_string()))?;
 
             // 1. Check strict link

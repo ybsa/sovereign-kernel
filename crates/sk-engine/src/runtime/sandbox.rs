@@ -496,6 +496,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg_attr(target_os = "windows", ignore = "Wasmtime fuel traps cause non-unwinding panics on Windows tokio threads")]
     async fn test_fuel_exhaustion() {
         let sandbox = WasmSandbox::new().unwrap();
         let input = serde_json::json!({});

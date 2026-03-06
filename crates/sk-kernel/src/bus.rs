@@ -31,22 +31,22 @@ impl InterAgentBus {
         let formatted_message = format!("[Incoming Message from {}]:\n{}", sender_name, message);
 
         // Load the latest session for the target agent from memory
-        let mut session = if let Ok(sessions) = self.memory.sessions.list_for_agent(to.clone()) {
+        let mut session = if let Ok(sessions) = self.memory.sessions.list_for_agent(*to) {
             if let Some((session_id, _, _)) = sessions.first() {
                 self.memory
                     .sessions
                     .load(*session_id)
                     .map_err(|e| format!("Failed to load target session: {}", e))?
-                    .unwrap_or_else(|| sk_types::Session::new(to.clone()))
+                    .unwrap_or_else(|| sk_types::Session::new(*to))
             } else {
                 debug!(
                     target = "inter-agent",
                     "Target agent {} has no sessions yet. Creating.", to
                 );
-                sk_types::Session::new(to.clone())
+                sk_types::Session::new(*to)
             }
         } else {
-            sk_types::Session::new(to.clone())
+            sk_types::Session::new(*to)
         };
 
         // Append the message as a user message (so the agent responds to it next time it acts)
@@ -91,7 +91,7 @@ mod tests {
         let session = bus
             .memory
             .sessions
-            .load(session_id.clone())
+            .load(*session_id)
             .unwrap()
             .unwrap();
 

@@ -28,10 +28,10 @@ impl ChannelBridgeHandle for SovereignBridge {
         // Retrieve or create session in memory cache
         let session_mutex = self
             .sessions
-            .entry(agent_id.clone())
+            .entry(agent_id)
             .or_insert_with(|| {
                 // Try to load from SQLite database first
-                if let Ok(entries) = self.kernel.memory.sessions.list_for_agent(agent_id.clone()) {
+                if let Ok(entries) = self.kernel.memory.sessions.list_for_agent(agent_id) {
                     if let Some((latest_id, _, _)) = entries.first() {
                         if let Ok(Some(loaded_session)) =
                             self.kernel.memory.sessions.load(*latest_id)
@@ -42,7 +42,7 @@ impl ChannelBridgeHandle for SovereignBridge {
                 }
                 // Fallback to new session
                 Arc::new(tokio::sync::Mutex::new(sk_types::Session::new(
-                    agent_id.clone(),
+                    agent_id,
                 )))
             })
             .clone();

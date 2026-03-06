@@ -126,31 +126,31 @@ impl SovereignKernel {
         #[allow(unused_assignments)]
         let mut model_name = String::new();
         let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> =
-            if let Some(key) = std::env::var("ANTHROPIC_API_KEY").ok() {
+            if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
                 model_name = "claude-3-5-sonnet-20241022".to_string();
                 Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
                     key,
                     "https://api.anthropic.com".to_string(),
                 ))
-            } else if let Some(key) = std::env::var("OPENAI_API_KEY").ok() {
+            } else if let Ok(key) = std::env::var("OPENAI_API_KEY") {
                 model_name = "gpt-4o".to_string();
                 Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
                     key,
                     "https://api.openai.com/v1".to_string(),
                 ))
-            } else if let Some(key) = std::env::var("GITHUB_TOKEN").ok() {
+            } else if let Ok(key) = std::env::var("GITHUB_TOKEN") {
                 model_name = "gpt-4o".to_string();
                 Arc::new(sk_engine::drivers::copilot::CopilotDriver::new(
                     key,
                     "".to_string(),
                 ))
-            } else if let Some(key) = std::env::var("GROQ_API_KEY").ok() {
+            } else if let Ok(key) = std::env::var("GROQ_API_KEY") {
                 model_name = "llama3-70b-8192".to_string();
                 Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
                     key,
                     "https://api.groq.com/openai/v1".to_string(),
                 ))
-            } else if let Some(key) = std::env::var("GEMINI_API_KEY").ok() {
+            } else if let Ok(key) = std::env::var("GEMINI_API_KEY") {
                 model_name = "gemini-2.0-flash-lite".to_string();
                 Arc::new(sk_engine::drivers::gemini::GeminiDriver::new(
                     key,
@@ -223,7 +223,7 @@ impl SovereignKernel {
             self.driver.as_ref(), // needs to be &dyn LlmDriver
             system_prompt,
             self.model_name.clone(),
-            session.agent_id.clone(),
+            session.agent_id,
             self.browser.clone(),
             self.skills.clone(),
         );
@@ -259,14 +259,15 @@ impl SovereignKernel {
 
                     match &job.action {
                         sk_types::scheduler::CronAction::AgentTurn { message, .. } => {
+                            let aid = job.agent_id;
                             let k = kernel.clone();
-                            let aid = job.agent_id.clone();
                             let msg = message.clone();
                             let job_id = job.id;
+                            let delivery = job.delivery.clone();
 
                             tokio::spawn(async move {
-                                let mut session =
-                                    match k.memory.sessions.list_for_agent(aid.clone()) {
+                                let session =
+                                    match k.memory.sessions.list_for_agent(aid) {
                                         Ok(sessions) if !sessions.is_empty() => {
                                             k.memory.sessions.load(sessions[0].0).unwrap_or(None)
                                         }
@@ -286,7 +287,6 @@ impl SovereignKernel {
                                         if let Some(handler) =
                                             k.delivery_handler.read().await.as_ref()
                                         {
-                                            let delivery = job.delivery.clone();
                                             let response_text = res.response.clone();
                                             let h_clone = handler.clone();
                                             tokio::spawn(async move {
@@ -331,7 +331,7 @@ impl SovereignKernel {
         let addr = &self.config.api_listen;
         let port = addr
             .split(':')
-            .last()
+            .next_back()
             .and_then(|p| p.parse().ok())
             .unwrap_or(3000);
         crate::api::start_server(self, port).await

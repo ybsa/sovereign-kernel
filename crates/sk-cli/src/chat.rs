@@ -31,18 +31,18 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
     println!("\nSovereign: [Connected to {}]\n", kernel.model_name);
 
     // Load existing session or create new one
-    let mut session = if let Ok(entries) = kernel.memory.sessions.list_for_agent(agent_id.clone()) {
+    let mut session = if let Ok(entries) = kernel.memory.sessions.list_for_agent(agent_id) {
         if let Some((latest_id, _, _)) = entries.first() {
             if let Ok(Some(loaded_session)) = kernel.memory.sessions.load(*latest_id) {
                 loaded_session
             } else {
-                sk_types::Session::new(agent_id.clone())
+                sk_types::Session::new(agent_id)
             }
         } else {
-            sk_types::Session::new(agent_id.clone())
+            sk_types::Session::new(agent_id)
         }
     } else {
-        sk_types::Session::new(agent_id.clone())
+        sk_types::Session::new(agent_id)
     };
 
     // Chat loop
@@ -91,7 +91,7 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
                 break;
             }
             "clear" | "/clear" => {
-                session = sk_types::Session::new(agent_id.clone());
+                session = sk_types::Session::new(agent_id);
                 println!("Session cleared.\n");
                 continue;
             }

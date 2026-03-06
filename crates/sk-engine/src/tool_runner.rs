@@ -57,7 +57,7 @@ impl ToolRegistry {
     pub fn executor(
         &self,
         _agent_capabilities: Vec<sk_types::security::Capability>,
-    ) -> Box<dyn Fn(&ToolCall) -> SovereignResult<String> + Send + Sync> {
+    ) -> crate::agent_loop::ToolExecutor {
         let registry = self.clone();
         Box::new(move |call| {
             // Check capabilities
