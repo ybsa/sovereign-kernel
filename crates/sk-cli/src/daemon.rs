@@ -11,6 +11,9 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
     // Initialize kernel
     let kernel = Arc::new(SovereignKernel::init(config).await?);
 
+    // Start background background job scheduler
+    kernel.start_background_services().await;
+
     // Start the API Bridge server
     let k_server = kernel.clone();
     tokio::spawn(async move {

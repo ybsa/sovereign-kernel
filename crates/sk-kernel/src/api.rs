@@ -51,7 +51,9 @@ pub struct ActionResponse {
 
 /// Start the API server in the background.
 pub async fn start_server(kernel: Arc<SovereignKernel>, port: u16) -> SovereignResult<()> {
-    let state = Arc::new(ApiState { kernel: kernel.clone() });
+    let state = Arc::new(ApiState {
+        kernel: kernel.clone(),
+    });
 
     let app = Router::new()
         .route("/health", get(health_handler))
@@ -62,8 +64,9 @@ pub async fn start_server(kernel: Arc<SovereignKernel>, port: u16) -> SovereignR
         .with_state(state);
 
     let addr = format!("127.0.0.1:{}", port);
-    let listener = tokio::net::TcpListener::bind(&addr).await
-        .map_err(|e| SovereignError::Config(format!("Failed to bind API server to {}: {}", addr, e)))?;
+    let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|e| {
+        SovereignError::Config(format!("Failed to bind API server to {}: {}", addr, e))
+    })?;
 
     info!(addr = %addr, "API Bridge server starting...");
 
@@ -78,7 +81,10 @@ pub async fn start_server(kernel: Arc<SovereignKernel>, port: u16) -> SovereignR
 
 /// GET /health
 async fn health_handler(State(_state): State<Arc<ApiState>>) -> impl IntoResponse {
-    (StatusCode::OK, Json(serde_json::json!({ "status": "ok", "version": env!("CARGO_PKG_VERSION") })))
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "status": "ok", "version": env!("CARGO_PKG_VERSION") })),
+    )
 }
 
 /// POST /v1/chat
@@ -87,7 +93,10 @@ async fn chat_handler(
     Json(payload): Json<ChatRequest>,
 ) -> Result<Json<ChatResponse>, (StatusCode, String)> {
     let agent_id = if let Some(id) = payload.agent_id {
-        AgentId(uuid::Uuid::parse_str(&id).map_err(|_| (StatusCode::BAD_REQUEST, "Invalid Agent ID".to_string()))?)
+        AgentId(
+            uuid::Uuid::parse_str(&id)
+                .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid Agent ID".to_string()))?,
+        )
     } else {
         AgentId::new() // Use a default/new agent if not specified
     };
@@ -95,7 +104,12 @@ async fn chat_handler(
     info!(agent = %agent_id, "API Chat Request: {}", payload.message);
 
     // Load existing session or create new one
-    let mut session = if let Ok(entries) = state.kernel.memory.sessions.list_for_agent(agent_id.clone()) {
+    let mut session = if let Ok(entries) = state
+        .kernel
+        .memory
+        .sessions
+        .list_for_agent(agent_id.clone())
+    {
         if let Some((latest_id, _, _)) = entries.first() {
             if let Ok(Some(loaded_session)) = state.kernel.memory.sessions.load(*latest_id) {
                 loaded_session
@@ -109,9 +123,16 @@ async fn chat_handler(
         sk_types::Session::new(agent_id.clone())
     };
 
-    let result = state.kernel.run_agent(&mut session, &payload.message)
+    let result = state
+        .kernel
+        .run_agent(&mut session, &payload.message)
         .await
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Agent execution error: {}", e)))?;
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Agent execution error: {}", e),
+            )
+        })?;
 
     Ok(Json(ChatResponse {
         response: result.response,
@@ -125,19 +146,23 @@ async fn webhook_handler(
     Json(payload): Json<serde_json::Value>,
 ) -> impl IntoResponse {
     info!("External Webhook Received: {:?}", payload);
-    
+
     // Log the webhook trigger in the audit trail
-    if let Err(e) = state.kernel.memory.audit.append_log(
-        &AgentId::new(), 
-        "API", 
-        "webhook_trigger", 
-        &payload
-    ) {
+    if let Err(e) =
+        state
+            .kernel
+            .memory
+            .audit
+            .append_log(&AgentId::new(), "API", "webhook_trigger", &payload)
+    {
         warn!("Failed to log webhook to audit trail: {}", e);
     }
 
-    (StatusCode::ACCEPTED, Json(ActionResponse {
-        success: true,
-        message: "Webhook accepted and logged to audit trail.".to_string(),
-    }))
+    (
+        StatusCode::ACCEPTED,
+        Json(ActionResponse {
+            success: true,
+            message: "Webhook accepted and logged to audit trail.".to_string(),
+        }),
+    )
 }

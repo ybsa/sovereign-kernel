@@ -71,7 +71,7 @@ pub async fn handle_shell_exec(
             let stdout = String::from_utf8_lossy(&out.stdout).to_string();
             let stderr = String::from_utf8_lossy(&out.stderr).to_string();
             let exit_code = out.status.code().unwrap_or(-1);
-            
+
             let mut response = String::new();
             response.push_str(&format!("Exit Code: {}\n", exit_code));
             if !stdout.trim().is_empty() {
@@ -125,7 +125,11 @@ mod tests {
             no_output_timeout_secs: 10,
         };
         // Command that sleeps longer than timeout
-        let cmd = if cfg!(target_os = "windows") { "timeout 2" } else { "sleep 2" };
+        let cmd = if cfg!(target_os = "windows") {
+            "timeout 2"
+        } else {
+            "sleep 2"
+        };
         let result = handle_shell_exec(&policy, cmd, None, Some(1)).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("timed out"));

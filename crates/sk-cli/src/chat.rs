@@ -10,7 +10,7 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
     println!("═══════════════════════════════════════════════════════");
     println!("  ⚡ Sovereign Kernel v{}", env!("CARGO_PKG_VERSION"));
     println!("  Type 'exit' or 'quit' to leave, 'clear' to reset");
-    
+
     match config.execution_mode {
         sk_types::config::ExecutionMode::Sandbox => {
             println!("  [🛡️ Mode: SANDBOX - File and command safety enabled]");
@@ -53,7 +53,7 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
         std::io::stdout().flush()?;
 
         let mut input = String::new();
-        
+
         if kernel.safety.has_pending(&agent_id) {
             println!("  [⏱️ Waiting for approval... default deny in 60s]");
             let res = tokio::time::timeout(std::time::Duration::from_secs(60), async {
@@ -61,8 +61,11 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
                     let mut s = String::new();
                     let _ = std::io::stdin().read_line(&mut s);
                     s
-                }).await.unwrap_or_default()
-            }).await;
+                })
+                .await
+                .unwrap_or_default()
+            })
+            .await;
 
             match res {
                 Ok(s) => input = s,

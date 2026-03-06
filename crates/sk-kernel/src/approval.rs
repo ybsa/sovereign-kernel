@@ -134,14 +134,19 @@ impl ApprovalManager {
     pub fn classify_risk(tool_name: &str, args: Option<&serde_json::Value>) -> RiskLevel {
         match tool_name {
             // Read-only / safe
-            "web_search" | "web_fetch" | "read_file" | "list_dir" | "recall" | "browser_read_page" => RiskLevel::Low,
-            
+            "web_search" | "web_fetch" | "read_file" | "list_dir" | "recall"
+            | "browser_read_page" => RiskLevel::Low,
+
             // Moderate actions
-            "write_file" | "copy_file" | "remember" | "browser_navigate" | "browser_click" | "browser_type" | "browser_screenshot" | "browser_close" => RiskLevel::Medium,
-            
+            "write_file" | "copy_file" | "remember" | "browser_navigate" | "browser_click"
+            | "browser_type" | "browser_screenshot" | "browser_close" => RiskLevel::Medium,
+
             // Dangerous execution
             "shell_exec" => {
-                let command = args.and_then(|a| a.get("command")).and_then(|v| v.as_str()).unwrap_or("");
+                let command = args
+                    .and_then(|a| a.get("command"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 if Self::is_destructive_command(command) {
                     RiskLevel::Critical
                 } else {
@@ -150,7 +155,7 @@ impl ApprovalManager {
             }
             "code_exec" => RiskLevel::Critical,
             "forget" | "delete_file" | "move_file" => RiskLevel::High,
-            
+
             _ => RiskLevel::High,
         }
     }
@@ -159,15 +164,45 @@ impl ApprovalManager {
     fn is_destructive_command(command: &str) -> bool {
         let cmd_lower = command.to_lowercase();
         let dangerous_patterns = [
-            "remove-item", "del ", "rd ", "rmdir", "format ", "clear-recyclebin",
-            "stop-process", "kill ", "taskkill", "shutdown", "restart-computer",
-            "reg delete", "reg add", "net user", "net stop", "diskpart",
-            "cipher /w", "sfc ", "dism ", "bcdedit", "wmic",
-            "rm -rf", "rm -r", "mkfs", "dd if=", "chmod 777", "chown",
-            "kill -9", "pkill", "reboot", "halt", "poweroff", "> /dev/",
-            "curl | sh", "wget | sh",
+            "remove-item",
+            "del ",
+            "rd ",
+            "rmdir",
+            "format ",
+            "clear-recyclebin",
+            "stop-process",
+            "kill ",
+            "taskkill",
+            "shutdown",
+            "restart-computer",
+            "reg delete",
+            "reg add",
+            "net user",
+            "net stop",
+            "diskpart",
+            "cipher /w",
+            "sfc ",
+            "dism ",
+            "bcdedit",
+            "wmic",
+            "rm -rf",
+            "rm -r",
+            "mkfs",
+            "dd if=",
+            "chmod 777",
+            "chown",
+            "kill -9",
+            "pkill",
+            "reboot",
+            "halt",
+            "poweroff",
+            "> /dev/",
+            "curl | sh",
+            "wget | sh",
         ];
-        dangerous_patterns.iter().any(|pattern| cmd_lower.contains(pattern))
+        dangerous_patterns
+            .iter()
+            .any(|pattern| cmd_lower.contains(pattern))
     }
 }
 
@@ -238,9 +273,11 @@ impl SafetyGate {
                             cmd
                         )
                     }
-                    "forget" | "file_delete" => "🛡️ **Safety Block**: The agent wants to delete data.\n\
+                    "forget" | "file_delete" => {
+                        "🛡️ **Safety Block**: The agent wants to delete data.\n\
                          Reply with **'approve'** to allow, or **'deny'** to block."
-                        .to_string(),
+                            .to_string()
+                    }
                     _ => {
                         format!(
                             "🛡️ **Safety Block**: The agent wants to use tool '{}' which is classified as dangerous.\n\
@@ -358,12 +395,18 @@ mod tests {
     fn test_classify_risk() {
         // Critical: destructive shell patterns
         assert_eq!(
-            ApprovalManager::classify_risk("shell_exec", Some(&serde_json::json!({"command": "rm -rf /"}))),
+            ApprovalManager::classify_risk(
+                "shell_exec",
+                Some(&serde_json::json!({"command": "rm -rf /"}))
+            ),
             RiskLevel::Critical
         );
         // High: non-destructive shell still High
         assert_eq!(
-            ApprovalManager::classify_risk("shell_exec", Some(&serde_json::json!({"command": "ls -la"}))),
+            ApprovalManager::classify_risk(
+                "shell_exec",
+                Some(&serde_json::json!({"command": "ls -la"}))
+            ),
             RiskLevel::High
         );
         // Critical: raw code execution allows maximum arbitrary control
@@ -392,7 +435,10 @@ mod tests {
             RiskLevel::Medium
         );
         // Low: read_file (implementation uses "read_file")
-        assert_eq!(ApprovalManager::classify_risk("read_file", None), RiskLevel::Low);
+        assert_eq!(
+            ApprovalManager::classify_risk("read_file", None),
+            RiskLevel::Low
+        );
     }
 
     #[test]

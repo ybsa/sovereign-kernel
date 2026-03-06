@@ -69,6 +69,7 @@ pub async fn run_agent_loop(
     let mut total_tokens = 0u32;
     let mut tool_calls_made = 0u32;
     let mut iterations = 0u32;
+    let mut consecutive_errors = 0u32;
     let mut final_response = String::new();
 
     let mut loop_guard = LoopGuard::new();
@@ -201,13 +202,17 @@ pub async fn run_agent_loop(
                     // 2. Execute tool
                     let result = match (config.tool_executor)(tool_call) {
                         Ok(output) => {
+                            consecutive_errors = 0;
                             if output.is_empty() {
                                 "Success (No output returned)".to_string()
                             } else {
                                 output
                             }
                         }
-                        Err(e) => format!("Error executing tool: {e}"),
+                        Err(e) => {
+                            consecutive_errors += 1;
+                            format!("Error executing tool: {e}")
+                        }
                     };
 
                     let tool_msg = sk_types::message::Message {
@@ -216,12 +221,25 @@ pub async fn run_agent_loop(
                             sk_types::message::ContentBlock::ToolResult {
                                 tool_use_id: tool_call.id.clone(),
                                 content: result,
-                                is_error: false,
+                                is_error: consecutive_errors > 0, // Mark as error block if it was an error
                             },
                         ]),
                     };
                     messages.push(tool_msg.clone());
                     session.push_message(tool_msg);
+
+                    // 3. Circuit Breaker
+                    if consecutive_errors >= 5 {
+                        warn!("Circuit breaker tripped: 5 consecutive tool execution errors.");
+                        final_response = "System Error: Circuit breaker tripped due to 5 consecutive tool failures. The system has automatically halted to prevent infinite error loops.".to_string();
+                        return Ok(AgentLoopResult {
+                            response: final_response,
+                            session: session.clone(),
+                            total_tokens,
+                            tool_calls_made,
+                            iterations,
+                        });
+                    }
                 }
                 // Loop back to LLM with tool results
             }

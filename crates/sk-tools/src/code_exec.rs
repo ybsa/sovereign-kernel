@@ -1,6 +1,6 @@
 //! Code execution tool for running scripts safely.
-use sk_types::ToolDefinition;
 use sk_types::config::ExecPolicy;
+use sk_types::ToolDefinition;
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -38,19 +38,22 @@ pub async fn handle_code_exec(
             "🛡️ SECURITY POLICY: Code execution is disabled in this mode.".into(),
         ));
     }
-    
+
     let file_id = uuid::Uuid::new_v4().to_string();
     let temp_dir = std::env::temp_dir().join(format!("sk_code_{}", file_id));
     std::fs::create_dir_all(&temp_dir)
         .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
-        
+
     let script_path = temp_dir.join(match language {
         "python" => "script.py",
         "node" => "script.js",
         "bash" => "script.sh",
         _ => {
             let _ = std::fs::remove_dir_all(&temp_dir);
-            return Err(sk_types::SovereignError::ToolExecutionError(format!("Unsupported language: {}", language)));
+            return Err(sk_types::SovereignError::ToolExecutionError(format!(
+                "Unsupported language: {}",
+                language
+            )));
         }
     });
 
@@ -62,17 +65,27 @@ pub async fn handle_code_exec(
     let binary = match language {
         "python" => "python3",
         "node" => "node",
-        "bash" => if cfg!(target_os = "windows") { "bash" } else { "sh" },
+        "bash" => {
+            if cfg!(target_os = "windows") {
+                "bash"
+            } else {
+                "sh"
+            }
+        }
         _ => unreachable!(),
     };
-    
+
     // Fallback binary checks for windows (often just 'python' instead of 'python3')
-    let actual_binary = if language == "python" && cfg!(target_os = "windows") { "python" } else { binary };
+    let actual_binary = if language == "python" && cfg!(target_os = "windows") {
+        "python"
+    } else {
+        binary
+    };
 
     let mut cmd = tokio::process::Command::new(actual_binary);
     cmd.arg(&script_path);
     cmd.current_dir(&temp_dir);
-    
+
     let timeout_duration = Duration::from_secs(30);
 
     let execution_result = match timeout(timeout_duration, cmd.output()).await {
@@ -80,7 +93,7 @@ pub async fn handle_code_exec(
             let stdout = String::from_utf8_lossy(&out.stdout).to_string();
             let stderr = String::from_utf8_lossy(&out.stderr).to_string();
             let exit_code = out.status.code().unwrap_or(-1);
-            
+
             let mut response = String::new();
             response.push_str(&format!("Exit Code: {}\n", exit_code));
             if !stdout.trim().is_empty() {
@@ -94,7 +107,10 @@ pub async fn handle_code_exec(
             }
             Ok(response)
         }
-        Ok(Err(e)) => Err(sk_types::SovereignError::ToolExecutionError(format!("Failed to spawn process {}: {}", actual_binary, e))),
+        Ok(Err(e)) => Err(sk_types::SovereignError::ToolExecutionError(format!(
+            "Failed to spawn process {}: {}",
+            actual_binary, e
+        ))),
         Err(_) => Err(sk_types::SovereignError::ToolExecutionError(format!(
             "Script timed out after {} seconds.",
             timeout_duration.as_secs()
@@ -122,7 +138,7 @@ mod tests {
         };
         let code = "print('hello from python')";
         let result = handle_code_exec(&policy, "python", code).await;
-        
+
         // Python might not be installed on all test runners, so we handle Err gracefully
         if let Ok(res) = result {
             assert!(res.contains("hello from python"));

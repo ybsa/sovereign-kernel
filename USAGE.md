@@ -59,6 +59,22 @@ Features:
 
 ---
 
+## ⏰ Autonomous Background Scheduling (Phase 16)
+
+Agents possess a `CronScheduler` that allows them to book tasks for the future in the background.
+
+To use background scheduling, **you must have the daemon running**:
+```bash
+sovereign start
+```
+
+Once running, you can connect via `sovereign chat` and tell your agent to:
+> "Schedule a task to check the weather every 1 hour and email me a summary at 8 AM."
+
+The agent will use the `schedule_create` tool. The daemon will monitor the time in the background and automatically wake the agent up precisely when the task is due, completely seamlessly.
+
+---
+
 ## 🖐️ Managing Hands
 
 Hands are autonomous capability agents you can activate:

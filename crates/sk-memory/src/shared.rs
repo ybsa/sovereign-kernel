@@ -20,7 +20,7 @@ impl SharedMemoryStore {
             .conn
             .lock()
             .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
-        
+
         // Simple insertion
         conn.execute(
             "INSERT INTO global_knowledge (author_id, content, topic, created_at)
@@ -37,12 +37,12 @@ impl SharedMemoryStore {
             .conn
             .lock()
             .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
-        
+
         let pattern = format!("%{}%", query);
         let mut stmt = conn
             .prepare("SELECT author_id, content, created_at FROM global_knowledge WHERE topic LIKE ?1 OR content LIKE ?1 ORDER BY created_at DESC LIMIT 50")
             .map_err(|e| SovereignError::Memory(e.to_string()))?;
-            
+
         let rows = stmt
             .query_map(rusqlite::params![pattern], |row| {
                 let author_id: String = row.get(0)?;
@@ -54,7 +54,8 @@ impl SharedMemoryStore {
 
         let mut results = Vec::new();
         for row in rows {
-            let (author_id, content, created_at) = row.map_err(|e| SovereignError::Memory(e.to_string()))?;
+            let (author_id, content, created_at) =
+                row.map_err(|e| SovereignError::Memory(e.to_string()))?;
             results.push((author_id, content, created_at));
         }
         Ok(results)
@@ -68,7 +69,8 @@ mod tests {
     #[test]
     fn test_shared_memory_store_and_recall() {
         let conn = rusqlite::Connection::open_in_memory().unwrap();
-        conn.execute_batch("
+        conn.execute_batch(
+            "
             CREATE TABLE global_knowledge (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 author_id TEXT NOT NULL,
@@ -76,15 +78,19 @@ mod tests {
                 topic TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
-        ").unwrap();
+        ",
+        )
+        .unwrap();
         let conn = Arc::new(Mutex::new(conn));
         let store = SharedMemoryStore::new(conn);
 
         let agent_a = AgentId::new();
 
         // Agent A stores something
-        store.store(agent_a.clone(), "The password is 'banana'", "secrets").unwrap();
-        
+        store
+            .store(agent_a.clone(), "The password is 'banana'", "secrets")
+            .unwrap();
+
         // Recall by content
         let results = store.recall("banana").unwrap();
         assert_eq!(results.len(), 1);
@@ -97,4 +103,3 @@ mod tests {
         assert_eq!(results_topic[0].1, "The password is 'banana'");
     }
 }
-

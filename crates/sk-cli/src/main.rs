@@ -31,6 +31,14 @@ struct Cli {
     /// Config file path
     #[arg(short, long, global = true)]
     config: Option<String>,
+
+    /// Enable verbose logging (debug level)
+    #[arg(short, long, global = true)]
+    verbose: bool,
+
+    /// Write structured logs to this file (JSON format)
+    #[arg(long, global = true)]
+    log_file: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -79,14 +87,39 @@ async fn main() -> anyhow::Result<()> {
     // Load environment variables from .env file
     dotenvy::dotenv().ok();
 
-    // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
-        .init();
-
     let cli = Cli::parse();
+
+    // Setup logging
+    let filter = if cli.verbose {
+        tracing_subscriber::EnvFilter::new("debug")
+    } else {
+        tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"))
+    };
+
+    if let Some(ref log_path) = cli.log_file {
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)
+            .unwrap_or_else(|e| panic!("Failed to open log file {}: {}", log_path, e));
+
+        let file_layer = tracing_subscriber::fmt::layer()
+            .with_writer(file)
+            .json() // Write as JSON to the log file for structure
+            .with_ansi(false);
+
+        use tracing_subscriber::layer::SubscriberExt;
+        use tracing_subscriber::util::SubscriberInitExt;
+
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(file_layer)
+            .with(tracing_subscriber::fmt::layer()) // And write standard tracing to stdout
+            .init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(filter).init();
+    }
 
     // Load config
     let config = if let Some(ref path) = cli.config {

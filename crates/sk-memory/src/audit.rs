@@ -6,8 +6,8 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use sha2::{Digest, Sha256};
 use sk_types::{AgentId, SovereignError, SovereignResult};
-use std::sync::{Arc, Mutex};
 use std::str::FromStr;
+use std::sync::{Arc, Mutex};
 use tracing::info;
 
 /// A single entry in the cryptographic audit log.
@@ -65,7 +65,9 @@ impl AuditStore {
             )
             .optional()
             .map_err(|e| SovereignError::Memory(e.to_string()))?
-            .unwrap_or_else(|| "0000000000000000000000000000000000000000000000000000000000000000".to_string()); // Genesis hash
+            .unwrap_or_else(|| {
+                "0000000000000000000000000000000000000000000000000000000000000000".to_string()
+            }); // Genesis hash
 
         // 2. Prepare the new data
         let timestamp = chrono::Utc::now().to_rfc3339();
@@ -171,7 +173,8 @@ impl AuditStore {
             })
             .map_err(|e| SovereignError::Memory(e.to_string()))?;
 
-        let mut expected_prev_hash = "0000000000000000000000000000000000000000000000000000000000000000".to_string();
+        let mut expected_prev_hash =
+            "0000000000000000000000000000000000000000000000000000000000000000".to_string();
 
         for (_i, item) in iter.enumerate() {
             let entry = item.map_err(|e| SovereignError::Memory(e.to_string()))?;
@@ -195,7 +198,7 @@ impl AuditStore {
             let recalculated_hash = format!("{:x}", hasher.finalize());
 
             if entry.hash != recalculated_hash {
-                 return Err(SovereignError::Memory(format!(
+                return Err(SovereignError::Memory(format!(
                     "Audit Data tampered at row #{}! Database hash {} does not match recalculated hash {}.",
                     entry.id, entry.hash, recalculated_hash
                 )));

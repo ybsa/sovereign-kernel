@@ -18,7 +18,7 @@ Manages the agent reasoning loop, LLM driver abstraction, tool execution pipelin
 
 ### 3. `sk-kernel` — The Supervisor
 The OS monitor that manages agent lifecycles and system-level concerns.
-- Background scheduler (cron-based task triggers)
+- **CronScheduler**: A background daemon thread (`start_background_services`) polling for due agent alarms and spawning dynamic wake-up sessions.
 - Heartbeat monitor with configurable timeouts
 - Config hot-reload without daemon restart
 - **Inter-Agent Bus** (`bus.rs`): Persistent message routing between agents
@@ -46,6 +46,7 @@ Implements the concrete action handlers available to agents.
 - **File Hand** (`file_ops.rs`): Full filesystem operations — read (1 MB limit), write, append, delete, move, copy, list with rich metadata. Path validation prevents traversal attacks.
 - **Web Hand** (`web_fetch.rs`): Fetches web pages via `reqwest` with automatic HTML-to-text stripping and response truncation.
 - **Code Hand** (`code_exec.rs`): Sandboxed script runner for Python, Node.js, and Bash with configurable timeouts and policy gating.
+- **Scheduler Hand** (`scheduler.rs`): Exposes `schedule_create`, `schedule_list`, and `schedule_delete` for autonomous time-based triggers.
 - **Skills System**: Dynamic registry of **52 expert skills** (Obsidian, GitHub, Weather, etc.) parsed from `SKILL.md` files — on-demand instructions without prompt bloat.
 
 ### 8. `sk-hands` — Autonomous Capability Packages

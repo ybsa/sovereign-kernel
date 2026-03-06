@@ -548,8 +548,9 @@ async fn handle_command(
     match name {
         "start" => {
             let agents = handle.list_agents().await.unwrap_or_default();
-            let mut msg = "Welcome to Sovereign Kernel! I connect you to AI agents.\n\nAvailable agents:\n"
-                .to_string();
+            let mut msg =
+                "Welcome to Sovereign Kernel! I connect you to AI agents.\n\nAvailable agents:\n"
+                    .to_string();
             if agents.is_empty() {
                 msg.push_str("  (none running)\n");
             } else {

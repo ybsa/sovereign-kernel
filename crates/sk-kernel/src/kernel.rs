@@ -30,6 +30,8 @@ pub struct SovereignKernel {
     pub skills: Arc<sk_tools::skills::SkillRegistry>,
     /// Agent-to-Agent message bus.
     pub bus: Arc<crate::bus::InterAgentBus>,
+    /// Scheduled background job orchestrator.
+    pub cron: Arc<crate::cron::CronScheduler>,
 }
 
 impl SovereignKernel {
@@ -120,29 +122,50 @@ impl SovereignKernel {
         // model_name is built up through if-else branches then moved into the struct.
         #[allow(unused_assignments)]
         let mut model_name = String::new();
-        let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = if let Some(key) = std::env::var("ANTHROPIC_API_KEY").ok() {
-            model_name = "claude-3-5-sonnet-20241022".to_string();
-            Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(key, "https://api.anthropic.com".to_string()))
-        } else if let Some(key) = std::env::var("OPENAI_API_KEY").ok() {
-            model_name = "gpt-4o".to_string();
-            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(key, "https://api.openai.com/v1".to_string()))
-        } else if let Some(key) = std::env::var("GITHUB_TOKEN").ok() {
-            model_name = "gpt-4o".to_string();
-            Arc::new(sk_engine::drivers::copilot::CopilotDriver::new(key, "".to_string()))
-        } else if let Some(key) = std::env::var("GROQ_API_KEY").ok() {
-            model_name = "llama3-70b-8192".to_string();
-            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(key, "https://api.groq.com/openai/v1".to_string()))
-        } else if let Some(key) = std::env::var("GEMINI_API_KEY").ok() {
-            model_name = "gemini-2.0-flash-lite".to_string();
-            Arc::new(sk_engine::drivers::gemini::GeminiDriver::new(key, "https://generativelanguage.googleapis.com".to_string()))
-        } else {
-            model_name = "claude-3-5-sonnet-20241022".to_string();
-            // Default to Anthropic if no keys found (will fail at runtime, but kernel can still boot)
-            Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new("".to_string(), "https://api.anthropic.com".to_string()))
-        };
+        let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> =
+            if let Some(key) = std::env::var("ANTHROPIC_API_KEY").ok() {
+                model_name = "claude-3-5-sonnet-20241022".to_string();
+                Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
+                    key,
+                    "https://api.anthropic.com".to_string(),
+                ))
+            } else if let Some(key) = std::env::var("OPENAI_API_KEY").ok() {
+                model_name = "gpt-4o".to_string();
+                Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                    key,
+                    "https://api.openai.com/v1".to_string(),
+                ))
+            } else if let Some(key) = std::env::var("GITHUB_TOKEN").ok() {
+                model_name = "gpt-4o".to_string();
+                Arc::new(sk_engine::drivers::copilot::CopilotDriver::new(
+                    key,
+                    "".to_string(),
+                ))
+            } else if let Some(key) = std::env::var("GROQ_API_KEY").ok() {
+                model_name = "llama3-70b-8192".to_string();
+                Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                    key,
+                    "https://api.groq.com/openai/v1".to_string(),
+                ))
+            } else if let Some(key) = std::env::var("GEMINI_API_KEY").ok() {
+                model_name = "gemini-2.0-flash-lite".to_string();
+                Arc::new(sk_engine::drivers::gemini::GeminiDriver::new(
+                    key,
+                    "https://generativelanguage.googleapis.com".to_string(),
+                ))
+            } else {
+                model_name = "claude-3-5-sonnet-20241022".to_string();
+                // Default to Anthropic if no keys found (will fail at runtime, but kernel can still boot)
+                Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
+                    "".to_string(),
+                    "https://api.anthropic.com".to_string(),
+                ))
+            };
 
         // Initialize Browser Manager
-        let browser = Arc::new(sk_engine::media::browser::BrowserManager::new(config.browser.clone()));
+        let browser = Arc::new(sk_engine::media::browser::BrowserManager::new(
+            config.browser.clone(),
+        ));
 
         // Initialize Skills Registry
         let skills_path = std::env::current_dir()
@@ -153,6 +176,11 @@ impl SovereignKernel {
         let skills = Arc::new(sk_tools::skills::SkillRegistry::load_from_dir(skills_path));
 
         let bus = Arc::new(crate::bus::InterAgentBus::new(memory.clone()));
+
+        let cron = Arc::new(crate::cron::CronScheduler::new(&config.data_dir, 100));
+        if let Err(e) = cron.load() {
+            tracing::warn!("Failed to load persisted cron jobs: {}", e);
+        }
 
         Ok(Self {
             config,
@@ -165,6 +193,7 @@ impl SovereignKernel {
             browser,
             skills,
             bus,
+            cron,
         })
     }
 
@@ -198,10 +227,81 @@ impl SovereignKernel {
         Ok(result)
     }
 
+    /// Start background services, including the cron job executor.
+    pub async fn start_background_services(self: &Arc<Self>) {
+        let kernel = self.clone();
+        tokio::spawn(async move {
+            tracing::info!("Starting background cron scheduler...");
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+
+                let due_jobs = kernel.cron.due_jobs();
+                for job in due_jobs {
+                    tracing::info!(
+                        agent_id = %job.agent_id,
+                        job_id = %job.id,
+                        name = %job.name,
+                        "Executing scheduled background job"
+                    );
+
+                    match &job.action {
+                        sk_types::scheduler::CronAction::AgentTurn { message, .. } => {
+                            let k = kernel.clone();
+                            let aid = job.agent_id.clone();
+                            let msg = message.clone();
+                            let job_id = job.id;
+
+                            tokio::spawn(async move {
+                                let mut session =
+                                    match k.memory.sessions.list_for_agent(aid.clone()) {
+                                        Ok(sessions) if !sessions.is_empty() => {
+                                            k.memory.sessions.load(sessions[0].0).unwrap_or(None)
+                                        }
+                                        _ => None,
+                                    };
+
+                                let mut s = session.unwrap_or_else(|| {
+                                    let mut new_s = sk_types::Session::new(aid);
+                                    new_s.push_message(sk_types::Message::user("System Notification: You have been woken up by your scheduled background job. Please use logs and context to fulfill the task."));
+                                    new_s
+                                });
+
+                                match k.run_agent(&mut s, &msg).await {
+                                    Ok(_) => k.cron.record_success(job_id),
+                                    Err(e) => k.cron.record_failure(job_id, &e.to_string()),
+                                }
+                                let _ = k.cron.persist();
+                            });
+                        }
+                        sk_types::scheduler::CronAction::SystemEvent { text } => {
+                            let payload =
+                                serde_json::json!({ "job_id": job.id.to_string(), "text": text });
+                            if let Err(e) = kernel.memory.audit.append_log(
+                                &job.agent_id,
+                                "System",
+                                "cron_event",
+                                &payload,
+                            ) {
+                                kernel.cron.record_failure(job.id, &e.to_string());
+                            } else {
+                                kernel.cron.record_success(job.id);
+                            }
+                            let _ = kernel.cron.persist();
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     /// Start the API bridge server if enabled in configuration.
     pub async fn start_api_server(self: Arc<Self>) -> SovereignResult<()> {
         let addr = &self.config.api_listen;
-        let port = addr.split(':').last().and_then(|p| p.parse().ok()).unwrap_or(3000);
+        let port = addr
+            .split(':')
+            .last()
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(3000);
         crate::api::start_server(self, port).await
     }
 

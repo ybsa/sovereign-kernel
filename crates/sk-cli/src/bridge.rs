@@ -41,7 +41,9 @@ impl ChannelBridgeHandle for SovereignBridge {
                     }
                 }
                 // Fallback to new session
-                Arc::new(tokio::sync::Mutex::new(sk_types::Session::new(agent_id.clone())))
+                Arc::new(tokio::sync::Mutex::new(sk_types::Session::new(
+                    agent_id.clone(),
+                )))
             })
             .clone();
 

@@ -7,6 +7,7 @@ pub mod code_exec;
 pub mod file_ops;
 pub mod mcp_bridge;
 pub mod memory_tools;
+pub mod scheduler;
 pub mod shared_memory;
 pub mod shell;
 pub mod skills;

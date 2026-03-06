@@ -1,7 +1,7 @@
 //! File operations tools.
 use sk_types::ToolDefinition;
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 // ---------------------------------------------------------------------------
 // Tool Definitions
@@ -10,7 +10,8 @@ use std::fs;
 pub fn read_file_tool() -> ToolDefinition {
     ToolDefinition {
         name: "read_file".into(),
-        description: "Read a file's contents. Supports a maximum of 1MB to prevent context overflow.".into(),
+        description:
+            "Read a file's contents. Supports a maximum of 1MB to prevent context overflow.".into(),
         input_schema: serde_json::json!({"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}),
     }
 }
@@ -18,7 +19,9 @@ pub fn read_file_tool() -> ToolDefinition {
 pub fn write_file_tool() -> ToolDefinition {
     ToolDefinition {
         name: "write_file".into(),
-        description: "Write content to a file. Optionally set append=true to add instead of overwrite.".into(),
+        description:
+            "Write content to a file. Optionally set append=true to add instead of overwrite."
+                .into(),
         input_schema: serde_json::json!({"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"append":{"type":"boolean"}},"required":["path","content"]}),
     }
 }
@@ -73,18 +76,23 @@ pub fn validate_safe_path(root: &Path, path: &str) -> Result<PathBuf, sk_types::
 
     let canonical_path = if requested.exists() {
         requested.canonicalize().map_err(|e| {
-            sk_types::SovereignError::ToolExecutionError(format!("Security error: Failed to canonicalize path: {e}"))
+            sk_types::SovereignError::ToolExecutionError(format!(
+                "Security error: Failed to canonicalize path: {e}"
+            ))
         })?
     } else {
         match requested.parent() {
             Some(parent) if parent.exists() => {
                 let canon_parent = parent.canonicalize().map_err(|e| {
-                    sk_types::SovereignError::ToolExecutionError(format!("Security error: Failed to canonicalize parent: {e}"))
+                    sk_types::SovereignError::ToolExecutionError(format!(
+                        "Security error: Failed to canonicalize parent: {e}"
+                    ))
                 })?;
                 if !canon_parent.starts_with(&base) {
                     return Err(sk_types::SovereignError::ToolExecutionError(format!(
                         "🛡️ SECURITY VIOLATION: Path '{}' is outside the permitted workspace '{}'",
-                        path, base.display()
+                        path,
+                        base.display()
                     )));
                 }
                 requested
@@ -96,7 +104,8 @@ pub fn validate_safe_path(root: &Path, path: &str) -> Result<PathBuf, sk_types::
     if !canonical_path.starts_with(&base) {
         return Err(sk_types::SovereignError::ToolExecutionError(format!(
             "🛡️ SECURITY VIOLATION: Path '{}' is outside the permitted workspace '{}'",
-            path, base.display()
+            path,
+            base.display()
         )));
     }
 
@@ -111,19 +120,21 @@ const MAX_FILE_SIZE_BYTES: u64 = 1024 * 1024; // 1MB limit for reads
 
 pub fn handle_read_file(root: &Path, path: &str) -> Result<String, sk_types::SovereignError> {
     let safe_path = validate_safe_path(root, path)?;
-    
+
     let metadata = fs::metadata(&safe_path)
         .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
-        
+
     if metadata.len() > MAX_FILE_SIZE_BYTES {
         return Err(sk_types::SovereignError::ToolExecutionError(format!(
             "File size {} bytes exceeds maximum allowed read size of {} bytes.",
-            metadata.len(), MAX_FILE_SIZE_BYTES
+            metadata.len(),
+            MAX_FILE_SIZE_BYTES
         )));
     }
 
-    fs::read_to_string(&safe_path)
-        .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to read file as text: {}", e)))
+    fs::read_to_string(&safe_path).map_err(|e| {
+        sk_types::SovereignError::ToolExecutionError(format!("Failed to read file as text: {}", e))
+    })
 }
 
 pub fn handle_write_file(
@@ -151,34 +162,48 @@ pub fn handle_write_file(
 
     file.write_all(content.as_bytes())
         .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
-        
-    Ok(format!("Successfully {} to {}", if append { "appended" } else { "wrote" }, path))
+
+    Ok(format!(
+        "Successfully {} to {}",
+        if append { "appended" } else { "wrote" },
+        path
+    ))
 }
 
 pub fn handle_list_dir(root: &Path, path: &str) -> Result<String, sk_types::SovereignError> {
     let safe_path = validate_safe_path(root, path)?;
     let mut entries = Vec::new();
-    
-    entries.push(format!("{:<30} | {:<10} | {:<12}", "Name", "Type", "Size (bytes)"));
+
+    entries.push(format!(
+        "{:<30} | {:<10} | {:<12}",
+        "Name", "Type", "Size (bytes)"
+    ));
     entries.push("-".repeat(58));
 
     for entry in fs::read_dir(safe_path)
         .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?
     {
-        let entry = entry.map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
-        let match_name = entry.file_name().into_string().unwrap_or_else(|_| "INVALID_UTF8".to_string());
-        
-        let metadata = entry.metadata().map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
+        let entry =
+            entry.map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
+        let match_name = entry
+            .file_name()
+            .into_string()
+            .unwrap_or_else(|_| "INVALID_UTF8".to_string());
+
+        let metadata = entry
+            .metadata()
+            .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
         let size = metadata.len();
-        let (type_str, indicator) = if metadata.is_dir() { 
-            ("DIR", "/") 
-        } else { 
-            ("FILE", "") 
+        let (type_str, indicator) = if metadata.is_dir() {
+            ("DIR", "/")
+        } else {
+            ("FILE", "")
         };
-        
-        entries.push(format!("{:<30} | {:<10} | {:<12}", 
-            format!("{}{}", match_name, indicator), 
-            type_str, 
+
+        entries.push(format!(
+            "{:<30} | {:<10} | {:<12}",
+            format!("{}{}", match_name, indicator),
+            type_str,
             size
         ));
     }
@@ -187,43 +212,59 @@ pub fn handle_list_dir(root: &Path, path: &str) -> Result<String, sk_types::Sove
 
 pub fn handle_delete_file(root: &Path, path: &str) -> Result<String, sk_types::SovereignError> {
     let safe_path = validate_safe_path(root, path)?;
-    let metadata = fs::metadata(&safe_path).map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
+    let metadata = fs::metadata(&safe_path)
+        .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
 
     if metadata.is_dir() {
-        fs::remove_dir_all(&safe_path).map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
+        fs::remove_dir_all(&safe_path)
+            .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
     } else {
-        fs::remove_file(&safe_path).map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
+        fs::remove_file(&safe_path)
+            .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
     }
-    
+
     Ok(format!("Successfully deleted {}", path))
 }
 
-pub fn handle_move_file(root: &Path, source: &str, dest: &str) -> Result<String, sk_types::SovereignError> {
+pub fn handle_move_file(
+    root: &Path,
+    source: &str,
+    dest: &str,
+) -> Result<String, sk_types::SovereignError> {
     let safe_src = validate_safe_path(root, source)?;
     let safe_dst = validate_safe_path(root, dest)?;
-    
+
     if let Some(parent) = safe_dst.parent() {
-        fs::create_dir_all(parent).map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
+        fs::create_dir_all(parent)
+            .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
     }
 
-    fs::rename(&safe_src, &safe_dst).map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
+    fs::rename(&safe_src, &safe_dst)
+        .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
     Ok(format!("Successfully moved {} to {}", source, dest))
 }
 
-pub fn handle_copy_file(root: &Path, source: &str, dest: &str) -> Result<String, sk_types::SovereignError> {
+pub fn handle_copy_file(
+    root: &Path,
+    source: &str,
+    dest: &str,
+) -> Result<String, sk_types::SovereignError> {
     let safe_src = validate_safe_path(root, source)?;
     let safe_dst = validate_safe_path(root, dest)?;
-    
+
     if let Some(parent) = safe_dst.parent() {
-        fs::create_dir_all(parent).map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
+        fs::create_dir_all(parent)
+            .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
     }
 
-    let metadata = fs::metadata(&safe_src).map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
+    let metadata = fs::metadata(&safe_src)
+        .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
     if metadata.is_dir() {
         return Err(sk_types::SovereignError::ToolExecutionError("Copying entire directories is not supported natively via this tool point yet. Use shell_exec for cp -r.".into()));
     }
 
-    fs::copy(&safe_src, &safe_dst).map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
+    fs::copy(&safe_src, &safe_dst)
+        .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
     Ok(format!("Successfully copied {} to {}", source, dest))
 }
 
@@ -241,17 +282,30 @@ mod tests {
 
         // Valid relative path (for a new file, validate_safe_path returns base.join(path))
         let safe = validate_safe_path(root, "test.txt").unwrap();
-        assert!(safe.starts_with(&canon_root), "Expected {:?} to start with {:?}", safe, canon_root);
+        assert!(
+            safe.starts_with(&canon_root),
+            "Expected {:?} to start with {:?}",
+            safe,
+            canon_root
+        );
 
         // Valid sub-directory path
         fs::create_dir(root.join("sub")).unwrap();
         let safe_sub = validate_safe_path(root, "sub/file.txt").unwrap();
-        assert!(safe_sub.starts_with(&canon_root), "Expected {:?} to start with {:?}", safe_sub, canon_root);
+        assert!(
+            safe_sub.starts_with(&canon_root),
+            "Expected {:?} to start with {:?}",
+            safe_sub,
+            canon_root
+        );
 
         // Invalid: directory traversal attempt
         let result = validate_safe_path(root, "../outside.txt");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("SECURITY VIOLATION"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("SECURITY VIOLATION"));
     }
 
     #[test]
