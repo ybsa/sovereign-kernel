@@ -17,6 +17,12 @@ require_approval = [
     "browser_navigate", 
     "browser_click", 
     "browser_type",
-    "forget"
+    "forget",
+    "schedule_create",
+    "delete_file",
+    "move_file",
+    "code_exec",
+    "agent_spawn_worker",
+    "shared_memory_store"
 ]
 timeout_secs = 60
