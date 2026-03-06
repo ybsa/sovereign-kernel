@@ -240,6 +240,7 @@ pub struct BridgeManager {
     shutdown_tx: watch::Sender<bool>,
     shutdown_rx: watch::Receiver<bool>,
     tasks: Vec<tokio::task::JoinHandle<()>>,
+    adapters: Arc<DashMap<String, Arc<dyn ChannelAdapter>>>,
 }
 
 impl BridgeManager {
@@ -252,6 +253,7 @@ impl BridgeManager {
             shutdown_tx,
             shutdown_rx,
             tasks: Vec::new(),
+            adapters: Arc::new(DashMap::new()),
         }
     }
 
@@ -266,6 +268,11 @@ impl BridgeManager {
         let rate_limiter = self.rate_limiter.clone();
         let adapter_clone = adapter.clone();
         let mut shutdown = self.shutdown_rx.clone();
+
+        self.adapters.insert(
+            channel_type_str(&adapter.channel_type()).to_string(),
+            adapter.clone(),
+        );
 
         let task = tokio::spawn(async move {
             let mut stream = std::pin::pin!(stream);
@@ -305,6 +312,59 @@ impl BridgeManager {
         let _ = self.shutdown_tx.send(true);
         for task in self.tasks.drain(..) {
             let _ = task.await;
+        }
+    }
+}
+
+pub struct BridgeDelivery {
+    adapters: Arc<DashMap<String, Arc<dyn ChannelAdapter>>>,
+}
+
+impl BridgeManager {
+    pub fn delivery_handler(&self) -> BridgeDelivery {
+        BridgeDelivery {
+            adapters: self.adapters.clone(),
+        }
+    }
+}
+
+#[async_trait]
+impl sk_types::scheduler::CronDeliveryHandler for BridgeDelivery {
+    async fn deliver(
+        &self,
+        delivery: &sk_types::scheduler::CronDelivery,
+        message: &str,
+    ) -> Result<(), String> {
+        match delivery {
+            sk_types::scheduler::CronDelivery::None => Ok(()),
+            sk_types::scheduler::CronDelivery::Channel { channel, to } => {
+                if let Some(adapter) = self.adapters.get(channel) {
+                    let user = ChannelUser {
+                        platform_id: to.clone(),
+                        display_name: "CronJob".to_string(),
+                        sk_user: None,
+                    };
+                    adapter
+                        .send(&user, ChannelContent::Text(message.to_string()))
+                        .await
+                        .map_err(|e| format!("Adapter send failed: {e}"))
+                } else {
+                    Err(format!("Channel adapter not found: {channel}"))
+                }
+            }
+            sk_types::scheduler::CronDelivery::LastChannel => {
+                Err("LastChannel delivery not implemented in daemon yet".to_string())
+            }
+            sk_types::scheduler::CronDelivery::Webhook { url } => {
+                let client = reqwest::Client::new();
+                client
+                    .post(url)
+                    .json(&serde_json::json!({ "result": message }))
+                    .send()
+                    .await
+                    .map_err(|e| format!("Webhook delivery failed: {e}"))?;
+                Ok(())
+            }
         }
     }
 }

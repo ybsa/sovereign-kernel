@@ -86,4 +86,26 @@ impl ChannelBridgeHandle for SovereignBridge {
         let hash = md5::compute(manifest_name);
         Ok(AgentId(uuid::Uuid::from_bytes(*hash)))
     }
+
+    async fn record_delivery(
+        &self,
+        agent_id: AgentId,
+        channel: &str,
+        recipient: &str,
+        _success: bool,
+        _error: Option<&str>,
+    ) {
+        let value = serde_json::json!({
+            "channel": channel,
+            "to": recipient
+        });
+        if let Err(e) = self
+            .kernel
+            .memory
+            .structured
+            .set(agent_id, "last_channel", value)
+        {
+            error!("Failed to save last_channel for agent {agent_id}: {e}");
+        }
+    }
 }

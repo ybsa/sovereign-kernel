@@ -27,6 +27,11 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
     let router = Arc::new(sk_channels::router::AgentRouter::new());
     let mut manager = sk_channels::bridge::BridgeManager::new(handle.clone() as _, router);
 
+    // Connect the channel delivery system to the kernel's background task scheduler
+    kernel
+        .set_delivery_handler(Arc::new(manager.delivery_handler()))
+        .await;
+
     let mut bridged = false;
 
     // Start Telegram Channel if valid token

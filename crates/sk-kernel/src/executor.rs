@@ -438,10 +438,12 @@ pub fn create_agent_config<'a>(
                             name: name.to_string(),
                             enabled: true,
                             schedule,
-                            action: sk_types::scheduler::CronAction::SystemEvent {
-                                text: task_desc.to_string(),
+                            action: sk_types::scheduler::CronAction::AgentTurn {
+                                message: task_desc.to_string(),
+                                model_override: None,
+                                timeout_secs: None,
                             },
-                            delivery: sk_types::scheduler::CronDelivery::None,
+                            delivery: sk_types::scheduler::CronDelivery::LastChannel,
                             created_at: chrono::Utc::now(),
                             last_run: None,
                             next_run: None,

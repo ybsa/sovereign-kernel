@@ -32,6 +32,9 @@ pub struct SovereignKernel {
     pub bus: Arc<crate::bus::InterAgentBus>,
     /// Scheduled background job orchestrator.
     pub cron: Arc<crate::cron::CronScheduler>,
+    /// Handler to send back responses to channels like Telegram/Discord.
+    pub delivery_handler:
+        tokio::sync::RwLock<Option<Arc<dyn sk_types::scheduler::CronDeliveryHandler>>>,
 }
 
 impl SovereignKernel {
@@ -194,7 +197,17 @@ impl SovereignKernel {
             skills,
             bus,
             cron,
+            delivery_handler: tokio::sync::RwLock::new(None),
         })
+    }
+
+    /// Set the global delivery handler for cron jobs.
+    pub async fn set_delivery_handler(
+        &self,
+        handler: Arc<dyn sk_types::scheduler::CronDeliveryHandler>,
+    ) {
+        let mut lock = self.delivery_handler.write().await;
+        *lock = Some(handler);
     }
 
     /// Run a complete agent loop for a given session and user input.
@@ -267,7 +280,26 @@ impl SovereignKernel {
                                 });
 
                                 match k.run_agent(&mut s, &msg).await {
-                                    Ok(_) => k.cron.record_success(job_id),
+                                    Ok(res) => {
+                                        k.cron.record_success(job_id);
+                                        // Execute delivery
+                                        if let Some(handler) =
+                                            k.delivery_handler.read().await.as_ref()
+                                        {
+                                            let delivery = job.delivery.clone();
+                                            let response_text = res.response.clone();
+                                            let h_clone = handler.clone();
+                                            tokio::spawn(async move {
+                                                if let Err(e) =
+                                                    h_clone.deliver(&delivery, &response_text).await
+                                                {
+                                                    tracing::error!(
+                                                        "Delivery failed for job {job_id}: {e}"
+                                                    );
+                                                }
+                                            });
+                                        }
+                                    }
                                     Err(e) => k.cron.record_failure(job_id, &e.to_string()),
                                 }
                                 let _ = k.cron.persist();

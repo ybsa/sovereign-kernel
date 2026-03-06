@@ -865,3 +865,14 @@ mod tests {
         assert!(job.validate(0).is_ok());
     }
 }
+
+// ---------------------------------------------------------------------------
+// CronDeliveryHandler
+// ---------------------------------------------------------------------------
+
+/// A trait implemented by the channel bridge to deliver cron job results.
+#[async_trait::async_trait]
+pub trait CronDeliveryHandler: Send + Sync {
+    /// Deliver a message based on the specified delivery method.
+    async fn deliver(&self, delivery: &CronDelivery, message: &str) -> Result<(), String>;
+}
