@@ -19,7 +19,7 @@ use serde::Serialize;
 use sk_hands::registry::HandRegistry;
 use std::sync::Arc;
 use std::time::Instant;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
 // ─── Compile-time ETag ───────────────────────────────────────────────────────
@@ -362,18 +362,37 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .layer(axum::middleware::from_fn(
             crate::middleware::security_headers,
         ))
-        // CORS
-        .layer(CorsLayer::permissive())
+        // CORS (Restricted)
+        .layer(
+            CorsLayer::new()
+                .allow_origin(axum::http::HeaderValue::from_static(
+                    "http://127.0.0.1:1420",
+                )) // Example allowed origin
+                .allow_origin(axum::http::HeaderValue::from_static(
+                    "http://localhost:1420",
+                ))
+                .allow_origin(axum::http::HeaderValue::from_static(
+                    "http://localhost:4200",
+                ))
+                .allow_methods(Any)
+                .allow_headers(Any),
+        )
         .with_state(state)
 }
 
 /// Start the dashboard web server on the given port.
-pub async fn start_server(state: Arc<AppState>, port: u16) {
+pub async fn start_server(state: Arc<AppState>, port: u16) -> anyhow::Result<()> {
     let app = build_router(state);
 
-    let addr = format!("0.0.0.0:{port}");
+    // Bind to localhost by default for security, instead of 0.0.0.0
+    let addr = format!("127.0.0.1:{port}");
     info!("⚡ Live Canvas dashboard at http://localhost:{port}");
 
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to bind dashboard server to {}: {}", addr, e))?;
+    axum::serve(listener, app)
+        .await
+        .map_err(|e| anyhow::anyhow!("Dashboard server error: {}", e))?;
+    Ok(())
 }

@@ -17,7 +17,7 @@ use axum::{
 pub async fn auth(req: Request<Body>, next: Next) -> Result<Response, StatusCode> {
     let api_key = match std::env::var("SOVEREIGN_API_KEY") {
         Ok(key) if !key.is_empty() => key,
-        _ => return Ok(next.run(req).await), // No key set — allow all
+        _ => return Err(StatusCode::UNAUTHORIZED), // No key set — deny all API requests
     };
 
     let path = req.uri().path();

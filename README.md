@@ -31,7 +31,7 @@ It is not just a framework — it is the mediation layer between Autonomous Enti
 ## 🚀 Quick Start
 
 ### Requirements
-- Rust `1.80.0+`
+- Rust `1.75+`
 - An API key for at least one LLM provider
 
 ### Run from source
@@ -142,7 +142,7 @@ Sovereign Kernel now supports **swarm intelligence** — agents can communicate,
 
 ---
 
-## 🏗️ Architecture (9-Crate Workspace)
+## 🏗️ Architecture (10-Crate Workspace)
 
 ```
 sk-types    → Shared types, capability gates, taint tracking
@@ -180,7 +180,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive.
 
 ## 📚 Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — 9-crate workspace deep dive
+- [ARCHITECTURE.md](ARCHITECTURE.md) — 10-crate workspace deep dive
 - [SECURITY.md](SECURITY.md) — Security model, sandboxing, audit trail
 - [USAGE.md](USAGE.md) — Hands, dashboard, channels, and agent configuration
 - [VISION.md](VISION.md) — The long-term AI Operating System vision

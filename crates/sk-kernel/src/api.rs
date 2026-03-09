@@ -13,7 +13,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use sk_types::{AgentId, SovereignError, SovereignResult};
 use std::sync::Arc;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing::{info, warn};
 
@@ -50,21 +50,63 @@ pub struct ActionResponse {
 }
 
 /// Start the API server in the background.
-pub async fn start_server(kernel: Arc<SovereignKernel>, port: u16) -> SovereignResult<()> {
+pub async fn start_server(kernel: Arc<SovereignKernel>, addr: &str) -> SovereignResult<()> {
     let state = Arc::new(ApiState {
         kernel: kernel.clone(),
     });
+
+    // The auth middleware from sk-cli isn't available here in sk-kernel directly,
+    // so we enforce API key check here.
+    async fn auth(
+        req: axum::extract::Request<axum::body::Body>,
+        next: axum::middleware::Next,
+    ) -> Result<axum::response::Response, axum::http::StatusCode> {
+        let api_key = match std::env::var("SOVEREIGN_API_KEY") {
+            Ok(key) if !key.is_empty() => key,
+            _ => return Err(axum::http::StatusCode::UNAUTHORIZED),
+        };
+
+        let path = req.uri().path();
+        if path == "/health" {
+            return Ok(next.run(req).await);
+        }
+
+        let provided_key = req
+            .headers()
+            .get(axum::http::header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.strip_prefix("Bearer "))
+            .or_else(|| req.headers().get("x-api-key").and_then(|v| v.to_str().ok()));
+
+        match provided_key {
+            Some(key) if key == api_key => Ok(next.run(req).await),
+            _ => Err(axum::http::StatusCode::UNAUTHORIZED),
+        }
+    }
 
     let app = Router::new()
         .route("/health", get(health_handler))
         .route("/v1/chat", post(chat_handler))
         .route("/v1/triggers/webhook", post(webhook_handler))
-        .layer(CorsLayer::permissive())
+        .layer(axum::middleware::from_fn(auth))
+        .layer(
+            CorsLayer::new()
+                .allow_origin(axum::http::HeaderValue::from_static(
+                    "http://127.0.0.1:1420",
+                ))
+                .allow_origin(axum::http::HeaderValue::from_static(
+                    "http://localhost:1420",
+                ))
+                .allow_origin(axum::http::HeaderValue::from_static(
+                    "http://localhost:4200",
+                ))
+                .allow_methods(Any)
+                .allow_headers(Any),
+        )
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
-    let addr = format!("127.0.0.1:{}", port);
-    let listener = tokio::net::TcpListener::bind(&addr).await.map_err(|e| {
+    let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| {
         SovereignError::Config(format!("Failed to bind API server to {}: {}", addr, e))
     })?;
 
@@ -104,12 +146,7 @@ async fn chat_handler(
     info!(agent = %agent_id, "API Chat Request: {}", payload.message);
 
     // Load existing session or create new one
-    let mut session = if let Ok(entries) = state
-        .kernel
-        .memory
-        .sessions
-        .list_for_agent(agent_id)
-    {
+    let mut session = if let Ok(entries) = state.kernel.memory.sessions.list_for_agent(agent_id) {
         if let Some((latest_id, _, _)) = entries.first() {
             if let Ok(Some(loaded_session)) = state.kernel.memory.sessions.load(*latest_id) {
                 loaded_session

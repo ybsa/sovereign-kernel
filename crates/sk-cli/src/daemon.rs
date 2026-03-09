@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 
 pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
-    println!("⚡ Starting Sovereign Kernel daemon in the background...");
+    println!("⚡ Starting Sovereign...");
 
     // Initialize kernel
     let kernel = Arc::new(SovereignKernel::init(config).await?);
@@ -104,13 +104,33 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
     println!("Daemon is now running. (Press Ctrl+C to stop)\n");
 
     let pid_path = std::path::PathBuf::from("sovereign.pid");
-    std::fs::write(&pid_path, std::process::id().to_string())
+
+    // Check for double-start using sysinfo
+    if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
+        if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&pid_str) {
+            if let Some(pid) = meta.get("pid").and_then(|v| v.as_u64()) {
+                let system = sysinfo::System::new_all();
+                if let Some(process) = system.process(sysinfo::Pid::from_u32(pid as u32)) {
+                    let name = process.name().to_string_lossy().to_lowercase();
+                    if name.contains("sovereign") {
+                        anyhow::bail!("🟢 Daemon is already running (PID: {}).", pid);
+                    }
+                }
+            }
+        }
+    }
+
+    let meta = serde_json::json!({
+        "pid": std::process::id(),
+        "exe": std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default(),
+        "cwd": std::env::current_dir().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default(),
+        "start_time": chrono::Utc::now().to_rfc3339()
+    });
+
+    std::fs::write(&pid_path, serde_json::to_string_pretty(&meta).unwrap())
         .unwrap_or_else(|e| tracing::warn!("Failed to write PID file: {}", e));
 
-    println!(
-        "⚡ Sovereign Kernel daemon started in background (PID: {}).",
-        std::process::id()
-    );
+    println!("⚡ Sovereign Kernel started (PID: {}).", std::process::id());
 
     // Config hot-reload watcher (from Sovereign Kernel's server.rs)
     {
@@ -135,8 +155,18 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
         .await
         .expect("Failed to install Ctrl+C handler");
     tracing::info!("Ctrl+C received, shutting down...");
+
+    // Initiate Graceful Shutdown
+    let coordinator =
+        sk_engine::runtime::graceful_shutdown::ShutdownCoordinator::new(Default::default());
+    coordinator.initiate();
+
+    if let Err(e) = kernel.shutdown().await {
+        tracing::error!("Error during kernel shutdown: {}", e);
+    }
+
     let _ = std::fs::remove_file(&pid_path);
-    println!("\n⚡ Sovereign Kernel daemon stopped.");
+    println!("\n⚡ Sovereign Kernel stopped.");
     Ok(())
 }
 
@@ -144,12 +174,17 @@ pub async fn status() -> anyhow::Result<()> {
     println!("⚡ Sovereign Kernel status:");
     let pid_path = std::path::PathBuf::from("sovereign.pid");
     if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
-        if let Ok(pid) = pid_str.trim().parse::<u32>() {
-            // Rough check if process is alive (mostly cross-platform)
-            // On Windows this is harder without sysinfo crate, but we'll assume alive
-            // if the file exists and has a number.
-            println!("🟢 RUNNING (PID: {})", pid);
-            return Ok(());
+        if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&pid_str) {
+            if let Some(pid) = meta.get("pid").and_then(|v| v.as_u64()) {
+                let system = sysinfo::System::new_all();
+                if let Some(process) = system.process(sysinfo::Pid::from_u32(pid as u32)) {
+                    let name = process.name().to_string_lossy().to_lowercase();
+                    if name.contains("sovereign") {
+                        println!("🟢 RUNNING (PID: {})", pid);
+                        return Ok(());
+                    }
+                }
+            }
         }
     }
     println!("🔴 STOPPED");
@@ -157,27 +192,34 @@ pub async fn status() -> anyhow::Result<()> {
 }
 
 pub async fn stop() -> anyhow::Result<()> {
-    println!("⚡ Stopping Sovereign Kernel daemon...");
+    println!("⚡ Stopping Sovereign Kernel...");
     let pid_path = std::path::PathBuf::from("sovereign.pid");
     if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
-        if let Ok(pid) = pid_str.trim().parse::<u32>() {
-            #[cfg(target_os = "windows")]
-            {
-                std::process::Command::new("taskkill")
-                    .args(["/F", "/PID", &pid.to_string()])
-                    .output()?;
+        if let Ok(meta) = serde_json::from_str::<serde_json::Value>(&pid_str) {
+            if let Some(pid) = meta.get("pid").and_then(|v| v.as_u64()) {
+                let system = sysinfo::System::new_all();
+                if let Some(process) = system.process(sysinfo::Pid::from_u32(pid as u32)) {
+                    let name = process.name().to_string_lossy().to_lowercase();
+                    if name.contains("sovereign") {
+                        if process.kill() {
+                            let _ = std::fs::remove_file(&pid_path);
+                            println!("✅ Stopped successfully.");
+                            return Ok(());
+                        } else {
+                            anyhow::bail!("❌ Failed to kill the daemon process.");
+                        }
+                    }
+                }
             }
-            #[cfg(not(target_os = "windows"))]
-            {
-                std::process::Command::new("kill")
-                    .arg(pid.to_string())
-                    .output()?;
-            }
-            let _ = std::fs::remove_file(&pid_path);
-            println!("✅ Daemon stopped successfully.");
-            return Ok(());
         }
     }
+
+    // Cleanup stale PID file if present
+    if pid_path.exists() {
+        tracing::info!("Cleaning up stale PID file.");
+        let _ = std::fs::remove_file(&pid_path);
+    }
+
     println!("⚠️ Daemon does not appear to be running.");
     Ok(())
 }

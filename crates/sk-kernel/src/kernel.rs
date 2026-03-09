@@ -30,8 +30,12 @@ pub struct SovereignKernel {
     pub skills: Arc<sk_tools::skills::SkillRegistry>,
     /// Agent-to-Agent message bus.
     pub bus: Arc<crate::bus::InterAgentBus>,
+    /// Global agent registry.
+    pub agents: Arc<crate::registry::AgentRegistry>,
     /// Scheduled background job orchestrator.
     pub cron: Arc<crate::cron::CronScheduler>,
+    /// Process supervisor.
+    pub supervisor: Arc<crate::supervisor::Supervisor>,
     /// Handler to send back responses to channels like Telegram/Discord.
     pub delivery_handler:
         tokio::sync::RwLock<Option<Arc<dyn sk_types::scheduler::CronDeliveryHandler>>>,
@@ -171,11 +175,19 @@ impl SovereignKernel {
         ));
 
         // Initialize Skills Registry
-        let skills_path = std::env::current_dir()
+        let mut skills_path = std::env::current_dir()
             .unwrap_or_default()
             .join("crates")
             .join("sk-tools")
             .join("skills");
+
+        if !skills_path.exists() {
+            if let Ok(exe) = std::env::current_exe() {
+                if let Some(parent) = exe.parent() {
+                    skills_path = parent.join("skills");
+                }
+            }
+        }
         let skills = Arc::new(sk_tools::skills::SkillRegistry::load_from_dir(skills_path));
 
         let bus = Arc::new(crate::bus::InterAgentBus::new(memory.clone()));
@@ -184,6 +196,9 @@ impl SovereignKernel {
         if let Err(e) = cron.load() {
             tracing::warn!("Failed to load persisted cron jobs: {}", e);
         }
+
+        let supervisor = Arc::new(crate::supervisor::Supervisor::new());
+        let agents = Arc::new(crate::registry::AgentRegistry::new());
 
         Ok(Self {
             config,
@@ -196,7 +211,9 @@ impl SovereignKernel {
             browser,
             skills,
             bus,
+            agents,
             cron,
+            supervisor,
             delivery_handler: tokio::sync::RwLock::new(None),
         })
     }
@@ -248,6 +265,60 @@ impl SovereignKernel {
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
+                // --- Heartbeat & Supervisor Check ---
+                let db_agents = kernel.agents.list();
+                let mut hb_info = Vec::new();
+                for agent in db_agents {
+                    if agent.state == sk_types::agent::AgentState::Running {
+                        hb_info.push(crate::heartbeat::AgentHeartbeatInfo {
+                            id: agent.id,
+                            name: agent.name.clone(),
+                            state: agent.state,
+                            last_active: agent.last_active,
+                            heartbeat_interval_secs: agent
+                                .manifest
+                                .autonomous
+                                .and_then(|a| Some(a.heartbeat_interval_secs)),
+                        });
+                    }
+                }
+
+                let hb_config = crate::heartbeat::HeartbeatConfig::default();
+                let statuses = crate::heartbeat::check_agents(&hb_info, &hb_config);
+
+                for status in statuses {
+                    if status.unresponsive {
+                        tracing::warn!(
+                            "Agent {} is unresponsive. Initiating recovery...",
+                            status.name
+                        );
+                        if kernel
+                            .supervisor
+                            .record_agent_restart(status.agent_id, 3)
+                            .is_ok()
+                        {
+                            tracing::info!(
+                                "Agent {} marked for restart by supervisor.",
+                                status.name
+                            );
+                            // A real system would enqueue a wake-up or reset the loop state here
+                        } else {
+                            tracing::error!(
+                                "Agent {} exceeded max restarts. Suspending.",
+                                status.name
+                            );
+                            if let Some(mut agent) = kernel.agents.get(status.agent_id) {
+                                agent.state = sk_types::agent::AgentState::Suspended;
+                                let _ = kernel.agents.set_state(
+                                    status.agent_id,
+                                    sk_types::agent::AgentState::Suspended,
+                                );
+                            }
+                        }
+                    }
+                }
+                // --- End Heartbeat Check ---
+
                 let due_jobs = kernel.cron.due_jobs();
                 for job in due_jobs {
                     tracing::info!(
@@ -266,13 +337,12 @@ impl SovereignKernel {
                             let delivery = job.delivery.clone();
 
                             tokio::spawn(async move {
-                                let session =
-                                    match k.memory.sessions.list_for_agent(aid) {
-                                        Ok(sessions) if !sessions.is_empty() => {
-                                            k.memory.sessions.load(sessions[0].0).unwrap_or(None)
-                                        }
-                                        _ => None,
-                                    };
+                                let session = match k.memory.sessions.list_for_agent(aid) {
+                                    Ok(sessions) if !sessions.is_empty() => {
+                                        k.memory.sessions.load(sessions[0].0).unwrap_or(None)
+                                    }
+                                    _ => None,
+                                };
 
                                 let mut s = session.unwrap_or_else(|| {
                                     let mut new_s = sk_types::Session::new(aid);
@@ -328,13 +398,8 @@ impl SovereignKernel {
 
     /// Start the API bridge server if enabled in configuration.
     pub async fn start_api_server(self: Arc<Self>) -> SovereignResult<()> {
-        let addr = &self.config.api_listen;
-        let port = addr
-            .split(':')
-            .next_back()
-            .and_then(|p| p.parse().ok())
-            .unwrap_or(3000);
-        crate::api::start_server(self, port).await
+        let addr = self.config.api_listen.clone();
+        crate::api::start_server(self, &addr).await
     }
 
     /// Shut down the kernel gracefully.

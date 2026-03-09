@@ -126,7 +126,7 @@ mod tests {
         };
         // Command that sleeps longer than timeout
         let cmd = if cfg!(target_os = "windows") {
-            "timeout 2"
+            "ping 127.0.0.1 -n 3"
         } else {
             "sleep 2"
         };
