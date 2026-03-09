@@ -32,3 +32,6 @@ clippy_warns*.txt
 
 # Ignore OS-specific test artifacts
 test_sandbox/
+
+# Ignore daemon pid files
+*.pid
