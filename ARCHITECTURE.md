@@ -97,11 +97,11 @@ The user-facing binary (`sovereign`) and the embedded terminal web dashboard.
 
 ```
 Manager Agent
-    ├── agent_spawn_worker("researcher", "Find X")
+    ├── spawn_witch_skeleton("researcher", "Find X")
     │       └── Worker Agent (Sandbox Mode)
     │           ├── web_search("X")
     │           └── agent_message(manager_id, "Found X: ...")
-    └── agent_check_worker(worker_id)
+    └── check_witch_skeleton(witch_id)
             └── "Status: completed"
 ```
 

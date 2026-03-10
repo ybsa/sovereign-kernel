@@ -1,7 +1,7 @@
 # SOVEREIGN KERNEL: COMPLETE START-TO-FINISH IMPLEMENTATION PLAN
 
 ## PROJECT VISION
-**Build an open-source AI agent operating system that can do anything a human can do on a computer, with user-controlled risk levels (Sandbox or Unrestricted mode).**
+**Build an open-source AI agent operating system that can do anything a human can do on a computer, leveraging Universal Tooling (MCP) and on-the-fly code generation with user-controlled risk levels.**
 
 ---
 
@@ -246,7 +246,7 @@ User sees results (Web UI / Chat / CLI)
 ### 8.3: Docker Sandbox
 - [ ] Verify Docker sandbox works in both modes
 - [ ] In Sandbox mode: use Docker for extra isolation
-- [ ] In Unrestricted mode: skip Docker (native execution)
+- [ ] In Unrestricted mode: use Docker optionally when host dependencies (Python/Node) are missing to ensure tool reliability.
 
 **Timeline: 1 week**
 **Success Metric**: Sandbox mode blocks path traversal and unapproved commands
@@ -453,9 +453,9 @@ User sees results (Web UI / Chat / CLI)
 - [x] Integrated `agent_message` tool
 
 ### 15.2: Delegation System ✅
-- [x] Agent A delegates task to Agent B (Worker Spawning)
-- [x] Forced Sandbox mode for all worker agents (Security Guard)
-- [x] Status polling via `agent_check_worker`
+- [x] Agent A delegates task to Agent B (Witch Spawning)
+- [x] Forced Sandbox mode for all witch_skeleton agents (Security Guard)
+- [x] Status polling via `check_witch_skeleton`
 
 ### 15.3: Shared Semantic Memory ✅
 - [x] Global `global_knowledge` SQLite table in Memory Substrate
@@ -531,51 +531,75 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 18: DOCUMENTATION & RELEASE (Weeks 25-26)
+## PHASE 18: THE BUILDER AGENT (Weeks 25-26) ✅ COMPLETE
 
-### 18.1: Documentation
+**Goal: Shift from hand-coded tools to autonomous compilation and execution where the agent builds its own capabilities.**
+
+### 18.1: The Synthesis Engine ✅
+- [x] Dynamic code execution environments (`ottos_outpost`).
+- [x] Zero-Pollution Sandbox execution using Docker.
+- [x] Native fallback support for OS-level interactions.
+
+### 18.2: The OTTO Hand ✅
+- [x] Custom system prompt and specialized tooling.
+- [x] Integration with Kernel executor.
+- [x] Dynamic fetching and execution of arbitrary python/node packages without polluting host OS.
+
+**Timeline: 2 weeks**
+**Success Metric**: ✅ ACHIEVED — Agent can complete a task requiring external dependencies by building a Docker isolation container.
+
+---
+
+## PHASE 19: UNIVERSAL TOOLING & MCP (Next Milestone)
+
+**Goal: Expand the Laboratory infinitely by connecting to standard Model Context Protocol servers.**
+
+### 19.1: Universal Tooling (MCP)
+- [ ] Implement full MCP client in `sk-mcp`.
+- [ ] Connect agent to local MCP servers.
+- [ ] **Autonomous Discovery**: Agent searches online registries (e.g., Smithery.ai) for missing tools.
+
+### 19.2: Zero-Touch Install
+- [ ] Agent automatically pulls, configures, and runs MCP servers in Docker containers via OTTO.
+
+**Timeline: 2 weeks**
+**Success Metric**: Agent can complete a "human-level" task using an external MCP server.
+
+---
+
+## PHASE 20: DOCUMENTATION & LORE (Weeks 27-28) ✅ COMPLETE
+
+### 20.1: Dark Fantasy Lore Integration ✅
+- [x] Internal dictionaries updated to match the lore (Witch Skeleton, King, Laboratory, Grimoires).
+- [x] Complete PROJECT_MAP.md terminology guide.
+
+### 20.2: Core Documentation Update
 - [ ] README.md (overview, quick start)
 - [ ] ARCHITECTURE.md (system design)
-- [ ] INSTALLATION.md (setup instructions)
-- [ ] USER_GUIDE.md (how to use)
 - [ ] API_DOCS.md (REST/WebSocket API)
-- [ ] SECURITY_MODEL.md (Sandbox vs Unrestricted)
-- [ ] CONTRIBUTING.md (how to contribute)
-- [ ] FAQ.md (common questions)
-
-### 18.2: Tutorials
-- [ ] "Getting Started in 5 Minutes"
-- [ ] "Sandbox Mode: Safe Experiments"
-- [ ] "Unrestricted Mode: Full Power"
-- [ ] "Building Custom Hands/Tools"
-- [ ] "Multi-Agent Workflows"
-- [ ] "Troubleshooting Guide"
-
-### 18.3: Deployment Guides
-- [ ] Docker setup
-- [ ] Docker Compose (with PostgreSQL, Redis)
-- [ ] Kubernetes manifests
-- [ ] Cloud deployment (AWS, GCP, Azure)
-- [ ] Systemd service file
-
-### 18.4: Release Preparation
-- [ ] Finalize version number (1.0.0)
-- [ ] Create CHANGELOG.md
-- [ ] Create release notes
-- [ ] Build Docker image
-- [ ] Push to Docker Hub
-- [ ] Tag git release
-
-### 18.5: Public Launch
-- [ ] GitHub public release
-- [ ] Announcement blog post
-- [ ] Social media launch
-- [ ] Hacker News post
-- [ ] Reddit announcement
-- [ ] Email newsletter
+- [ ] SECURITY_MODEL.md (Universal Tooling & Sandboxing)
 
 **Timeline: 1.5 weeks**
-**Success Metric**: Public release, documentation complete
+**Success Metric**: Public release readiness, documentation polished.
+
+---
+
+## PHASE 21: ULTRA-SOVEREIGN CAPABILITIES (The Horizon)
+
+**Goal: Achieve total autonomy where the agent behaves as a self-sustaining digital entity.**
+
+### 21.1: Financial Autonomy (The Sovereign Wallet)
+- [ ] **Secure Vault Integration**: Link agents to a secure wallet (Crypto or Bank API).
+- [ ] **Autonomous Procurement**: Agent pays for its own API keys, server costs, and MCP subscriptions within a strict budget.
+- [ ] **Economic Value Generation**: Agent can perform "bounties" or tasks for others to earn its own operating costs.
+
+### 21.2: Self-Refactoring (Native Optimization)
+- [ ] **Python to Rust Conversion**: When a self-built Python tool is used frequently, the agent rewrites it in Rust for 100x performance.
+- [ ] **Dynamic Compilation**: Kernel automatically compiles new Rust "Skills" and hot-reloads them into the core without stopping.
+
+### 21.3: The Global Skill Graph (P2P Sharing)
+- [ ] **Peer Discovery**: (Opt-in) Agents share the "blueprints" of tools they've built with other Sovereign Kernels.
+- [ ] **Collaborative Learning**: If one agent builds a "PDF-to-Braille" tool, all other agents in the network can "learn" and use it instantly.
 
 ---
 

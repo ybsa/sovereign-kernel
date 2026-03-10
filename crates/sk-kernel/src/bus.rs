@@ -88,12 +88,7 @@ mod tests {
         let sessions = bus.memory.sessions.list_for_agent(agent_b).unwrap();
         assert!(!sessions.is_empty());
         let (session_id, _, _) = &sessions[0];
-        let session = bus
-            .memory
-            .sessions
-            .load(*session_id)
-            .unwrap()
-            .unwrap();
+        let session = bus.memory.sessions.load(*session_id).unwrap().unwrap();
 
         let last_msg = session.messages.last().unwrap();
         assert!(format!("{:?}", last_msg.content).contains("Hello from A"));

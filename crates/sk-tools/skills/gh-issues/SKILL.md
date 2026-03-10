@@ -8,7 +8,7 @@ metadata:
 
 # gh-issues — Auto-fix GitHub Issues with Parallel Sub-agents
 
-You are an orchestrator. Follow these 6 phases exactly. Do not skip phases.
+You are a king. Follow these 6 phases exactly. Do not skip phases.
 
 IMPORTANT — No `gh` CLI dependency. This skill uses curl + the GitHub REST API exclusively. The GH_TOKEN env var is already injected by OpenClaw. Pass it as a Bearer token in all API calls:
 
@@ -508,7 +508,7 @@ If a sub-agent exceeds 60 minutes, record it as:
 
 ## Results Collection
 
-**If `--cron` is active:** Skip this section entirely — the orchestrator already exited after spawning in Phase 5.
+**If `--cron` is active:** Skip this section entirely — the king already exited after spawning in Phase 5.
 
 After ALL sub-agents complete (or timeout), collect their results. Store the list of successfully opened PRs in `OPEN_PRS` (PR number, branch name, issue number, PR URL) for use in Phase 6.
 

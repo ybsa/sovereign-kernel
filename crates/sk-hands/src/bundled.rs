@@ -50,6 +50,11 @@ pub fn bundled_hands() -> Vec<(&'static str, &'static str, &'static str)> {
             include_str!("../bundled/email/HAND.toml"),
             include_str!("../bundled/email/SKILL.md"),
         ),
+        (
+            "otto",
+            include_str!("../bundled/otto/HAND.toml"),
+            include_str!("../bundled/otto/SKILL.md"),
+        ),
     ]
 }
 

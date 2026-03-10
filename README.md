@@ -20,8 +20,10 @@ It is not just a framework — it is the mediation layer between Autonomous Enti
 ## 🎯 What It Does
 
 - **Runs agents 24/7** as background OS daemons with heartbeat monitoring and auto-restart
-- **Executes tools safely** — shell, file, code, web, browser — with capability gates and sandbox policy
+- **Executes laboratory tools safely** — shell, file, code, web, browser — with capability gates and sandbox policy
 - **Remembers everything** via a hybrid SQLite + BM25 vector memory substrate across sessions
+- **Optimizes token usage** with "The Healer" (Smart Truncation & Ground-Truth Context Compaction)
+- **Executes safely** in native environments or isolated **Docker sandboxes**
 - **Ships 9 autonomous Hands** — pre-built capability packs for browser automation, research, email, lead generation, and more
 - **Streams a terminal dashboard** at `http://localhost:8080` — manage agents, monitor live logs, approve actions
 - **Integrates 30+ channels** — Telegram, Discord, WhatsApp, Signal, Slack, and more via the Channel Bridge
@@ -130,15 +132,15 @@ sovereign dashboard --no-open    # Don't auto-open browser
 
 Sovereign Kernel now supports **swarm intelligence** — agents can communicate, delegate tasks, and share knowledge.
 
-| Feature | Tool | Description |
+| Feature | Laboratory Tool | Description |
 |---------|------|-------------|
 | **Agent Messaging** | `agent_message` | Send direct messages between agents via the Inter-Agent Bus |
-| **Worker Spawning** | `agent_spawn_worker` | Dynamically spawn sandboxed worker agents for parallel tasks |
-| **Worker Status** | `agent_check_worker` | Poll the status and results of spawned workers |
+| **Witch Skeleton Spawning** | `spawn_witch_skeleton` | Dynamically spawn sandboxed witch skeleton agents for parallel tasks |
+| **Witch Status** | `check_witch_skeleton` | Poll the status and results of spawned witch skeletons |
 | **Shared Memory Store** | `shared_memory_store` | Store facts globally for all authorized agents |
 | **Shared Memory Recall** | `shared_memory_recall` | Search the global knowledge pool |
 
-> **Security**: All spawned workers are **forced into Sandbox mode** — they must ask the user for permission on every action, regardless of the parent agent's mode.
+> **Security**: All spawned witch skeletons are **forced into Sandbox mode** — they must ask the user for permission on every action, regardless of the parent agent's mode.
 
 ---
 
@@ -170,11 +172,13 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive.
 | 12 | ✅ Complete | Terminal Web Dashboard (`sovereign dashboard`) |
 | 13 | ✅ Complete | Core Tools Upgrade: Shell, File, Code, Browser Hands |
 | 14 | ✅ Complete | Optional Hands: Web Search, Email |
-| 15 | ✅ Complete | Multi-Agent Coordination: A2A Bus, Worker Spawning, Shared Memory |
+| 15 | ✅ Complete | Multi-Agent Coordination: A2A Bus, Witch Spawning, Shared Memory |
 | 16 | ✅ Complete | Production Hardening: Daemon Cron Scheduler, Tracing, Circuit Breakers |
 | 17 | ✅ Complete | Channel Integrations: Discord, Telegram, WhatsApp Robustness |
-| 18 | [/] In Progress | The Builder Agent: ("Agent Forge") Self-Assembling Orchestration |
+| 18 | ✅ Complete | Docker Sandbox Integration: Secure isolated execution for shell and code |
 | 19 | ✅ Complete | Global Audit & Hardening: 45+ Clippy Fixes, 100% Test Success, MSRV 1.75 |
+| 20 | ✅ Complete | The Healer: Token Optimization, Smart Truncation, & Conversation Compaction |
+| 21 | [/] In Progress | The Builder Agent: ("Agent Forge") Self-Assembling Orchestration |
 
 ---
 

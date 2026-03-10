@@ -34,7 +34,7 @@ Control tmux sessions by sending keystrokes and reading output. Essential for ma
 | Session                 | Purpose                     |
 | ----------------------- | --------------------------- |
 | `shared`                | Primary interactive session |
-| `worker-2` - `worker-8` | Parallel worker sessions    |
+| `skeleton-2` - `skeleton-8` | Parallel skeleton sessions    |
 
 ## Common Commands
 
@@ -117,23 +117,23 @@ tmux send-keys -t shared Enter
 
 ```bash
 # Look for prompts
-tmux capture-pane -t worker-3 -p | tail -10 | grep -E "❯|Yes.*No|proceed|permission"
+tmux capture-pane -t skeleton-3 -p | tail -10 | grep -E "❯|Yes.*No|proceed|permission"
 ```
 
 ### Approve Claude Code Prompt
 
 ```bash
 # Send 'y' and Enter
-tmux send-keys -t worker-3 'y' Enter
+tmux send-keys -t skeleton-3 'y' Enter
 
 # Or select numbered option
-tmux send-keys -t worker-3 '2' Enter
+tmux send-keys -t skeleton-3 '2' Enter
 ```
 
 ### Check All Sessions Status
 
 ```bash
-for s in shared worker-2 worker-3 worker-4 worker-5 worker-6 worker-7 worker-8; do
+for s in shared skeleton-2 skeleton-3 skeleton-4 skeleton-5 skeleton-6 skeleton-7 skeleton-8; do
   echo "=== $s ==="
   tmux capture-pane -t $s -p 2>/dev/null | tail -5
 done
@@ -142,7 +142,7 @@ done
 ### Send Task to Session
 
 ```bash
-tmux send-keys -t worker-4 "Fix the bug in auth.js" Enter
+tmux send-keys -t skeleton-4 "Fix the bug in auth.js" Enter
 ```
 
 ## Notes

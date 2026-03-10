@@ -162,7 +162,9 @@ async fn main() -> anyhow::Result<()> {
             if !no_open {
                 let _ = open::that(&url);
             }
-            dashboard::start_server(state, port).await;
+            if let Err(e) = dashboard::start_server(state, port).await {
+                tracing::error!("Dashboard server failed to start: {}", e);
+            }
         }
     }
 

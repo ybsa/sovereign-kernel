@@ -35,8 +35,8 @@ Privacy is not a feature; it's the foundation. Sovereign Kernel has **Zero Telem
 ## The 2026 Roadmap
 
 -   **Phase 1-15 (Complete)**: Core infrastructure, industrial tools, audit trails, and multi-agent coordination.
--   **Phase 16-19 (Complete)**: Production Hardening, Scheduling, Channel Robustness, and Global Hardening Audit.
--   **Phase 20-26**: Self-Assembling Orchestration (Builder Agent), Distributed Networks, and UI Ecosystem.
+-   **Phase 16-20 (Complete)**: Production Hardening, Channel Robustness, Docker Sandboxing, Global Audit, and The Healer (Token Optimization).
+-   **Phase 21+**: Self-Assembling Orchestration (Builder Agent), Distributed Networks, and UI Ecosystem.
 
 ---
 

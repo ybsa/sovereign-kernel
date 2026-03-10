@@ -44,6 +44,9 @@ pub struct Session {
     /// Optional human-readable label.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
+    /// Optional summary of the conversation history (populated by THE HEALER).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
     /// When this session was created.
     pub created_at: chrono::DateTime<chrono::Utc>,
     /// When this session was last updated.
@@ -59,6 +62,7 @@ impl Session {
             agent_id,
             messages: Vec::new(),
             label: None,
+            summary: None,
             created_at: now,
             updated_at: now,
         }

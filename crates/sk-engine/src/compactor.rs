@@ -256,7 +256,8 @@ pub fn format_context_report(report: &ContextReport) -> String {
     let bar_len: usize = 20;
     let filled = ((report.usage_percent / 100.0) * bar_len as f64).round() as usize;
     let empty = bar_len.saturating_sub(filled);
-    let bar: String = std::iter::repeat('█').take(filled)
+    let bar: String = std::iter::repeat('█')
+        .take(filled)
         .chain(std::iter::repeat('░').take(empty))
         .collect();
 
@@ -431,8 +432,14 @@ async fn summarize_messages(
     }
 
     let summarize_prompt = format!(
-        "Summarize the following conversation preserving key facts, decisions, user preferences, \
-         and important context. Be concise but thorough. Output only the summary, no preamble.\n\n\
+        "### THE HEALER: GROUND-TRUTH SUMMARIZATION ###\n\
+         Summarize the following conversation into a cohesive 'State Manifest'. \n\
+         You MUST preserve and clearly list:\n\
+         1. **Core State**: Current variables, project status, and final results of recent operations.\n\
+         2. **Tool History**: Which tools were called and if they succeeded/failed (especially file writes and shell commands).\n\
+         3. **User Intent**: The ultimate objective and any specific constraints given.\n\
+         4. **File Manifest**: List of all files mentioned or modified.\n\n\
+         Be concise but clinically accurate. Avoid flowery language. Output ONLY the summary.\n\n\
          ---\n{conversation_text}---"
     );
 
@@ -543,13 +550,15 @@ async fn summarize_in_chunks(
 
     // Merge summaries with another LLM call
     let merge_prompt = format!(
-        "Merge these {} conversation summaries into one concise, coherent summary. \
-         Preserve all key facts, decisions, and context. Output only the merged summary.\n\n{}",
+        "### THE HEALER: MASTER MERGE ###\n\
+         Merge these {} conversation summaries into one coherent 'Master State Manifest'. \n\
+         Ensure zero loss of critical 'Ground Truth' data (files, tool results, specific values). \n\
+         Output only the merged summary.\n\n{}",
         summaries.len(),
         summaries
             .iter()
             .enumerate()
-            .map(|(i, s)| format!("--- Part {} ---\n{}", i + 1, s))
+            .map(|(i, s)| format!("--- Manifest {} ---\n{}", i + 1, s))
             .collect::<Vec<_>>()
             .join("\n\n")
     );
@@ -745,7 +754,9 @@ mod tests {
 
         #[async_trait]
         impl LlmDriver for FakeDriver {
-            fn provider(&self) -> &str { "fake" }
+            fn provider(&self) -> &str {
+                "fake"
+            }
 
             async fn complete(
                 &self,
@@ -792,7 +803,9 @@ mod tests {
 
         #[async_trait]
         impl LlmDriver for FakeDriver {
-            fn provider(&self) -> &str { "fake" }
+            fn provider(&self) -> &str {
+                "fake"
+            }
 
             async fn complete(
                 &self,
@@ -888,7 +901,9 @@ mod tests {
 
         #[async_trait]
         impl LlmDriver for FakeDriver {
-            fn provider(&self) -> &str { "fake" }
+            fn provider(&self) -> &str {
+                "fake"
+            }
 
             async fn complete(
                 &self,
@@ -1021,7 +1036,9 @@ mod tests {
 
         #[async_trait]
         impl LlmDriver for FailingDriver {
-            fn provider(&self) -> &str { "failing" }
+            fn provider(&self) -> &str {
+                "failing"
+            }
 
             async fn complete(
                 &self,
@@ -1075,7 +1092,9 @@ mod tests {
 
         #[async_trait]
         impl LlmDriver for CountingDriver {
-            fn provider(&self) -> &str { "counting" }
+            fn provider(&self) -> &str {
+                "counting"
+            }
 
             async fn complete(
                 &self,

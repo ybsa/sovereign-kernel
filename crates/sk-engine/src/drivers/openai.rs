@@ -232,8 +232,8 @@ impl LlmDriver for OpenAIDriver {
                 .json(&oai_request);
 
             if !self.api_key.is_empty() {
-                req_builder = req_builder
-                    .header("authorization", format!("Bearer {}", self.api_key));
+                req_builder =
+                    req_builder.header("authorization", format!("Bearer {}", self.api_key));
             }
 
             let resp = req_builder

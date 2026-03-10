@@ -123,16 +123,16 @@ sovereign --config config.unrestricted.toml chat
 
 ---
 
-## 🧰 Built-In Tools Available to Agents
+## 🧰 The Laboratory: Built-In Tools Available to Agents
 
-| Tool | Description |
+| Laboratory Tool | Description |
 |------|-------------|
-| `shell_exec` | Run terminal commands (ExecPolicy enforced in Sandbox) |
+| `shell_exec` | Run terminal commands (ExecPolicy enforced in Sandbox). Supports `use_sandbox` flag for Docker. |
 | `file_read` / `file_write` | Read/write files (path-sanitized) |
 | `file_list` / `file_delete` | Browse and manage filesystem |
 | `web_fetch` | Fetch and extract text from URLs |
 | `web_search` | Search the web (requires BRAVE_API_KEY or TAVILY_API_KEY) |
-| `code_exec` | Run Python, Node.js, or Bash scripts |
+| `code_exec` | Run scripts natively or in Docker (supports `use_sandbox` flag). |
 | `browser_navigate` | Open URLs in Playwright browser |
 | `browser_click` / `browser_type` | Interact with web pages |
 | `browser_screenshot` | Capture screenshots |
@@ -141,8 +141,8 @@ sovereign --config config.unrestricted.toml chat
 | `schedule_create` / `schedule_list` | Manage cron-based tasks |
 | `get_skill` / `list_skills` | Access 52 expert skill prompts |
 | `agent_message` | Send a direct message to another active agent |
-| `agent_spawn_worker` | Spawn a sandboxed background worker agent |
-| `agent_check_worker` | Check the status of a spawned worker |
+| `spawn_witch_skeleton` | Spawn a sandboxed background witch_skeleton |
+| `check_witch_skeleton` | Check the status of a spawned witch_skeleton |
 | `shared_memory_store` | Store facts in global shared memory |
 | `shared_memory_recall` | Search the global shared knowledge pool |
 
@@ -167,14 +167,22 @@ Agents can now communicate, delegate tasks, and share knowledge across the swarm
 ### Agent Messaging
 Agents send direct messages to each other via the **Inter-Agent Bus**. Messages are persisted in the recipient's session — they'll see them on their next activation.
 
-### Worker Spawning
-A manager agent can spawn a background worker for parallel tasks:
-- Workers are **forced into Sandbox mode** — every action requires your approval
-- Use `agent_check_worker` to poll the worker's progress
-- Workers message results back to the manager via `agent_message`
+### Witch Skeleton Spawning
+A manager agent can spawn a background witch_skeleton for parallel tasks:
+- Skeletons are **forced into Sandbox mode** — every action requires your approval
+- Use `check_witch_skeleton` to poll the skeleton's progress
+- Skeletons message results back to the manager via `agent_message`
 
 ### Shared Memory
 Agents with the `SharedMemory` capability can store and recall facts from a global knowledge pool, enabling cross-agent context sharing.
+
+---
+
+## ⚕️ The Healer (Token Efficiency)
+
+Sovereign Kernel natively implements **The Healer**, a background mechanism designed to keep token usage low and prevent model hallucination during long tasks:
+- **Smart Truncation**: If a tool like `shell_exec` returns over 8,000 characters, The Healer injects a warning marker and preserves only the head and tail.
+- **Conversation Compaction**: When the context window fills up (80% budget), the agent automatically condenses older messages into a "Ground-Truth State Manifest" stored in memory, while keeping the most recent 10 messages raw for immediate context.
 
 ---
 

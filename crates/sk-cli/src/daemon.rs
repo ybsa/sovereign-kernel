@@ -90,7 +90,9 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
     let dashboard_port = 4200u16;
     let ds = dashboard_state.clone();
     tokio::spawn(async move {
-        crate::dashboard::start_server(ds, dashboard_port).await;
+        if let Err(e) = crate::dashboard::start_server(ds, dashboard_port).await {
+            tracing::error!("Background dashboard server failed: {}", e);
+        }
     });
 
     println!("⚡ Live Canvas dashboard at http://localhost:{dashboard_port}");

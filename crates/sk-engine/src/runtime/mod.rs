@@ -15,6 +15,7 @@ pub mod llm_errors;
 pub mod mcp;
 pub mod mcp_server;
 pub mod media_understanding;
+pub mod ottos_outpost;
 pub mod provider_health;
 pub mod reply_directives;
 pub mod sandbox;

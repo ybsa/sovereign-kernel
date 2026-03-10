@@ -61,7 +61,7 @@ fn check_capability(
     if capabilities.contains(required) {
         return Ok(());
     }
-    
+
     let has_wildcard = capabilities.iter().any(|c| match (c, required) {
         (Capability::FileRead(c_path), Capability::FileRead(_)) => c_path == "*",
         (Capability::FileWrite(c_path), Capability::FileWrite(_)) => c_path == "*",

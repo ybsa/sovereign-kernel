@@ -1,19 +1,18 @@
 use sk_engine::agent_loop::AgentLoopConfig;
-use sk_types::AgentId;
 use std::sync::Arc;
 
 use crate::SovereignKernel;
 
 /// Creates a standardized AgentLoopConfig with all default tools registered.
-pub fn create_agent_config<'a>(
+pub fn create_agent_config(
     kernel: Arc<SovereignKernel>,
-    driver: &'a dyn sk_engine::llm_driver::LlmDriver,
+    driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
     system_prompt: String,
     model_name: String,
-    agent_id: AgentId,
+    agent_id: sk_types::AgentId,
     browser_manager: Arc<sk_engine::media::browser::BrowserManager>,
     skill_registry: Arc<sk_tools::skills::SkillRegistry>,
-) -> AgentLoopConfig<'a> {
+) -> AgentLoopConfig {
     let mut tools = vec![
         sk_tools::memory_tools::remember_tool(),
         sk_tools::memory_tools::recall_tool(),
@@ -37,6 +36,7 @@ pub fn create_agent_config<'a>(
     tools.extend(sk_tools::browser_tools::browser_tools());
     tools.push(sk_tools::skills::get_skill_tool());
     tools.push(sk_tools::skills::list_skills_tool());
+    tools.push(sk_tools::ottos_outpost::ottos_outpost_tool());
 
     // Agent-to-Agent message tool
     tools.push(sk_types::ToolDefinition {
@@ -59,28 +59,28 @@ pub fn create_agent_config<'a>(
     });
 
     tools.push(sk_types::ToolDefinition {
-        name: "agent_spawn_worker".into(),
-        description: "Dynamically spawn a background worker agent. It will run in Sandbox mode and will ask the user for permission on actions. You can continue working while it runs. Use agent_check_worker to see its status.".into(),
+        name: "spawn_witch_skeleton".into(),
+        description: "Dynamically spawn a background witch_skeleton. It will run in Sandbox mode and will ask the user for permission on actions. You can continue working while it runs. Use check_witch_skeleton to see its status.".into(),
         input_schema: serde_json::json!({
             "type": "object",
             "properties": {
-                "worker_name": { "type": "string", "description": "Name of the worker (e.g. 'researcher')" },
-                "task_description": { "type": "string", "description": "What the worker should do. Provide complete details and goals." },
-                "capabilities": { "type": "array", "items": { "type": "string" }, "description": "Capabilities the worker needs (e.g. 'web', 'file_read', 'browser')" }
+                "skeleton_name": { "type": "string", "description": "Name of the skeleton (e.g. 'researcher')" },
+                "task_description": { "type": "string", "description": "What the skeleton should do. Provide complete details and goals." },
+                "capabilities": { "type": "array", "items": { "type": "string" }, "description": "Capabilities the skeleton needs (e.g. 'web', 'file_read', 'browser')" }
             },
-            "required": ["worker_name", "task_description", "capabilities"]
+            "required": ["skeleton_name", "task_description", "capabilities"]
         }),
     });
 
     tools.push(sk_types::ToolDefinition {
-        name: "agent_check_worker".into(),
-        description: "Check the latest status of a spawned worker agent.".into(),
+        name: "check_witch_skeleton".into(),
+        description: "Check the latest status of a spawned witch_skeleton.".into(),
         input_schema: serde_json::json!({
             "type": "object",
             "properties": {
-                "worker_id": { "type": "string", "description": "The Agent ID of the worker" }
+                "skeleton_id": { "type": "string", "description": "The Agent ID of the skeleton" }
             },
-            "required": ["worker_id"]
+            "required": ["skeleton_id"]
         }),
     });
 
@@ -99,7 +99,6 @@ pub fn create_agent_config<'a>(
             let kernel = k.clone();
             let browser = b.clone();
             let aid = aid;
-            let skills = skill_registry.clone();
             let agent_id_str = aid.to_string();
             let config = kernel.config.clone();
             let default_mode = config.execution_mode;
@@ -159,6 +158,8 @@ pub fn create_agent_config<'a>(
                 tracing::warn!("Failed to append to audit log: {}", e);
             }
 
+            let skills = skill_registry.clone();
+
             match tool_call.name.as_str() {
                 "agent_message" => {
                     if let Some(args) = tool_call.input.as_object() {
@@ -185,12 +186,12 @@ pub fn create_agent_config<'a>(
                         ))
                     }
                 }
-                "agent_spawn_worker" => {
+                "spawn_witch_skeleton" => {
                     if let Some(args) = tool_call.input.as_object() {
-                        let worker_name = args
-                            .get("worker_name")
+                        let skeleton_name = args
+                            .get("skeleton_name")
                             .and_then(|v| v.as_str())
-                            .unwrap_or("worker");
+                            .unwrap_or("skeleton");
                         let task_desc = args
                             .get("task_description")
                             .and_then(|v| v.as_str())
@@ -206,8 +207,8 @@ pub fn create_agent_config<'a>(
                             .unwrap_or_default();
 
                         let intent = crate::wizard::AgentIntent {
-                            name: worker_name.to_string(),
-                            description: format!("Temporary worker for parent {}", aid),
+                            name: skeleton_name.to_string(),
+                            description: format!("Temporary skeleton for manager {}", aid),
                             task: task_desc.to_string(),
                             skills: vec![],
                             model_tier: "simple".to_string(),
@@ -217,68 +218,70 @@ pub fn create_agent_config<'a>(
                         };
 
                         let _plan = crate::wizard::SetupWizard::build_plan(intent);
-                        let worker_id = sk_types::AgentId::new();
+                        let skeleton_id = sk_types::AgentId::new();
 
                         // Per User request, FORCED to Sandbox mode.
                         let _ = kernel.memory.structured.set(
-                            worker_id,
+                            skeleton_id,
                             "forced_sandbox",
                             serde_json::Value::Bool(true),
                         );
 
                         // Create initialization session
-                        let mut worker_session = sk_types::Session::new(worker_id);
-                        let startup_message = format!("You are a spawned worker agent. Your task is: {}\nWhen you finish or need help, use the agent_message tool to message your manager agent ID: {}", task_desc, aid);
-                        worker_session.push_message(sk_types::Message::user(&startup_message));
+                        let mut skeleton_session = sk_types::Session::new(skeleton_id);
+                        let startup_message = format!("You are a spawned witch_skeleton. Your task is: {}\nWhen you finish or need help, use the agent_message tool to message your manager agent ID: {}", task_desc, aid);
+                        skeleton_session.push_message(sk_types::Message::user(&startup_message));
 
-                        let _ = kernel.memory.sessions.save(&worker_session);
+                        let _ = kernel.memory.sessions.save(&skeleton_session);
 
-                        let worker_id_str = worker_id.to_string();
+                        let skeleton_id_str = skeleton_id.to_string();
                         let kernel_clone = kernel.clone();
 
-                        // Spawn background worker execution
+                        // Spawn background skeleton execution
                         tokio::spawn(async move {
                             if let Ok(Some(mut session)) =
-                                kernel_clone.memory.sessions.load(worker_session.id)
+                                kernel_clone.memory.sessions.load(skeleton_session.id)
                             {
-                                let _ = kernel_clone
-                                    .run_agent(&mut session, &startup_message)
-                                    .await;
+                                let _ =
+                                    kernel_clone.run_agent(&mut session, &startup_message).await;
                             }
                         });
 
-                        Ok(format!("Worker spawned successfully! Worker ID: {}. It is running in Sandbox mode in the background.", worker_id_str))
+                        Ok(format!("Witch Skeleton spawned successfully! Skeleton ID: {}. It is running in Sandbox mode in the background.", skeleton_id_str))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
                         ))
                     }
                 }
-                "agent_check_worker" => {
+                "check_witch_skeleton" => {
                     if let Some(args) = tool_call.input.as_object() {
-                        let worker_id_str =
-                            args.get("worker_id").and_then(|v| v.as_str()).unwrap_or("");
-                        if let Ok(worker_id) = std::str::FromStr::from_str(worker_id_str) {
-                            if let Ok(sessions) = kernel.memory.sessions.list_for_agent(worker_id) {
+                        let skeleton_id_str = args
+                            .get("skeleton_id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        if let Ok(skeleton_id) = std::str::FromStr::from_str(skeleton_id_str) {
+                            if let Ok(sessions) = kernel.memory.sessions.list_for_agent(skeleton_id)
+                            {
                                 if let Some((session_id, _, _)) = sessions.first() {
                                     if let Ok(Some(session)) =
                                         kernel.memory.sessions.load(*session_id)
                                     {
                                         let last_msg =
                                             session.messages.last().map(|m| m.content.clone());
-                                        Ok(format!("Worker latest activity: {:?}", last_msg))
+                                        Ok(format!("Skeleton latest activity: {:?}", last_msg))
                                     } else {
-                                        Ok("Worker initialized, but no activity yet.".to_string())
+                                        Ok("Skeleton initialized, but no activity yet.".to_string())
                                     }
                                 } else {
-                                    Ok("Worker has no active session.".to_string())
+                                    Ok("Skeleton has no active session.".to_string())
                                 }
                             } else {
-                                Ok("Failed to check worker.".to_string())
+                                Ok("Failed to check skeleton.".to_string())
                             }
                         } else {
                             Err(sk_types::SovereignError::ToolExecutionError(
-                                "Invalid worker_id format".into(),
+                                "Invalid skeleton_id format".into(),
                             ))
                         }
                     } else {
@@ -507,11 +510,7 @@ pub fn create_agent_config<'a>(
                 "remember" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::memory_tools::handle_remember(
-                            &kernel.memory,
-                            aid,
-                            content,
-                        )
+                        sk_tools::memory_tools::handle_remember(&kernel.memory, aid, content)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -526,12 +525,7 @@ pub fn create_agent_config<'a>(
                             .and_then(|v| v.as_u64())
                             .map(|v| v as usize)
                             .unwrap_or(5);
-                        sk_tools::memory_tools::handle_recall(
-                            &kernel.memory,
-                            aid,
-                            query,
-                            limit,
-                        )
+                        sk_tools::memory_tools::handle_recall(&kernel.memory, aid, query, limit)
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -672,17 +666,93 @@ pub fn create_agent_config<'a>(
                         let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
                         let working_dir = args.get("working_dir").and_then(|v| v.as_str());
                         let timeout_secs = args.get("timeout_secs").and_then(|v| v.as_u64());
+                        let use_sandbox = args
+                            .get("use_sandbox")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
 
-                        tokio::task::block_in_place(|| {
-                            tokio::runtime::Handle::current().block_on(
-                                sk_tools::shell::handle_shell_exec(
-                                    &config.exec_policy,
-                                    command,
-                                    working_dir,
-                                    timeout_secs,
-                                ),
-                            )
-                        })
+                        if use_sandbox {
+                            tokio::task::block_in_place(|| {
+                                tokio::runtime::Handle::current().block_on(async {
+                                    let sandbox_config = &config.docker;
+                                    let workspace = config.effective_workspaces_dir();
+                                    let config_hash =
+                                        sk_engine::runtime::docker_sandbox::config_hash(
+                                            sandbox_config,
+                                        );
+
+                                    let container = if let Some(c) = kernel
+                                        .sandbox_pool
+                                        .acquire(config_hash, sandbox_config.reuse_cool_secs)
+                                    {
+                                        c
+                                    } else {
+                                        sk_engine::runtime::docker_sandbox::create_sandbox(
+                                            sandbox_config,
+                                            &agent_id_str,
+                                            &workspace,
+                                        )
+                                        .await
+                                        .map_err(|e| {
+                                            sk_types::SovereignError::ToolExecutionError(e)
+                                        })?
+                                    };
+
+                                    let timeout =
+                                        std::time::Duration::from_secs(timeout_secs.unwrap_or(30));
+                                    let res = sk_engine::runtime::docker_sandbox::exec_in_sandbox(
+                                        &container, command, timeout,
+                                    )
+                                    .await;
+
+                                    kernel.sandbox_pool.release(container, config_hash);
+
+                                    match res {
+                                        Ok(exec_res) => {
+                                            let mut response = String::new();
+                                            response.push_str(&format!(
+                                                "Exit Code: {}\n",
+                                                exec_res.exit_code
+                                            ));
+                                            if !exec_res.stdout.trim().is_empty() {
+                                                response.push_str(&format!(
+                                                    "STDOUT:\n{}\n",
+                                                    exec_res.stdout.trim()
+                                                ));
+                                            }
+                                            if !exec_res.stderr.trim().is_empty() {
+                                                response.push_str(&format!(
+                                                    "STDERR:\n{}\n",
+                                                    exec_res.stderr.trim()
+                                                ));
+                                            }
+                                            if response.trim()
+                                                == format!("Exit Code: {}", exec_res.exit_code)
+                                            {
+                                                response.push_str(
+                                                    "Command executed successfully with no output.",
+                                                );
+                                            }
+                                            Ok(healer(response, 8000))
+                                        }
+                                        Err(e) => {
+                                            Err(sk_types::SovereignError::ToolExecutionError(e))
+                                        }
+                                    }
+                                })
+                            })
+                        } else {
+                            tokio::task::block_in_place(|| {
+                                tokio::runtime::Handle::current()
+                                    .block_on(sk_tools::shell::handle_shell_exec(
+                                        &config.exec_policy,
+                                        command,
+                                        working_dir,
+                                        timeout_secs,
+                                    ))
+                                    .map(|out| healer(out, 8000))
+                            })
+                        }
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -693,15 +763,206 @@ pub fn create_agent_config<'a>(
                     if let Some(args) = tool_call.input.as_object() {
                         let language = args.get("language").and_then(|v| v.as_str()).unwrap_or("");
                         let code = args.get("code").and_then(|v| v.as_str()).unwrap_or("");
+                        let use_sandbox = args
+                            .get("use_sandbox")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+
+                        if use_sandbox {
+                            tokio::task::block_in_place(|| {
+                                tokio::runtime::Handle::current().block_on(async {
+                                    let sandbox_config = &config.docker;
+                                    let workspace = config.effective_workspaces_dir();
+
+                                    // 1. Create a script file in the workspace subfolder
+                                    let file_id = uuid::Uuid::new_v4().to_string();
+                                    let temp_rel_dir = format!(".sk_temp/code_{}", file_id);
+                                    let temp_abs_dir = workspace.join(&temp_rel_dir);
+                                    std::fs::create_dir_all(&temp_abs_dir).map_err(|e| {
+                                        sk_types::SovereignError::ToolExecutionError(e.to_string())
+                                    })?;
+
+                                    let script_filename = match language {
+                                        "python" => "script.py",
+                                        "node" => "script.js",
+                                        "bash" => "script.sh",
+                                        _ => {
+                                            return Err(
+                                                sk_types::SovereignError::ToolExecutionError(
+                                                    format!("Unsupported language: {}", language),
+                                                ),
+                                            )
+                                        }
+                                    };
+                                    let script_abs_path = temp_abs_dir.join(script_filename);
+                                    std::fs::write(&script_abs_path, code).map_err(|e| {
+                                        sk_types::SovereignError::ToolExecutionError(e.to_string())
+                                    })?;
+
+                                    // 2. Prepare docker command
+                                    let binary = match language {
+                                        "python" => "python3",
+                                        "node" => "node",
+                                        "bash" => "sh",
+                                        _ => unreachable!(),
+                                    };
+                                    let container_script_path = format!(
+                                        "{}/{}/{}",
+                                        sandbox_config.workdir, temp_rel_dir, script_filename
+                                    );
+                                    let command = format!("{} {}", binary, container_script_path);
+
+                                    // 3. Run in sandbox
+                                    let config_hash =
+                                        sk_engine::runtime::docker_sandbox::config_hash(
+                                            sandbox_config,
+                                        );
+                                    let container = if let Some(c) = kernel
+                                        .sandbox_pool
+                                        .acquire(config_hash, sandbox_config.reuse_cool_secs)
+                                    {
+                                        c
+                                    } else {
+                                        sk_engine::runtime::docker_sandbox::create_sandbox(
+                                            sandbox_config,
+                                            &agent_id_str,
+                                            &workspace,
+                                        )
+                                        .await
+                                        .map_err(|e| {
+                                            sk_types::SovereignError::ToolExecutionError(e)
+                                        })?
+                                    };
+
+                                    let timeout = std::time::Duration::from_secs(30);
+                                    let res = sk_engine::runtime::docker_sandbox::exec_in_sandbox(
+                                        &container, &command, timeout,
+                                    )
+                                    .await;
+
+                                    kernel.sandbox_pool.release(container, config_hash);
+
+                                    // Cleanup temp file
+                                    let _ = std::fs::remove_dir_all(&temp_abs_dir);
+
+                                    match res {
+                                        Ok(exec_res) => {
+                                            let mut response = String::new();
+                                            response.push_str(&format!(
+                                                "Exit Code: {}\n",
+                                                exec_res.exit_code
+                                            ));
+                                            if !exec_res.stdout.trim().is_empty() {
+                                                response.push_str(&format!(
+                                                    "STDOUT:\n{}\n",
+                                                    exec_res.stdout.trim()
+                                                ));
+                                            }
+                                            if !exec_res.stderr.trim().is_empty() {
+                                                response.push_str(&format!(
+                                                    "STDERR:\n{}\n",
+                                                    exec_res.stderr.trim()
+                                                ));
+                                            }
+                                            if response.trim()
+                                                == format!("Exit Code: {}", exec_res.exit_code)
+                                            {
+                                                response.push_str(
+                                                    "Script executed successfully with no output.",
+                                                );
+                                            }
+                                            Ok(response)
+                                        }
+                                        Err(e) => {
+                                            Err(sk_types::SovereignError::ToolExecutionError(e))
+                                        }
+                                    }
+                                })
+                            })
+                        } else {
+                            tokio::task::block_in_place(|| {
+                                tokio::runtime::Handle::current()
+                                    .block_on(sk_tools::code_exec::handle_code_exec(
+                                        &config.exec_policy,
+                                        language,
+                                        code,
+                                    ))
+                                    .map(|out| healer(out, 8000))
+                            })
+                        }
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "ottos_outpost" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let language = args.get("language").and_then(|v| v.as_str()).unwrap_or("");
+                        let exec_env_str = args
+                            .get("execution_env")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("docker");
+                        let exec_env = match exec_env_str {
+                            "native" => sk_engine::runtime::ottos_outpost::ExecutionEnv::Native,
+                            _ => sk_engine::runtime::ottos_outpost::ExecutionEnv::Docker,
+                        };
+
+                        let dependencies = args
+                            .get("dependencies")
+                            .and_then(|v| v.as_array())
+                            .map(|a| {
+                                a.iter()
+                                    .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+
+                        let code = args.get("code").and_then(|v| v.as_str()).unwrap_or("");
+
+                        let mut input_files = Vec::new();
+                        if let Some(files) = args.get("input_files").and_then(|v| v.as_array()) {
+                            for f in files {
+                                if let Some(fname) = f.get("filename").and_then(|v| v.as_str()) {
+                                    if let Some(fcontent) =
+                                        f.get("content").and_then(|v| v.as_str())
+                                    {
+                                        input_files.push((fname.to_string(), fcontent.to_string()));
+                                    }
+                                }
+                            }
+                        }
+
+                        let req = sk_engine::runtime::ottos_outpost::OttosOutpostRequest {
+                            language: language.to_string(),
+                            execution_env: exec_env,
+                            dependencies,
+                            code: code.to_string(),
+                            input_files,
+                        };
 
                         tokio::task::block_in_place(|| {
-                            tokio::runtime::Handle::current().block_on(
-                                sk_tools::code_exec::handle_code_exec(
-                                    &config.exec_policy,
-                                    language,
-                                    code,
-                                ),
-                            )
+                            tokio::runtime::Handle::current().block_on(async {
+                                let workspace = config.effective_workspaces_dir();
+                                match sk_engine::runtime::ottos_outpost::execute_ottos_outpost(req, &workspace).await {
+                                    Ok(res) => {
+                                        let mut response = String::new();
+                                        response.push_str(&format!("Exit Code: {}\n", res.exit_code));
+                                        if !res.stdout.trim().is_empty() {
+                                            response.push_str(&format!("STDOUT:\n{}\n", res.stdout.trim()));
+                                        }
+                                        if !res.stderr.trim().is_empty() {
+                                            response.push_str(&format!("STDERR:\n{}\n", res.stderr.trim()));
+                                        }
+                                        if response.trim() == format!("Exit Code: {}", res.exit_code) {
+                                            response.push_str("Tool synthesized and executed successfully with no output.");
+                                        }
+                                        // Pass through the healer to truncate if output is massive
+                                        Ok(crate::executor::healer(response, 8000))
+                                    }
+                                    Err(e) => Err(sk_types::SovereignError::ToolExecutionError(e.to_string())),
+                                }
+                            })
                         })
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
@@ -835,5 +1096,56 @@ pub fn create_agent_config<'a>(
             }
         }),
         stream_handler: None,
+    }
+}
+
+/// The Healer: Truncates large tool outputs to prevent context bloat.
+pub fn healer(output: String, max_chars: usize) -> String {
+    if output.len() <= max_chars {
+        return output;
+    }
+
+    let keep = max_chars / 2;
+    let head = &output[..keep];
+    let tail = &output[output.len() - keep..];
+    let removed = output.len() - max_chars;
+
+    format!(
+        "{}\n\n[... THE HEALER: Truncated {} characters to save tokens. Use a more specific command or read a sub-range if you need the full data. ...]\n\n{}",
+        head, removed, tail
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_healer_no_truncation() {
+        let input = "hello world".to_string();
+        let healed = healer(input.clone(), 50);
+        assert_eq!(healed, input);
+    }
+
+    #[test]
+    fn test_healer_truncation() {
+        let mut input = String::new();
+        for i in 0..10_000 {
+            input.push_str(&format!("Line {}\n", i));
+        }
+
+        // input has > 70,000 characters
+        let original_len = input.len();
+        let healed = healer(input, 1000);
+
+        // Should be around ~1000 chars + the marker string
+        assert!(healed.len() > 1000);
+        assert!(healed.len() < 1200);
+
+        assert!(healed.starts_with("Line 0\n"));
+        // The marker should mention exactly how many characters were removed
+        let marker = format!("Truncated {} characters", original_len - 1000);
+        assert!(healed.contains(&marker));
+        assert!(healed.ends_with("Line 9999\n"));
     }
 }

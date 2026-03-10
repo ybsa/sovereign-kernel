@@ -30,9 +30,11 @@ pub struct AgentLoopResult {
 pub type ToolExecutor = Box<dyn Fn(&ToolCall) -> SovereignResult<String> + Send + Sync>;
 pub type StreamHandler = Box<dyn Fn(&str) + Send + Sync>;
 
-pub struct AgentLoopConfig<'a> {
+use std::sync::Arc;
+
+pub struct AgentLoopConfig {
     /// The LLM driver to use.
-    pub driver: &'a dyn LlmDriver,
+    pub driver: Arc<dyn LlmDriver + Send + Sync>,
     /// System prompt (including Soul injection).
     pub system_prompt: String,
     /// Available tools (builtin + MCP).
@@ -58,7 +60,7 @@ use tokio::time::sleep;
 /// This is the core of the Sovereign Kernel: load context → recall memories →
 /// LLM → tool calls → save. Loops until the model ends its turn or we hit MAX_ITERATIONS.
 pub async fn run_agent_loop(
-    config: AgentLoopConfig<'_>,
+    config: AgentLoopConfig,
     session: &mut Session,
     user_message: &str,
 ) -> SovereignResult<AgentLoopResult> {
@@ -123,13 +125,44 @@ pub async fn run_agent_loop(
 
         total_tokens += response.usage.total_tokens;
 
-        // Context budget check
+        // Context budget check: Trigger THE HEALER (Compaction) if we exceed 80% of budget
         if !crate::context_budget::fits_in_context(
             total_tokens as usize,
-            config.max_tokens as usize * 10,
+            (config.max_tokens as usize * 10) * 8 / 10, // 80% of budget
         ) {
-            warn!("Approaching context window limit: {} tokens", total_tokens);
-            // In a full implementation, we would compact here
+            info!("Context pressure detected. Triggering THE HEALER for session compaction...");
+
+            let compaction_config = crate::compactor::CompactionConfig::default();
+            let drv = config.driver.clone();
+            let model = config.model.clone();
+
+            // Run compaction
+            match crate::compactor::compact_session(drv, &model, session, &compaction_config).await
+            {
+                Ok(result) => {
+                    info!(
+                        compacted = result.compacted_count,
+                        "THE HEALER has successfully healed the session."
+                    );
+
+                    // Update session with compacted state
+                    session.messages = result.kept_messages;
+                    session.summary = Some(result.summary);
+
+                    // Recalculate total_tokens (approximate)
+                    total_tokens = session
+                        .summary
+                        .as_ref()
+                        .map(|s| s.len() as u32 / 4)
+                        .unwrap_or(0);
+                    for m in &session.messages {
+                        total_tokens += m.content.text_length() as u32 / 4;
+                    }
+                }
+                Err(e) => {
+                    warn!("THE HEALER failed to heal the session: {}", e);
+                }
+            }
         }
 
         // Empty response guard validation

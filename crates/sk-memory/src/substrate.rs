@@ -145,6 +145,7 @@ impl MemorySubstrate {
                 agent_id TEXT NOT NULL,
                 messages TEXT NOT NULL DEFAULT '[]',
                 label TEXT,
+                summary TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );

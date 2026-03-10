@@ -8,7 +8,7 @@ use sk_types::{SovereignError, SovereignResult};
 use std::sync::Arc;
 use tracing::info;
 
-/// The Sovereign Kernel — top-level orchestrator.
+/// The Sovereign Kernel — top-level king.
 pub struct SovereignKernel {
     /// Global configuration.
     pub config: KernelConfig,
@@ -32,13 +32,15 @@ pub struct SovereignKernel {
     pub bus: Arc<crate::bus::InterAgentBus>,
     /// Global agent registry.
     pub agents: Arc<crate::registry::AgentRegistry>,
-    /// Scheduled background job orchestrator.
+    /// Scheduled background job king.
     pub cron: Arc<crate::cron::CronScheduler>,
     /// Process supervisor.
     pub supervisor: Arc<crate::supervisor::Supervisor>,
     /// Handler to send back responses to channels like Telegram/Discord.
     pub delivery_handler:
         tokio::sync::RwLock<Option<Arc<dyn sk_types::scheduler::CronDeliveryHandler>>>,
+    /// Docker sandbox container pool.
+    pub sandbox_pool: Arc<sk_engine::runtime::docker_sandbox::ContainerPool>,
 }
 
 impl SovereignKernel {
@@ -199,6 +201,7 @@ impl SovereignKernel {
 
         let supervisor = Arc::new(crate::supervisor::Supervisor::new());
         let agents = Arc::new(crate::registry::AgentRegistry::new());
+        let sandbox_pool = Arc::new(sk_engine::runtime::docker_sandbox::ContainerPool::new());
 
         Ok(Self {
             config,
@@ -215,6 +218,7 @@ impl SovereignKernel {
             cron,
             supervisor,
             delivery_handler: tokio::sync::RwLock::new(None),
+            sandbox_pool,
         })
     }
 
@@ -237,7 +241,7 @@ impl SovereignKernel {
 
         let agent_config = crate::executor::create_agent_config(
             self.clone(),
-            self.driver.as_ref(), // needs to be &dyn LlmDriver
+            self.driver.clone(),
             system_prompt,
             self.model_name.clone(),
             session.agent_id,
@@ -278,7 +282,7 @@ impl SovereignKernel {
                             heartbeat_interval_secs: agent
                                 .manifest
                                 .autonomous
-                                .and_then(|a| Some(a.heartbeat_interval_secs)),
+                                .map(|a| a.heartbeat_interval_secs),
                         });
                     }
                 }
