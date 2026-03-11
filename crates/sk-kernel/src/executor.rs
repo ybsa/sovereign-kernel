@@ -10,7 +10,7 @@ pub fn create_agent_config(
     system_prompt: String,
     model_name: String,
     agent_id: sk_types::AgentId,
-    browser_manager: Arc<sk_engine::media::browser::BrowserManager>,
+    browser_manager: Arc<sk_engine::runtime::browser::BrowserManager>,
     skill_registry: Arc<sk_tools::skills::SkillRegistry>,
 ) -> AgentLoopConfig {
     let mut tools = vec![
@@ -974,7 +974,7 @@ pub fn create_agent_config(
                     if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
-                                sk_engine::media::browser::tool_browser_navigate(
+                                sk_engine::runtime::browser::tool_browser_navigate(
                                     &tool_call.input,
                                     &browser,
                                     &agent_id_str,
@@ -992,7 +992,7 @@ pub fn create_agent_config(
                     if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
-                                sk_engine::media::browser::tool_browser_click(
+                                sk_engine::runtime::browser::tool_browser_click(
                                     &tool_call.input,
                                     &browser,
                                     &agent_id_str,
@@ -1010,7 +1010,7 @@ pub fn create_agent_config(
                     if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
-                                sk_engine::media::browser::tool_browser_type(
+                                sk_engine::runtime::browser::tool_browser_type(
                                     &tool_call.input,
                                     &browser,
                                     &agent_id_str,
@@ -1028,7 +1028,7 @@ pub fn create_agent_config(
                     if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
-                                sk_engine::media::browser::tool_browser_screenshot(
+                                sk_engine::runtime::browser::tool_browser_screenshot(
                                     &tool_call.input,
                                     &browser,
                                     &agent_id_str,
@@ -1046,7 +1046,7 @@ pub fn create_agent_config(
                     if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
-                                sk_engine::media::browser::tool_browser_read_page(
+                                sk_engine::runtime::browser::tool_browser_read_page(
                                     &tool_call.input,
                                     &browser,
                                     &agent_id_str,
@@ -1064,7 +1064,7 @@ pub fn create_agent_config(
                     if let Some(_args) = tool_call.input.as_object() {
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(
-                                sk_engine::media::browser::tool_browser_close(
+                                sk_engine::runtime::browser::tool_browser_close(
                                     &tool_call.input,
                                     &browser,
                                     &agent_id_str,

@@ -209,7 +209,7 @@ impl ProcessManager {
 
         if let Some(pid) = proc.child.id() {
             debug!(process_id, pid, "Killing persistent process");
-            let _ = crate::sandbox::subprocess_sandbox::kill_process_tree(pid, 3000).await;
+            let _ = crate::runtime::subprocess_sandbox::kill_process_tree(pid, 3000).await;
         }
         let _ = proc.child.kill().await;
         Ok(())

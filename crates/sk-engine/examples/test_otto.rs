@@ -1,6 +1,5 @@
 use sk_engine::runtime::ottos_outpost::{execute_ottos_outpost, ExecutionEnv, OttosOutpostRequest};
 use std::path::Path;
-use tokio;
 
 #[tokio::main]
 async fn main() {

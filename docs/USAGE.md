@@ -22,7 +22,7 @@ Sets up your LLM API key, execution mode, and agent identity.
 | `sovereign status` | Check if daemon is running |
 | `sovereign stop` | Stop the daemon |
 | `sovereign dashboard` | Open terminal web dashboard |
-| `sovereign hands list` | List all 9 bundled hands |
+| `sovereign hands list` | List all 10 bundled hands |
 | `sovereign audit logs` | View cryptographic audit trail |
 
 ---
@@ -80,7 +80,7 @@ The agent will use the `schedule_create` tool. The daemon will monitor the time 
 Hands are autonomous capability agents you can activate:
 
 ```bash
-sovereign hands list                  # Show all 9 hands with requirements
+sovereign hands list                  # Show all 10 hands with requirements
 sovereign hands activate browser      # Start the browser automation hand
 sovereign hands activate web-search   # Start the web research hand
 sovereign hands activate email        # Start the email management hand

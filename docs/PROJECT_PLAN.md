@@ -193,27 +193,27 @@ User sees results (Web UI / Chat / CLI)
 
 **Goal: Let users choose Sandbox or Unrestricted mode**
 
-### 7.1: Add ExecutionMode Enum
+### 7.1: Add ExecutionMode Enum ✅
 **Tasks:**
-- [ ] Define ExecutionMode enum
-- [ ] Add to KernelConfig struct
-- [ ] Implement Default
-- [ ] Write unit tests
+- [x] Define ExecutionMode enum
+- [x] Add to KernelConfig struct
+- [x] Implement Default
+- [x] Write unit tests
 
-### 7.2: Create Config Templates
+### 7.2: Create Config Templates ✅
 **Tasks:**
-- [ ] Create sandbox config example
-- [ ] Create unrestricted config example
-- [ ] Create custom config example
-- [ ] Document each config option
+- [x] Create sandbox config example
+- [x] Create unrestricted config example
+- [x] Create custom config example
+- [x] Document each config option
 
-### 7.3: Config Loading & Validation
+### 7.3: Config Loading & Validation ✅
 **Tasks:**
-- [ ] Load ExecutionMode from config file
-- [ ] Validate mode-specific settings
-- [ ] Show user what mode is active
-- [ ] Warn if using unrestricted mode
-- [ ] Unit tests for config loading
+- [x] Load ExecutionMode from config file
+- [x] Validate mode-specific settings
+- [x] Show user what mode is active
+- [x] Warn if using unrestricted mode
+- [x] Unit tests for config loading
 
 **Timeline: 1 week**
 **Success Metric**: User can choose mode in config file
@@ -224,29 +224,29 @@ User sees results (Web UI / Chat / CLI)
 
 **Goal: Block dangerous actions in Sandbox mode**
 
-### 8.1: Workspace Sandbox Enhancement
+### 8.1: Workspace Sandbox Enhancement ✅
 **Tasks:**
-- [ ] Check file paths are within workspace (if Sandbox)
-- [ ] Block path traversal (`../`)
-- [ ] Block absolute paths outside workspace
-- [ ] Canonicalize paths to prevent tricks
-- [ ] Test: try to read /etc/passwd → blocked
-- [ ] Test: try to read /workspace/file → allowed
-- [ ] Test: unrestricted can read anywhere
+- [x] Check file paths are within workspace (if Sandbox)
+- [x] Block path traversal (`../`)
+- [x] Block absolute paths outside workspace
+- [x] Canonicalize paths to prevent tricks
+- [x] Test: try to read /etc/passwd → blocked
+- [x] Test: try to read /workspace/file → allowed
+- [x] Test: unrestricted can read anywhere
 
-### 8.2: Subprocess Sandbox Enhancement
+### 8.2: Subprocess Sandbox Enhancement ✅
 **Tasks:**
-- [ ] Check command against whitelist (if Sandbox)
-- [ ] Extract base command name
-- [ ] Block dangerous commands in Sandbox
-- [ ] Test: try `rm -rf /` → blocked in Sandbox
-- [ ] Test: try `git clone` → allowed in Sandbox
-- [ ] Test: unrestricted can run any command
+- [x] Check command against whitelist (if Sandbox)
+- [x] Extract base command name
+- [x] Block dangerous commands in Sandbox
+- [x] Test: try `rm -rf /` → blocked in Sandbox
+- [x] Test: try `git clone` → allowed in Sandbox
+- [x] Test: unrestricted can run any command
 
-### 8.3: Docker Sandbox
-- [ ] Verify Docker sandbox works in both modes
-- [ ] In Sandbox mode: use Docker for extra isolation
-- [ ] In Unrestricted mode: use Docker optionally when host dependencies (Python/Node) are missing to ensure tool reliability.
+### 8.3: Docker Sandbox ✅
+- [x] Verify Docker sandbox works in both modes
+- [x] In Sandbox mode: use Docker for extra isolation
+- [x] In Unrestricted mode: use Docker optionally when host dependencies (Python/Node) are missing to ensure tool reliability.
 
 **Timeline: 1 week**
 **Success Metric**: Sandbox mode blocks path traversal and unapproved commands
@@ -257,22 +257,22 @@ User sees results (Web UI / Chat / CLI)
 
 **Goal: Ask human permission for risky actions**
 
-### 9.1: Approval Manager Enhancement
+### 9.1: Approval Manager Enhancement ✅
 **Tasks:**
-- [ ] Update ApprovalManager to check execution mode
-- [ ] Different approval policies for each mode
-- [ ] Implement approval request flow
-- [ ] Add timeout for approvals (default: 60 seconds)
-- [ ] Test: Sandbox asks before shell_exec
-- [ ] Test: Unrestricted only asks for user-defined actions
+- [x] Update ApprovalManager to check execution mode
+- [x] Different approval policies for each mode
+- [x] Implement approval request flow
+- [x] Add timeout for approvals (default: 60 seconds)
+- [x] Test: Sandbox asks before shell_exec
+- [x] Test: Unrestricted only asks for user-defined actions
 
 ### 9.2: Approval Handler (Web UI / CLI)
 **Tasks:**
-- [ ] CLI: Show prompt "Approve action? (y/n)"
+- [x] CLI: Show prompt "Approve action? (y/n)"
 - [ ] Web UI: Show clickable Approve/Deny buttons
-- [ ] Handle timeout (default deny)
-- [ ] Log user decision in audit trail
-- [ ] Test: User can approve/deny from CLI
+- [x] Handle timeout (default deny)
+- [x] Log user decision in audit trail
+- [x] Test: User can approve/deny from CLI
 - [ ] Test: User can approve/deny from Web UI
 
 **Timeline: 1 week**
@@ -284,22 +284,22 @@ User sees results (Web UI / Chat / CLI)
 
 **Goal: Log every action with Merkle chain**
 
-### 10.1: Enhanced Audit System
+### 10.1: Enhanced Audit System ✅
 **Tasks:**
-- [ ] Log every action (file read, shell exec, approval decision, etc.)
-- [ ] Include execution mode in each log entry
-- [ ] Calculate Merkle hash for each entry
-- [ ] Store in SQLite with chain verification
-- [ ] Create audit_log table schema
-- [ ] Add API endpoint to view audit logs
-- [ ] Test: Verify chain integrity
+- [x] Log every action (file read, shell exec, approval decision, etc.)
+- [x] Include execution mode in each log entry
+- [x] Calculate Merkle hash for each entry
+- [x] Store in SQLite with chain verification
+- [x] Create audit_log table schema
+- [x] Add API endpoint to view audit logs
+- [x] Test: Verify chain integrity
 
 ### 10.2: Audit Log Viewer
 **Tasks:**
-- [ ] CLI command to list audit logs
-- [ ] Filter by agent, date range, action type
-- [ ] Verify Merkle chain integrity
-- [ ] Export to JSON/CSV
+- [x] CLI command to list audit logs
+- [x] Filter by agent, date range, action type
+- [x] Verify Merkle chain integrity
+- [x] Export to JSON/CSV
 - [ ] Web UI: Searchable audit log viewer
 
 **Timeline: 1.5 weeks**
@@ -441,7 +441,7 @@ User sees results (Web UI / Chat / CLI)
 - [ ] Cost tracking
 
 **Timeline: 1 week**
-**Success Metric**: ✅ ACHIEVED — 9 bundled hands total (7 original + web-search + email)
+**Success Metric**: ✅ ACHIEVED — 10 bundled hands total (7 original + web-search + email + otto)
 
 ---
 
@@ -586,20 +586,95 @@ User sees results (Web UI / Chat / CLI)
 
 ## PHASE 21: ULTRA-SOVEREIGN CAPABILITIES (The Horizon)
 
-**Goal: Achieve total autonomy where the agent behaves as a self-sustaining digital entity.**
+**Goal: Achieve total autonomy where the agent continuously improves and collaborates.**
 
-### 21.1: Financial Autonomy (The Sovereign Wallet)
-- [ ] **Secure Vault Integration**: Link agents to a secure wallet (Crypto or Bank API).
-- [ ] **Autonomous Procurement**: Agent pays for its own API keys, server costs, and MCP subscriptions within a strict budget.
-- [ ] **Economic Value Generation**: Agent can perform "bounties" or tasks for others to earn its own operating costs.
-
-### 21.2: Self-Refactoring (Native Optimization)
+### 21.1: Self-Refactoring (Native Optimization)
 - [ ] **Python to Rust Conversion**: When a self-built Python tool is used frequently, the agent rewrites it in Rust for 100x performance.
 - [ ] **Dynamic Compilation**: Kernel automatically compiles new Rust "Skills" and hot-reloads them into the core without stopping.
 
-### 21.3: The Global Skill Graph (P2P Sharing)
+### 21.2: The Global Skill Graph (P2P Sharing)
 - [ ] **Peer Discovery**: (Opt-in) Agents share the "blueprints" of tools they've built with other Sovereign Kernels.
 - [ ] **Collaborative Learning**: If one agent builds a "PDF-to-Braille" tool, all other agents in the network can "learn" and use it instantly.
+
+---
+
+## PHASE 22: FULL GUI & SCREEN CONTROL (The Eyes & Hands)
+
+**Goal: Give the agent full human-like access to the graphical desktop — see the screen, click, type, scroll, and interact with ANY application, not just the terminal.**
+
+### 22.1: Browser Automation (Complete)
+- [ ] Wire `browser_click` to Playwright `page.click(selector)`.
+- [ ] Wire `browser_type` to Playwright `page.fill(selector, text)`.
+- [ ] Wire `browser_screenshot` to Playwright `page.screenshot()`.
+- [ ] Wire `browser_read_page` to extract visible text/DOM.
+- [ ] Wire `browser_close` to close tabs/browser.
+- [ ] Add `browser_scroll`, `browser_wait`, `browser_evaluate_js`.
+- [ ] Test: Agent can log into a website, fill a form, and submit it.
+
+### 22.2: Screen Capture & Vision
+- [ ] Implement cross-platform screenshot tool (Windows: `win32`, Linux: `scrot`/`xdotool`, Mac: `screencapture`).
+- [ ] Send screenshots to multimodal LLM (GPT-4o, Gemini, Claude) for visual understanding.
+- [ ] Agent can answer "What's on my screen right now?"
+- [ ] Agent can locate UI elements by description ("find the Submit button").
+- [ ] Implement screen region capture (crop to specific area).
+
+### 22.3: Desktop Automation (Mouse & Keyboard)
+- [ ] Implement cross-platform mouse control (`click`, `move`, `drag`, `scroll`).
+- [ ] Implement cross-platform keyboard control (`type`, `hotkey`, `press`).
+- [ ] Platform backends: Windows (Win32 API), Linux (X11/xdotool), Mac (CoreGraphics).
+- [ ] Coordinate system: pixel-based with screen resolution detection.
+- [ ] Safety: Always require approval in Sandbox mode before GUI actions.
+- [ ] Test: Agent can open Notepad, type text, save the file, and close it.
+
+### 22.4: Application Awareness
+- [ ] List running applications/windows (cross-platform).
+- [ ] Focus/switch between windows.
+- [ ] Read window titles for context.
+- [ ] Detect active application for context-aware assistance.
+
+**Timeline: 3-4 weeks**
+**Success Metric**: Agent can complete a task that requires GUI interaction — e.g., open a spreadsheet app, enter data, save it, and email it.
+
+---
+
+## PHASE 23: UNIVERSAL CROSS-PLATFORM SUPPORT (Every Device)
+
+**Goal: Sovereign Kernel runs on EVERY device — from Raspberry Pi to enterprise servers. One binary, any platform.**
+
+### 23.1: Tier 1 Platforms (Full Support)
+- [x] **Windows** (x86_64) — current primary development platform.
+- [ ] **Linux** (x86_64) — CI builds, Docker, bare metal servers.
+- [ ] **macOS** (x86_64 + Apple Silicon/aarch64) — native ARM support.
+
+### 23.2: Tier 2 Platforms (ARM / Embedded)
+- [ ] **Linux ARM64** (aarch64) — Raspberry Pi 4/5, NVIDIA Jetson, AWS Graviton.
+- [ ] **Linux ARMv7** (armhf) — Raspberry Pi 3, older ARM boards.
+- [ ] Cross-compile with `cross` or `cargo-zigbuild` for ARM targets.
+- [ ] Optimize build: strip debug symbols, LTO, `opt-level=s` for embedded.
+- [ ] Test: Sovereign Kernel runs on Raspberry Pi 4 with 4GB RAM.
+
+### 23.3: Lightweight Mode (Resource-Constrained Devices)
+- [ ] Detect available RAM at startup and auto-tune memory usage.
+- [ ] Disable non-essential features on low-RAM devices (< 2GB): no browser, no Docker sandbox.
+- [ ] Use smaller/local LLMs on edge devices (Ollama, llama.cpp integration).
+- [ ] SQLite-only mode (disable optional PostgreSQL/Redis).
+- [ ] Headless mode (no dashboard) for IoT/server deployments.
+
+### 23.4: CI Cross-Platform Build Matrix
+- [ ] GitHub Actions build matrix: `ubuntu-latest`, `macos-latest`, `windows-latest`.
+- [ ] ARM cross-compilation in CI: `aarch64-unknown-linux-gnu`, `armv7-unknown-linux-gnueabihf`.
+- [ ] Release binaries for all 5+ targets on every tagged release.
+- [ ] Platform-specific integration tests (filesystem paths, shell commands, process management).
+
+### 23.5: Platform-Specific Adaptations
+- [ ] Shell commands: auto-detect `cmd.exe` vs `bash` vs `sh`.
+- [ ] Path separators: `\` (Windows) vs `/` (Unix) — already handled via `std::path`.
+- [ ] Process tree management: Windows (`taskkill`) vs Unix (`kill -SIGTERM`).
+- [ ] Docker availability detection: graceful fallback if Docker not installed.
+- [ ] Home directory detection: `%USERPROFILE%` vs `$HOME`.
+
+**Timeline: 2-3 weeks**
+**Success Metric**: Same `sovereign chat` binary works on Windows laptop, Linux server, Mac desktop, and Raspberry Pi — with zero code changes.
 
 ---
 
@@ -615,6 +690,7 @@ User sees results (Web UI / Chat / CLI)
 - **Language**: Rust (memory-safe, fast, concurrent)
 - **Async Runtime**: Tokio (async/await)
 - **Build**: Cargo (dependency management)
+- **Cross-Compile**: `cross` / `cargo-zigbuild` (ARM targets)
 
 ## Web Framework
 - **HTTP**: Actix-web or Axum
@@ -622,8 +698,8 @@ User sees results (Web UI / Chat / CLI)
 - **Serialization**: Serde (JSON)
 
 ## Database
-- **SQLite**: Local storage (audit trail)
-- **PostgreSQL**: Optional (production)
+- **SQLite**: Local storage (primary — memory, audit trail, sessions)
+- **PostgreSQL**: Optional (production scale)
 - **Redis**: Optional (caching, session state)
 - **Vector DB**: Qdrant or Milvus (agent memories)
 
@@ -632,11 +708,13 @@ User sees results (Web UI / Chat / CLI)
 - **Anthropic**: anthropic-sdk
 - **Google**: google-generativeai
 - **Groq**: groq-sdk
+- **Local**: Ollama / llama.cpp (edge devices)
 
 ## Hands/Tools
 - **Browser**: Playwright
+- **Screen Control**: Platform-native APIs (Win32, X11, CoreGraphics)
 - **Code Execution**: Docker
-- **Search**: Google Search API
+- **Search**: Brave / Tavily / DuckDuckGo
 - **Email**: lettre (SMTP)
 - **Image Gen**: DALL-E API
 
@@ -650,10 +728,16 @@ User sees results (Web UI / Chat / CLI)
 - **Option 2**: Yew (Rust, WASM)
 - **Option 3**: React/TypeScript (separate project)
 
+## Target Platforms
+- **Windows**: x86_64 (Tier 1)
+- **Linux**: x86_64 (Tier 1), aarch64 (Tier 2), armv7 (Tier 2)
+- **macOS**: x86_64 + Apple Silicon (Tier 1)
+- **Embedded**: Raspberry Pi 3/4/5, NVIDIA Jetson
+
 ## DevOps
 - **Containerization**: Docker
 - **Orchestration**: Docker Compose, Kubernetes
-- **CI/CD**: GitHub Actions
+- **CI/CD**: GitHub Actions (cross-platform matrix)
 - **Monitoring**: Prometheus (metrics), Grafana (dashboards)
 
 ---
@@ -663,30 +747,46 @@ User sees results (Web UI / Chat / CLI)
 - Per-module strict testing for Sandbox boundary enforcement.
 ## Integration Tests
 - Full end-to-end API, CLI, and workflow test commands (`cargo test --test integration_tests`).
+## Cross-Platform Tests
+- Platform-specific path handling, shell command, and process management tests.
+- ARM emulation tests via QEMU in CI.
 ## Manual Testing
 - Human verification of Approval gates, API WS streaming behavior, and Sandbox execution constraints mapping out paths via Teloxide or Serenity bot interfaces.
 
 ---
 
 # 7. DEPLOYMENT & RELEASE
-- Binaries shipped from GitHub releases. 
+- Binaries shipped from GitHub releases for **all platforms**: Windows (x64), Linux (x64, ARM64, ARMv7), macOS (x64, Apple Silicon).
 - Distroless Docker deployment vectors generated through CI pipelines onto Docker Hub.
 - Docker-compose clusters spinning up VectorDBs and Postgres backing.
+- Raspberry Pi install script: `curl -sSL https://install.sovereign-kernel.dev | sh`.
 
 ---
 
 # 8. SUCCESS METRICS
 
 ## Overall Success Metric
-**User can do this end-to-end:**
-1. Install Sovereign Kernel
+**User can do this end-to-end on ANY device:**
+1. Install Sovereign Kernel (one binary — Windows, Mac, Linux, or Raspberry Pi)
 2. Create config (choose Sandbox or Unrestricted)
-3. Start daemon: `sovereign-kernel start`
-4. Text Telegram bot: "Monitor news for Company X daily, email me summaries"
+3. Start: `sovereign chat`
+4. Tell the agent: "Monitor news for Company X daily, email me summaries"
 5. Close laptop
-6. Agent runs autonomously (via cron), hunts the web, emails the user, and audits its execution onto Merkle structures locally.
+6. Agent runs autonomously (via cron), browses the web, emails the user, and audits every action onto tamper-proof Merkle structures locally.
 7. User views audit trails securely via dashboard.
 
-**Total effort: ~300-400 hours**
-**Ending point: 26 weeks from execution start**
-**Final goal: Public release of production-ready Sovereign Kernel**
+## Full Computer Access Metric
+**Agent can perform ANY task a human can do on the computer:**
+1. Read, write, move files on the filesystem
+2. Run shell commands and code in any language
+3. Browse the web — navigate, click, fill forms, submit
+4. See the screen and interact with desktop GUI applications
+5. Send emails, search the web, manage processes
+6. Remember everything across sessions
+7. Work 24/7 on scheduled tasks without human supervision
+8. All while respecting the user's security boundaries
+
+**Total effort: ~350-450 hours**
+**Ending point: 30 weeks from execution start**
+**Final goal: Public release of production-ready Sovereign Kernel — runs on every device, does everything a human can do on a computer, privately and securely.**
+

@@ -1,7 +1,8 @@
 //! The Engine — agent execution loop, LLM drivers, and tool runner.
 //!
-//! Based on Sovereign Kernel's Sovereign Kernel-runtime, stripped of Hands/browser/Docker.
+//! Based on Sovereign Kernel's Sovereign Kernel-runtime.
 //! This is the beating heart of the Sovereign Kernel.
+//! Includes Hands, browser, Docker sandbox, and MCP.
 
 pub mod agent_loop;
 pub mod compactor;
@@ -10,13 +11,11 @@ pub mod drivers;
 pub mod llm_driver;
 pub mod local_inference;
 pub mod loop_guard;
-pub mod media;
+
 pub mod model_catalog;
 pub mod prompt_builder;
 pub mod retry;
 pub mod routing;
-pub mod sandbox;
-pub mod streaming;
 pub mod tool_runner;
 
 pub mod a2a;

@@ -25,7 +25,7 @@ pub struct SovereignKernel {
     /// Global LLM model name.
     pub model_name: String,
     /// Browser session manager.
-    pub browser: Arc<sk_engine::media::browser::BrowserManager>,
+    pub browser: Arc<sk_engine::runtime::browser::BrowserManager>,
     /// Skill registry.
     pub skills: Arc<sk_tools::skills::SkillRegistry>,
     /// Agent-to-Agent message bus.
@@ -172,7 +172,7 @@ impl SovereignKernel {
             };
 
         // Initialize Browser Manager
-        let browser = Arc::new(sk_engine::media::browser::BrowserManager::new(
+        let browser = Arc::new(sk_engine::runtime::browser::BrowserManager::new(
             config.browser.clone(),
         ));
 

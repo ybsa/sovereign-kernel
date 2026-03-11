@@ -1,8 +1,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/language-Rust-orange?style=flat-square" alt="Rust" />
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT" />
-  <img src="https://img.shields.io/badge/status-Phase%2019%20Complete-brightgreen?style=flat-square" alt="Status" />
-  <img src="https://img.shields.io/badge/hands-9%20Bundled-brightgreen?style=flat-square" alt="Hands" />
+  <img src="https://img.shields.io/badge/status-Phase%2020%20Complete-brightgreen?style=flat-square" alt="Status" />
+  <img src="https://img.shields.io/badge/hands-10%20Bundled-brightgreen?style=flat-square" alt="Hands" />
   <img src="https://img.shields.io/badge/security-Merkle%20Audit%20Trail-brightgreen?style=flat-square" alt="Security" />
 </p>
 
@@ -11,7 +11,7 @@
 > [!WARNING]
 > **Active Development**: Sovereign Kernel is experimental software under active development. Expect breaking changes between versions.
 
-**Sovereign Kernel** is a virtual operating system for AI agents, built entirely in Rust. It merges a memory-safe daemon core with a sophisticated memory substrate, 9 bundled autonomous capability packages (Hands), and a built-in terminal web dashboard.
+**Sovereign Kernel** is a virtual operating system for AI agents, built entirely in Rust. It merges a memory-safe daemon core with a sophisticated memory substrate, 10 bundled autonomous capability packages (Hands), and a built-in terminal web dashboard.
 
 It is not just a framework — it is the mediation layer between Autonomous Entities and the silicon they run on.
 
@@ -24,7 +24,7 @@ It is not just a framework — it is the mediation layer between Autonomous Enti
 - **Remembers everything** via a hybrid SQLite + BM25 vector memory substrate across sessions
 - **Optimizes token usage** with "The Healer" (Smart Truncation & Ground-Truth Context Compaction)
 - **Executes safely** in native environments or isolated **Docker sandboxes**
-- **Ships 9 autonomous Hands** — pre-built capability packs for browser automation, research, email, lead generation, and more
+- **Ships 10 autonomous Hands** — pre-built capability packs for browser automation, research, email, lead generation, Docker sandbox, and more
 - **Streams a terminal dashboard** at `http://localhost:8080` — manage agents, monitor live logs, approve actions
 - **Integrates 30+ channels** — Telegram, Discord, WhatsApp, Signal, Slack, and more via the Channel Bridge
 
@@ -76,7 +76,7 @@ sovereign start                      # Start as background daemon
 sovereign status                     # Check daemon status
 sovereign stop                       # Stop the daemon
 sovereign dashboard [--port 8080]    # Open terminal web dashboard
-sovereign hands list                 # List all 9 bundled hands
+sovereign hands list                 # List all 10 bundled hands
 sovereign hands activate <name>      # Start a hand's autonomous agent
 sovereign hands status               # Show running hand instances
 sovereign hands deactivate <id>      # Stop a hand instance
@@ -86,7 +86,7 @@ sovereign audit verify               # Verify Merkle chain integrity
 
 ---
 
-## 🖐️ Bundled Hands (9 Included)
+## 🖐️ Bundled Hands (10 Included)
 
 Hands are autonomous capability packages — each one is a pre-configured agent with specific tools, prompts, and dashboard metrics.
 
@@ -101,6 +101,7 @@ Hands are autonomous capability packages — each one is a pre-configured agent 
 | **predictor** | Analytics | Trend analysis and forecasting |
 | **email** | Communication | SMTP/IMAP email management with draft mode |
 | **twitter** | Social | Twitter/X monitoring and engagement |
+| **otto** | Builder | Docker-sandboxed code execution with dynamic dependencies |
 
 ```bash
 sovereign hands list           # See all hands with requirements
@@ -154,12 +155,12 @@ sk-soul     → Agent identity from SOUL.md
 sk-memory   → SQLite + BM25 vector memory substrate
 sk-mcp      → Model Context Protocol (MCP) nervous system
 sk-tools    → Shell, file, web, code, browser tool implementations
-sk-hands    → 9 bundled autonomous capability packages
+sk-hands    → 10 bundled autonomous capability packages
 sk-channels → 30+ channel adapters (Telegram, Discord, WhatsApp...)
 sk-cli      → sovereign binary + terminal dashboard server
 ```
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deep dive.
 
 ---
 
@@ -173,28 +174,30 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a deep dive.
 | 13 | ✅ Complete | Core Tools Upgrade: Shell, File, Code, Browser Hands |
 | 14 | ✅ Complete | Optional Hands: Web Search, Email |
 | 15 | ✅ Complete | Multi-Agent Coordination: A2A Bus, Witch Spawning, Shared Memory |
-| 16 | ✅ Complete | Production Hardening: Daemon Cron Scheduler, Tracing, Circuit Breakers |
-| 17 | ✅ Complete | Channel Integrations: Discord, Telegram, WhatsApp Robustness |
-| 18 | ✅ Complete | Docker Sandbox Integration: Secure isolated execution for shell and code |
-| 19 | ✅ Complete | Global Audit & Hardening: 45+ Clippy Fixes, 100% Test Success, MSRV 1.75 |
-| 20 | ✅ Complete | The Healer: Token Optimization, Smart Truncation, & Conversation Compaction |
-| 21 | [/] In Progress | The Builder Agent: ("Agent Forge") Self-Assembling Orchestration |
+| 16 | ⏳ Planned | Production Hardening: Log rotation, fallback LLM, load testing |
+| 17 | ⚠️ Scaffolded | Channel Integrations: 30+ adapters exist, need wiring |
+| 18 | ✅ Complete | Docker Sandbox Integration: OTTO + zero-pollution execution |
+| 19 | ⏳ Planned | Universal Tooling: MCP client + autonomous discovery |
+| 20 | ✅ Complete | Documentation & Lore: Dark fantasy naming, PROJECT_MAP |
+| 21 | ⏳ Planned | Self-Refactoring & P2P Skill Graph |
+| 22 | ⏳ Planned | Full GUI & Screen Control (browser, screenshots, desktop automation) |
+| 23 | ⏳ Planned | Universal Cross-Platform (Windows, Linux, macOS, Raspberry Pi, ARM) |
 
 ---
 
 ## 📚 Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — 10-crate workspace deep dive
-- [SECURITY.md](SECURITY.md) — Security model, sandboxing, audit trail
-- [USAGE.md](USAGE.md) — Hands, dashboard, channels, and agent configuration
-- [VISION.md](VISION.md) — The long-term AI Operating System vision
-- [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) — Full 26-week development roadmap
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 10-crate workspace deep dive
+- [docs/SECURITY.md](docs/SECURITY.md) — Security model, sandboxing, audit trail
+- [docs/USAGE.md](docs/USAGE.md) — Hands, dashboard, channels, and agent configuration
+- [docs/VISION.md](docs/VISION.md) — The long-term AI Operating System vision
+- [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) — Full 30-week development roadmap (23 phases)
 
 ---
 
 ## 🤝 Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) to learn how to add new Hands, MCP tools, and channel adapters.
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) to learn how to add new Hands, MCP tools, and channel adapters.
 
 ## ⚖️ License
 

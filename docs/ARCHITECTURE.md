@@ -52,7 +52,7 @@ Implements the concrete action handlers available to agents.
 ### 8. `sk-hands` — Autonomous Capability Packages
 Pre-built, self-contained agents called **Hands** — each with a validated `HAND.toml`, `SKILL.md`, tool list, requirements checker, dashboard metrics, and agent prompt.
 
-**9 Bundled Hands:**
+**10 Bundled Hands:**
 | Hand | Category | Core Tools |
 |------|----------|------------|
 | `browser` | Automation | `browser_navigate`, `browser_click`, `browser_type`, `browser_screenshot` |
@@ -176,7 +176,7 @@ sovereign-kernel/
     ├── sk-tools/
     │   └── skills/         # 52 bundled expert skills
     ├── sk-hands/
-    │   └── bundled/        # 9 bundled autonomous hands
+    │   └── bundled/        # 10 bundled autonomous hands
     ├── sk-channels/
     └── sk-cli/
         └── static/         # Embedded dashboard frontend
