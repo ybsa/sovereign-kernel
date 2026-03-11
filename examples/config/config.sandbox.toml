@@ -26,3 +26,14 @@ require_approval = [
     "shared_memory_store"
 ]
 timeout_secs = 60
+
+[[mcp_servers]]
+# Example Model Context Protocol (MCP) server integration
+name = "sqlite"
+timeout_secs = 30
+env = []
+
+[mcp_servers.transport]
+type = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-sqlite", "--", "./data.db"]

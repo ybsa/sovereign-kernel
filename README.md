@@ -177,9 +177,9 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deep dive.
 | 16 | ⏳ Planned | Production Hardening: Log rotation, fallback LLM, load testing |
 | 17 | ⚠️ Scaffolded | Channel Integrations: 30+ adapters exist, need wiring |
 | 18 | ✅ Complete | Docker Sandbox Integration: OTTO + zero-pollution execution |
-| 19 | ⏳ Planned | Universal Tooling: MCP client + autonomous discovery |
+| 19 | ✅ Complete | Universal Tooling: MCP client + autonomous discovery |
 | 20 | ✅ Complete | Documentation & Lore: Dark fantasy naming, PROJECT_MAP |
-| 21 | ⏳ Planned | Self-Refactoring & P2P Skill Graph |
+| 21 | ✅ Complete | Self-Refactoring & P2P Skill Graph |
 | 22 | ⏳ Planned | Full GUI & Screen Control (browser, screenshots, desktop automation) |
 | 23 | ⏳ Planned | Universal Cross-Platform (Windows, Linux, macOS, Raspberry Pi, ARM) |
 

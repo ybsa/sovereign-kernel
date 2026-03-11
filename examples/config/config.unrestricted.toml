@@ -13,3 +13,14 @@ mode = "full"
 [approval]
 # No automatic approval required for local automation
 require_approval = []
+
+[[mcp_servers]]
+# Example Model Context Protocol (MCP) server integration
+name = "sqlite"
+timeout_secs = 30
+env = []
+
+[mcp_servers.transport]
+type = "stdio"
+command = "npx"
+args = ["-y", "@modelcontextprotocol/server-sqlite", "--", "./data.db"]

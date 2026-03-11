@@ -11,7 +11,7 @@ pub fn create_agent_config(
     model_name: String,
     agent_id: sk_types::AgentId,
     browser_manager: Arc<sk_engine::runtime::browser::BrowserManager>,
-    skill_registry: Arc<sk_tools::skills::SkillRegistry>,
+    skill_registry: Arc<tokio::sync::RwLock<sk_tools::skills::SkillRegistry>>,
 ) -> AgentLoopConfig {
     let mut tools = vec![
         sk_tools::memory_tools::remember_tool(),
@@ -37,6 +37,13 @@ pub fn create_agent_config(
     tools.push(sk_tools::skills::get_skill_tool());
     tools.push(sk_tools::skills::list_skills_tool());
     tools.push(sk_tools::ottos_outpost::ottos_outpost_tool());
+
+    // Pull in dynamic tools from the MCP registry
+    if let Ok(mcp_lock) = kernel.mcp.try_read() {
+        tools.extend(mcp_lock.all_tools());
+    } else {
+        tracing::warn!("Failed to acquire MCP read lock, MCP tools will be missing.");
+    }
 
     // Agent-to-Agent message tool
     tools.push(sk_types::ToolDefinition {
@@ -1081,18 +1088,198 @@ pub fn create_agent_config(
                 "get_skill" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                        Ok(sk_tools::skills::handle_get_skill(&skills, name))
+                        let locks = skills.clone();
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(async {
+                                let lock = locks.read().await;
+                                Ok(sk_tools::skills::handle_get_skill(&lock, name))
+                            })
+                        })
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
                         ))
                     }
                 }
-                "list_skills" => Ok(sk_tools::skills::handle_list_skills(&skills)),
-                _ => Err(sk_types::SovereignError::ToolExecutionError(format!(
-                    "Unknown tool: {}",
-                    tool_call.name
-                ))),
+                "list_skills" => {
+                    let locks = skills.clone();
+                    tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(async {
+                            let lock = locks.read().await;
+                            Ok(sk_tools::skills::handle_list_skills(&lock))
+                        })
+                    })
+                }
+                "compile_rust_skill" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let skill_name = args
+                            .get("skill_name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let description = args
+                            .get("description")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let dependencies_toml = args
+                            .get("dependencies_toml")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let code = args
+                            .get("code")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let instructions = args
+                            .get("instructions")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(async {
+                            // 1. Prepare Cargo workspace
+                            let file_id = uuid::Uuid::new_v4().to_string();
+                            let temp_rel_dir = format!(".sk_temp/compile_rust_{}_{}", skill_name, file_id);
+                            let workspace = config.effective_workspaces_dir();
+                            let temp_abs_dir = workspace.join(&temp_rel_dir);
+                            if let Err(e) = std::fs::create_dir_all(&temp_abs_dir) {
+                                return Err(sk_types::SovereignError::ToolExecutionError(format!("Failed to create temp dir: {}", e)));
+                            }
+
+                            // 2. Write Cargo.toml
+                            let cargo_toml = format!(r#"
+[package]
+name = "{}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+{}
+"#, skill_name, dependencies_toml);
+                            if let Err(e) = std::fs::write(temp_abs_dir.join("Cargo.toml"), cargo_toml) {
+                                return Err(sk_types::SovereignError::ToolExecutionError(format!("Failed to write Cargo.toml: {}", e)));
+                            }
+
+                            // 3. Write src/main.rs
+                            if let Err(e) = std::fs::create_dir_all(temp_abs_dir.join("src")) {
+                                return Err(sk_types::SovereignError::ToolExecutionError(format!("Failed to create src dir: {}", e)));
+                            }
+                            if let Err(e) = std::fs::write(temp_abs_dir.join("src/main.rs"), code) {
+                                return Err(sk_types::SovereignError::ToolExecutionError(format!("Failed to write main.rs: {}", e)));
+                            }
+
+                            // 4. Run `cargo build --release` in Docker sandbox using rust image
+                            let mut build_config = config.docker.clone();
+                            build_config.image = "rust:1.80-slim".to_string();
+
+                            let config_hash = sk_engine::runtime::docker_sandbox::config_hash(&build_config);
+                            let container = if let Some(c) = kernel.sandbox_pool.acquire(config_hash, build_config.reuse_cool_secs) {
+                                c
+                            } else {
+                                sk_engine::runtime::docker_sandbox::create_sandbox(&build_config, &agent_id_str, &workspace)
+                                    .await.map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Docker create failed: {}", e)))?
+                            };
+
+                            // Docker container runs with `workspace` mounted to `build_config.workdir`
+                            let container_script_path = format!("{}/{}", build_config.workdir, temp_rel_dir);
+                            let command = format!("cd {} && cargo build --release", container_script_path);
+
+                            let timeout = std::time::Duration::from_secs(300); // 5 min compilation timeout
+                            let res = sk_engine::runtime::docker_sandbox::exec_in_sandbox(&container, &command, timeout).await;
+
+                            kernel.sandbox_pool.release(container, config_hash);
+
+                            match res {
+                                Ok(exec_res) if exec_res.exit_code == 0 => {
+                                    // 5. Success! Move binary to skills directory.
+                                    let lock = skills.write().await;
+                                    let skills_dir = lock.dir.clone();
+                                    drop(lock);
+
+                                    let target_skill_dir = skills_dir.join(&skill_name);
+                                    if let Err(e) = std::fs::create_dir_all(&target_skill_dir) {
+                                         return Err(sk_types::SovereignError::ToolExecutionError(format!("Failed to create target skill dir: {}", e)));
+                                    }
+
+                                    // Extract compiled binary
+                                    let binary_src = temp_abs_dir.join("target/release").join(&skill_name);
+                                    let binary_dst = target_skill_dir.join(&skill_name);
+
+                                    if let Err(e) = std::fs::copy(&binary_src, &binary_dst) {
+                                         return Err(sk_types::SovereignError::ToolExecutionError(format!("Failed to copy binary (did it compile successfully?): {}\nSTDOUT:\n{}\nSTDERR:\n{}", e, exec_res.stdout, exec_res.stderr)));
+                                    }
+
+                                    #[cfg(unix)]
+                                    {
+                                        use std::os::unix::fs::PermissionsExt;
+                                        if let Ok(mut perms) = std::fs::metadata(&binary_dst).map(|m| m.permissions()) {
+                                            perms.set_mode(0o755);
+                                            let _ = std::fs::set_permissions(&binary_dst, perms);
+                                        }
+                                    }
+
+                                    // 6. Write SKILL.md
+                                    let skill_md_content = format!("---\nname: {}\ndescription: {}\nmetadata:\n  compiled: true\n---\n{}", skill_name, description, instructions);
+                                    if let Err(e) = std::fs::write(target_skill_dir.join("SKILL.md"), skill_md_content) {
+                                         return Err(sk_types::SovereignError::ToolExecutionError(format!("Failed to write SKILL.md: {}", e)));
+                                    }
+
+                                    // Cleanup temp compilation dir
+                                    let _ = std::fs::remove_dir_all(&temp_abs_dir);
+
+                                    // 7. Hot reload!
+                                    let mut lock = skills.write().await;
+                                    lock.reload();
+                                    drop(lock);
+
+                                    Ok(format!("Successfully compiled Rust skill '{}' and hot-reloaded the registry!", skill_name))
+                                }
+                                Ok(exec_res) => {
+                                    Err(sk_types::SovereignError::ToolExecutionError(format!("cargo build failed. Code: {}\nSTDOUT:\n{}\nSTDERR:\n{}", exec_res.exit_code, exec_res.stdout, exec_res.stderr)))
+                                }
+                                Err(e) => {
+                                    Err(sk_types::SovereignError::ToolExecutionError(format!("Docker execution failed: {}", e)))
+                                }
+                            }
+                        })
+                        })
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                _ => {
+                    let is_mcp = {
+                        if let Ok(mcp_lock) = kernel.mcp.try_read() {
+                            mcp_lock.is_mcp_tool(&tool_call.name)
+                        } else {
+                            false
+                        }
+                    };
+
+                    if is_mcp {
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(async {
+                                let mut mcp_lock = kernel.mcp.write().await;
+                                match mcp_lock.call_tool(&tool_call.name, &tool_call.input).await {
+                                    Ok(res) => Ok(healer(res, 8000)),
+                                    Err(e) => Err(sk_types::SovereignError::ToolExecutionError(
+                                        e.to_string(),
+                                    )),
+                                }
+                            })
+                        })
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(format!(
+                            "Unknown tool: {}",
+                            tool_call.name
+                        )))
+                    }
+                }
             }
         }),
         stream_handler: None,

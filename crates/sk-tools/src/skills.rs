@@ -23,6 +23,7 @@ pub struct Skill {
 /// Dynamic registry of available skills.
 pub struct SkillRegistry {
     skills: HashMap<String, Skill>,
+    pub dir: std::path::PathBuf,
 }
 
 impl SkillRegistry {
@@ -33,7 +34,10 @@ impl SkillRegistry {
 
         if !path.exists() {
             warn!(path = ?path, "Skills directory not found");
-            return Self { skills };
+            return Self {
+                skills,
+                dir: path.to_path_buf(),
+            };
         }
 
         if let Ok(entries) = std::fs::read_dir(path) {
@@ -51,7 +55,16 @@ impl SkillRegistry {
             }
         }
 
-        Self { skills }
+        Self {
+            skills,
+            dir: path.to_path_buf(),
+        }
+    }
+
+    /// Reload skills from the stored directory, updating the existing registry in-place.
+    pub fn reload(&mut self) {
+        let new_registry = Self::load_from_dir(&self.dir);
+        self.skills = new_registry.skills;
     }
 
     fn parse_skill_file(path: &Path) -> Result<Skill, String> {

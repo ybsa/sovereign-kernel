@@ -7,6 +7,7 @@ pub mod code_exec;
 pub mod file_ops;
 pub mod mcp_bridge;
 pub mod memory_tools;
+pub mod otto;
 pub mod ottos_outpost;
 pub mod scheduler;
 pub mod shared_memory;
@@ -34,5 +35,6 @@ pub fn builtin_tools() -> Vec<ToolDefinition> {
     tools.push(skills::get_skill_tool());
     tools.push(skills::list_skills_tool());
     tools.push(ottos_outpost::ottos_outpost_tool());
+    tools.push(otto::compile_rust_skill_tool());
     tools
 }

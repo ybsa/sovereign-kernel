@@ -17,7 +17,7 @@ pub struct SovereignKernel {
     /// Memory substrate.
     pub memory: Arc<MemorySubstrate>,
     /// MCP server registry.
-    pub mcp: McpRegistry,
+    pub mcp: Arc<tokio::sync::RwLock<McpRegistry>>,
     /// Conversational safety gate.
     pub safety: Arc<crate::approval::SafetyGate>,
     /// Global LLM driver.
@@ -27,7 +27,7 @@ pub struct SovereignKernel {
     /// Browser session manager.
     pub browser: Arc<sk_engine::runtime::browser::BrowserManager>,
     /// Skill registry.
-    pub skills: Arc<sk_tools::skills::SkillRegistry>,
+    pub skills: Arc<tokio::sync::RwLock<sk_tools::skills::SkillRegistry>>,
     /// Agent-to-Agent message bus.
     pub bus: Arc<crate::bus::InterAgentBus>,
     /// Global agent registry.
@@ -126,6 +126,7 @@ impl SovereignKernel {
             tools = mcp.tool_count(),
             "MCP registry initialized"
         );
+        let mcp = Arc::new(tokio::sync::RwLock::new(mcp));
 
         // Initialize LLM Driver from environment
         // model_name is built up through if-else branches then moved into the struct.
@@ -190,7 +191,9 @@ impl SovereignKernel {
                 }
             }
         }
-        let skills = Arc::new(sk_tools::skills::SkillRegistry::load_from_dir(skills_path));
+        let skills = Arc::new(tokio::sync::RwLock::new(
+            sk_tools::skills::SkillRegistry::load_from_dir(skills_path),
+        ));
 
         let bus = Arc::new(crate::bus::InterAgentBus::new(memory.clone()));
 

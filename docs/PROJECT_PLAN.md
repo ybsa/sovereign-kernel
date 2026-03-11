@@ -555,12 +555,12 @@ User sees results (Web UI / Chat / CLI)
 **Goal: Expand the Laboratory infinitely by connecting to standard Model Context Protocol servers.**
 
 ### 19.1: Universal Tooling (MCP)
-- [ ] Implement full MCP client in `sk-mcp`.
-- [ ] Connect agent to local MCP servers.
-- [ ] **Autonomous Discovery**: Agent searches online registries (e.g., Smithery.ai) for missing tools.
+- [x] Implement full MCP client in `sk-mcp`.
+- [x] Connect agent to local MCP servers.
+- [x] **Autonomous Discovery**: Agent searches online registries (e.g., Smithery.ai) for missing tools.
 
 ### 19.2: Zero-Touch Install
-- [ ] Agent automatically pulls, configures, and runs MCP servers in Docker containers via OTTO.
+- [x] Agent automatically pulls, configures, and runs MCP servers in Docker containers via OTTO.
 
 **Timeline: 2 weeks**
 **Success Metric**: Agent can complete a "human-level" task using an external MCP server.
@@ -589,8 +589,8 @@ User sees results (Web UI / Chat / CLI)
 **Goal: Achieve total autonomy where the agent continuously improves and collaborates.**
 
 ### 21.1: Self-Refactoring (Native Optimization)
-- [ ] **Python to Rust Conversion**: When a self-built Python tool is used frequently, the agent rewrites it in Rust for 100x performance.
-- [ ] **Dynamic Compilation**: Kernel automatically compiles new Rust "Skills" and hot-reloads them into the core without stopping.
+- [x] **Python to Rust Conversion**: When a self-built Python tool is used frequently, the agent rewrites it in Rust for 100x performance.
+- [x] **Dynamic Compilation**: Kernel automatically compiles new Rust "Skills" and hot-reloads them into the core without stopping.
 
 ### 21.2: The Global Skill Graph (P2P Sharing)
 - [ ] **Peer Discovery**: (Opt-in) Agents share the "blueprints" of tools they've built with other Sovereign Kernels.
@@ -661,10 +661,10 @@ User sees results (Web UI / Chat / CLI)
 - [ ] Headless mode (no dashboard) for IoT/server deployments.
 
 ### 23.4: CI Cross-Platform Build Matrix
-- [ ] GitHub Actions build matrix: `ubuntu-latest`, `macos-latest`, `windows-latest`.
+- [x] GitHub Actions build matrix: `ubuntu-latest`, `macos-latest`, `windows-latest`.
 - [ ] ARM cross-compilation in CI: `aarch64-unknown-linux-gnu`, `armv7-unknown-linux-gnueabihf`.
 - [ ] Release binaries for all 5+ targets on every tagged release.
-- [ ] Platform-specific integration tests (filesystem paths, shell commands, process management).
+- [x] Platform-specific integration tests (filesystem paths, shell commands, process management).
 
 ### 23.5: Platform-Specific Adaptations
 - [ ] Shell commands: auto-detect `cmd.exe` vs `bash` vs `sh`.
