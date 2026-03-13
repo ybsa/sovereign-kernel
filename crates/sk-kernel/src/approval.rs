@@ -135,11 +135,13 @@ impl ApprovalManager {
         match tool_name {
             // Read-only / safe
             "web_search" | "web_fetch" | "read_file" | "list_dir" | "recall"
-            | "browser_read_page" => RiskLevel::Low,
+            | "browser_read_page" | "host_list_dir" => RiskLevel::Low,
 
             // Moderate actions
             "write_file" | "copy_file" | "remember" | "browser_navigate" | "browser_click"
-            | "browser_type" | "browser_screenshot" | "browser_close" => RiskLevel::Medium,
+            | "browser_type" | "browser_screenshot" | "browser_close" | "host_read_file" => {
+                RiskLevel::Medium
+            }
 
             // Dangerous execution
             "shell_exec" => {
@@ -153,8 +155,9 @@ impl ApprovalManager {
                     RiskLevel::High // Even non-destructive shell is High risk
                 }
             }
-            "code_exec" => RiskLevel::Critical,
-            "forget" | "delete_file" | "move_file" => RiskLevel::High,
+            "code_exec" | "host_install_app" => RiskLevel::Critical,
+            "forget" | "delete_file" | "move_file" | "host_write_file" | "host_desktop_control"
+            | "host_system_config" => RiskLevel::High,
 
             _ => RiskLevel::High,
         }

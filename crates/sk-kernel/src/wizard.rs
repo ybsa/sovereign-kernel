@@ -29,6 +29,8 @@ pub struct AgentIntent {
     pub schedule: Option<String>,
     /// Suggested capabilities.
     pub capabilities: Vec<String>,
+    /// Execution mode: "safe" or "unrestricted".
+    pub mode: Option<String>,
 }
 
 /// A generated setup plan from the wizard.
@@ -257,6 +259,62 @@ impl SetupWizard {
     /// Parse an intent from a JSON string (typically LLM output).
     pub fn parse_intent(json: &str) -> Result<AgentIntent, serde_json::Error> {
         serde_json::from_str(json)
+    }
+
+    /// Use the LLM to extract a structured AgentIntent from a task description.
+    pub async fn analyze_task_intent(
+        driver: std::sync::Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+        model: &str,
+        task: &str,
+    ) -> sk_types::SovereignResult<AgentIntent> {
+        let system_prompt = r#"You are the Sovereign Kernel Setup Wizard. 
+Transform the user's task into a structured JSON AgentIntent.
+JSON Schema:
+{
+  "name": "slug-name",
+  "description": "Short summary",
+  "task": "Expanded instructions",
+  "skills": ["optional-skill-names"],
+  "model_tier": "simple|medium|complex",
+  "scheduled": true|false,
+  "schedule": "cron-expr or null",
+  "capabilities": ["web", "files", "shell", "memory", "browser"],
+  "mode": "safe" | "unrestricted"
+}
+Rules:
+- name: lowercase, no spaces.
+- mode: use 'unrestricted' ONLY for system admin, wallpaper, notifications, or app installs. Else 'safe'.
+- model_tier: use 'complex' for coding/logic, 'simple' for basic info fetching.
+- ONLY return VALID JSON. No prose."#;
+
+        let request = sk_engine::llm_driver::CompletionRequest {
+            model: model.to_string(),
+            messages: vec![
+                sk_types::Message::system(system_prompt),
+                sk_types::Message::user(task),
+            ],
+            tools: vec![],
+            max_tokens: 1000,
+            temperature: 0.0,
+            stream: false,
+        };
+
+        let resp = driver.complete(request).await
+            .map_err(|e| sk_types::SovereignError::Internal(format!("LLM Analyzer failing: {e}")))?;
+
+        let intent_json = resp.content.trim();
+        // LLMs sometimes wrap in ```json ... ```
+        let clean_json = if intent_json.starts_with("```json") {
+            intent_json.strip_prefix("```json").unwrap().strip_suffix("```").unwrap_or(intent_json)
+        } else if intent_json.starts_with("```") {
+             intent_json.strip_prefix("```").unwrap().strip_suffix("```").unwrap_or(intent_json)
+        } else {
+            intent_json
+        };
+
+        Self::parse_intent(clean_json.trim()).map_err(|e| {
+            sk_types::SovereignError::Internal(format!("Failed to parse wizard intent: {e}\nRaw: {clean_json}"))
+        })
     }
 }
 

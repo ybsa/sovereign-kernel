@@ -21,6 +21,8 @@ mod hands;
 mod init;
 mod middleware;
 mod openai_compat;
+mod run;
+mod status;
 
 #[derive(Parser)]
 #[command(name = "sovereign", version, about = "Sovereign Kernel — Agentic OS")]
@@ -49,9 +51,25 @@ enum Commands {
     Init,
     /// Start the kernel as a background daemon
     Start,
+    /// Run a task autonomously
+    Run {
+        /// The task description (natural language)
+        task: String,
+        /// Execution mode: auto, safe, unrestricted
+        #[arg(short, long, default_value = "auto")]
+        mode: String,
+        /// Optional schedule (cron expression)
+        #[arg(short, long)]
+        schedule: Option<String>,
+    },
     /// Check kernel status
     Status,
-    /// Stop the daemon
+    /// Stop the daemon or a specific agent
+    Kill {
+        /// Agent ID to kill (optional, stops daemon if omitted)
+        id: Option<String>,
+    },
+    /// Stop the daemon (Legacy, use 'kill' without ID)
     Stop,
     /// Manage autonomous hands (list, activate, deactivate, status)
     Hands {
@@ -142,7 +160,16 @@ async fn main() -> anyhow::Result<()> {
         Commands::Chat => chat::run(config).await?,
         Commands::Init => init::run().await?,
         Commands::Start => daemon::start(config).await?,
-        Commands::Status => daemon::status().await?,
+        Commands::Run { task, mode, schedule } => run::execute(config, &task, &mode, schedule).await?,
+        Commands::Status => status::print_status().await?,
+        Commands::Kill { id } => {
+            if let Some(agent_id) = id {
+                // TODO: Implement kill agent
+                println!("Killing agent {}...", agent_id);
+            } else {
+                daemon::stop().await?;
+            }
+        }
         Commands::Stop => daemon::stop().await?,
         Commands::Hands { action, args } => hands::run(&action, &args).await?,
         Commands::Audit { action, args } => audit::run(config, &action, &args).await?,

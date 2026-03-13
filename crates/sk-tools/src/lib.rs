@@ -6,6 +6,7 @@ pub mod browser_tools;
 pub mod code_exec;
 pub mod file_ops;
 pub mod mcp_bridge;
+pub mod host;
 pub mod memory_tools;
 pub mod otto;
 pub mod ottos_outpost;

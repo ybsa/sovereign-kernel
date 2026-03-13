@@ -49,6 +49,8 @@ pub struct AgentLoopConfig {
     pub tool_executor: ToolExecutor,
     /// Optional streaming callback to receive tokens as they are generated.
     pub stream_handler: Option<StreamHandler>,
+    /// Optional callback to save state checkpoints for recovery.
+    pub checkpoint_handler: Option<Box<dyn Fn(&Session) -> SovereignResult<()> + Send + Sync>>,
 }
 
 use crate::loop_guard::LoopGuard;
@@ -78,9 +80,22 @@ pub async fn run_agent_loop(
     let mut final_response = String::new();
 
     let mut loop_guard = LoopGuard::new();
+    let mut last_checkpoint = std::time::Instant::now();
 
     // 3. Agent loop: LLM → tool calls → LLM → ... → end turn
     loop {
+        // Trigger periodic checkpoint if requested
+        if let Some(ref handler) = config.checkpoint_handler {
+            if last_checkpoint.elapsed().as_secs() >= 30 {
+                if let Err(e) = handler(session) {
+                    warn!("Failed to save periodic checkpoint: {}", e);
+                } else {
+                    debug!("Saved periodic state checkpoint");
+                    last_checkpoint = std::time::Instant::now();
+                }
+            }
+        }
+
         iterations += 1;
         if iterations > MAX_ITERATIONS {
             warn!("Agent loop hit MAX_ITERATIONS ({MAX_ITERATIONS})");

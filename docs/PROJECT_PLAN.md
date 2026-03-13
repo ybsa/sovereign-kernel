@@ -9,11 +9,12 @@
 1. Project Overview
 2. Complete Architecture
 3. Phase-by-Phase Implementation (Weeks 1-26)
-4. Code Structure & File Organization
-5. Technology Stack
-6. Testing Strategy
-7. Deployment & Release
-8. Success Metrics
+4. **Phase 24: The Village (Agent Ecosystem)** ← NEW
+5. Code Structure & File Organization
+6. Technology Stack
+7. Testing Strategy
+8. Deployment & Release
+9. Success Metrics
 
 ---
 
@@ -678,6 +679,268 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
+## PHASE 24: THE VILLAGE — AGENT ECOSYSTEM (Next Major Milestone)
+
+**Goal: Transform Sovereign Kernel from an agent framework into a living agent village — where agents self-organize, recover from failures, and users interact through natural language rather than configuration files.**
+
+### 🔬 Problem Analysis (from Deep Technical Audit — March 2026)
+
+The following gaps were identified during a comprehensive code-level audit:
+
+| # | Problem | Where It Hurts | Severity |
+|---|---------|---------------|----------|
+| P1 | **No host-level tools** — `ExecutionMode::Unrestricted` exists but there are no tools for desktop control, system config, or app installation | Agents can't interact with the full OS in Unrestricted mode | 🔴 Critical |
+| P2 | **No crash recovery** — `Supervisor` detects dead agents and restarts, but loses all state (memory, context, progress) | Long-running agents lose hours of work on crash | 🔴 Critical |
+| P3 | **Monolithic executor** — `executor.rs` (1,339 LOC) is a single match statement dispatching 25+ tools; untestable | Adding new tools requires editing a god-function; zero tests on executor | 🟡 High |
+| P4 | **Low-level agent spawning** — `spawn_witch_skeleton` requires explicit capability lists and system prompts | Users must understand internal architecture to create agents | 🟡 High |
+| P5 | **No simplified CLI** — requires `sovereign daemon` → `sovereign hands activate` chain | New users bounce; too many steps to "just do a task" | 🟡 Medium |
+| P6 | **Dashboard serves static data** — API endpoints return hardcoded values, not live kernel state | Dashboard is visual-only; not operational | 🟡 Medium |
+
+### 🏘️ Village Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        THE VILLAGE (Sovereign Kernel)               │
+│                                                                     │
+│  ┌──────────────┐  ┌───────────────┐  ┌──────────────────┐          │
+│  │   COTTAGE    │  │     MANOR     │  │      ALARM       │          │
+│  │  (Sandbox)   │  │ (Unrestricted │  │   (Scheduled)    │          │
+│  │              │  │  + Approval)  │  │                  │          │
+│  │ • File read  │  │ • Full FS     │  │ • Sleeps until   │          │
+│  │ • Web fetch  │  │ • System cfg  │  │   wake time      │          │
+│  │ • Safe code  │  │ • Install apps│  │ • Becomes Manor  │          │
+│  │ • Docker     │  │ • Desktop ctl │  │   or Cottage     │          │
+│  │   isolated   │  │ • All tools   │  │ • Dies after     │          │
+│  │              │  │ + Elder gate  │  │   completion     │          │
+│  └──────┬───────┘  └───────┬───────┘  └────────┬─────────┘          │
+│         └──────────────────┼───────────────────┘                    │
+│                            ▼                                        │
+│              ┌────────────────────────┐                              │
+│              │     VILLAGE SQUARE     │  ← InterAgentBus (exists)   │
+│              │       (A2A Bus)        │                              │
+│              └──────────┬─────────────┘                              │
+│                         │                                           │
+│    ┌────────────────────┼────────────────────────┐                   │
+│    ▼                    ▼                        ▼                  │
+│ ┌───────────┐    ┌────────────┐    ┌──────────────────┐             │
+│ │ RESURRECTOR│    │  BUILDER   │    │     ELDER        │             │
+│ │ (enhanced  │    │ (enhanced  │    │   (Approval UI)  │             │
+│ │ Supervisor)│    │  Wizard)   │    │                  │             │
+│ │            │    │            │    │ • Risk tiers     │             │
+│ │ Watches    │    │ NL task →  │    │ • Auto-approve   │             │
+│ │ all agents │    │ agent with │    │   low-risk       │             │
+│ │ Revives    │    │ right tools│    │ • Prompt for     │             │
+│ │ from       │    │ right mode │    │   high-risk      │             │
+│ │ checkpoint │    │ right prompt│   │ • Block critical │             │
+│ └───────────┘    └────────────┘    └──────────────────┘             │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐    │
+│  │              MEMORY POND (sk-memory)                        │    │
+│  │    SQLite + BM25 + Semantic + NEW: Checkpoint table          │    │
+│  └─────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 24.1: Host Tools & Unrestricted Tooling (Week 1)
+
+**Problem:** `ExecutionMode::Unrestricted` and `SafetyGate` exist, but there are no tools that actually leverage full host access.
+
+**Solution:** Add 4 new tool modules in `sk-tools/src/host/` that are automatically available in Unrestricted mode. Enhance `SafetyGate` with 3-tier risk classification.
+
+**Existing code to extend (NOT replace):**
+- `sk-types/src/config.rs` — `ExecutionMode::Unrestricted` already defined
+- `sk-kernel/src/approval.rs` — `SafetyGate` already enforces approval flow
+- `sk-kernel/src/executor.rs` — tool dispatch already checks mode
+- `sk-memory/src/audit.rs` — Merkle audit trail already logs every action
+
+**Tasks:**
+- [ ] Create `sk-tools/src/host/mod.rs` — module root
+- [ ] Create `sk-tools/src/host/desktop_control.rs` — Wallpaper, theme, notification tools
+- [ ] Create `sk-tools/src/host/system_config.rs` — Edit system configs, manage services
+- [ ] Create `sk-tools/src/host/app_installer.rs` — Install via `winget`/`apt`/`brew` (auto-detect OS)
+- [ ] Create `sk-tools/src/host/file_full.rs` — Full filesystem access (no workspace restriction)
+- [ ] Add 3-tier risk classification to `SafetyGate`:
+  - **Low**: Read system info, list processes → auto-approve
+  - **Medium**: Write files outside workspace → warn + approve
+  - **High**: Install apps, modify system config → explicit approval + timeout
+- [ ] Register host tools in `executor.rs` (only when `ExecutionMode::Unrestricted`)
+- [ ] Tests: Verify host tools are blocked in Sandbox, available in Unrestricted
+- [ ] Tests: Verify risk tier classification routes to correct approval flow
+
+**Files created/modified:**
+| File | Action | Lines |
+|------|--------|-------|
+| `sk-tools/src/host/mod.rs` | NEW | ~30 |
+| `sk-tools/src/host/desktop_control.rs` | NEW | ~150 |
+| `sk-tools/src/host/system_config.rs` | NEW | ~200 |
+| `sk-tools/src/host/app_installer.rs` | NEW | ~250 |
+| `sk-tools/src/host/file_full.rs` | NEW | ~100 |
+| `sk-kernel/src/approval.rs` | MODIFY | +50 (risk tiers) |
+| `sk-kernel/src/executor.rs` | MODIFY | +30 (register host tools) |
+
+**Success Metric:** `sovereign run "install firefox" --mode unrestricted` → approval prompt → installs → audit logged.
+
+---
+
+### 24.2: The Resurrector — Crash Recovery (Week 2)
+
+**Problem:** `Supervisor` (in `sk-kernel/src/supervisor.rs`) detects dead agents via heartbeat and restarts them, but fresh — all conversation history, tool state, and progress are lost.
+
+**Solution:** Add a `checkpoints` table to `MemorySubstrate`, periodic state snapshots, and checkpoint-aware restart in `Supervisor`.
+
+**Existing code to extend:**
+- `sk-kernel/src/supervisor.rs` — already has `check_health()` + `restart_agent()` (7,365 LOC)
+- `sk-memory/src/substrate.rs` — schema init, need 1 new table
+- `sk-memory/src/session.rs` — session save/load already works
+
+**Note on naming:** The existing "HEALER" is the context compactor (`compactor.rs`). This feature is the **Resurrector** — agent crash recovery — to avoid confusion.
+
+**Tasks:**
+- [ ] Add `checkpoints` table to `MemorySubstrate::initialize_schema()`:
+  ```sql
+  CREATE TABLE IF NOT EXISTS checkpoints (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      agent_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      agent_config TEXT NOT NULL,
+      tool_state TEXT DEFAULT '{}',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (agent_id) REFERENCES agents(id)
+  );
+  ```
+- [ ] Create `sk-memory/src/checkpoint.rs` — `CheckpointStore` with `save()`, `load_latest()`, `prune(keep_last: usize)`
+- [ ] Add periodic checkpoint call (every 30s) in agent loop background task
+- [ ] Modify `Supervisor::restart_agent()` → `Supervisor::resurrect_agent()`:
+  - Load latest checkpoint
+  - Restore session from checkpoint
+  - Inject system message: "[Resurrector] You were restarted from checkpoint. Previous session restored."
+  - Resume agent loop
+- [ ] Add `/resurrector` bot command to show resurrection history
+- [ ] Tests: Kill agent → verify auto-restart from checkpoint within 10s
+- [ ] Tests: Checkpoint pruning keeps only last 5
+
+**Files created/modified:**
+| File | Action | Lines |
+|------|--------|-------|
+| `sk-memory/src/checkpoint.rs` | NEW | ~200 |
+| `sk-memory/src/substrate.rs` | MODIFY | +15 (schema) |
+| `sk-memory/src/lib.rs` | MODIFY | +2 (pub mod) |
+| `sk-kernel/src/supervisor.rs` | MODIFY | +80 (resurrect logic) |
+| `sk-engine/src/agent_loop.rs` | MODIFY | +20 (checkpoint trigger) |
+
+**Success Metric:** Kill -9 an agent → Resurrector detects within 10s → restarts from last checkpoint → user sees "Resurrector revived agent-123".
+
+---
+
+### 24.3: Natural Language Builder (Week 3)
+
+**Problem:** `spawn_witch_skeleton` requires explicit `skeleton_name`, `task_description`, and `capabilities` list. `SetupWizard` generates manifests but isn't accessible from CLI. Users need to understand internal tool names to spawn agents.
+
+**Solution:** Enhance `SetupWizard` to use the LLM for task analysis — given a plain English description, automatically determine the right tools, mode, system prompt, and capabilities.
+
+**Existing code to extend:**
+- `sk-kernel/src/wizard.rs` — `SetupWizard::build_plan()` already exists
+- `sk-kernel/src/executor.rs` — `spawn_witch_skeleton` tool handler exists (lines 196-263)
+- `sk-types/src/config.rs` — `ExecutionMode` enum exists
+- `sk-kernel/src/cron.rs` — `CronScheduler` already handles scheduled execution
+
+**Tasks:**
+- [ ] Add `SetupWizard::build_from_natural_language()` — sends task to LLM, gets back:
+  - Recommended tools (from `AVAILABLE_TOOLS` constant)
+  - Execution mode (Sandbox/Unrestricted)
+  - Generated system prompt
+  - Suggested name
+- [ ] Enhance `spawn_witch_skeleton` to accept `mode_hint` parameter: `safe`, `full_access`, `scheduled`
+- [ ] For `scheduled` mode: auto-create `CronJob` via existing `CronScheduler`
+- [ ] Add `builder` tool that agents can call to spawn sub-agents via NL description
+- [ ] Tests: NL "monitor CPU" → spawns agent with `shell_exec` tool
+- [ ] Tests: NL "email me tomorrow" → spawns scheduled agent with cron job
+
+**Files created/modified:**
+| File | Action | Lines |
+|------|--------|-------|
+| `sk-kernel/src/wizard.rs` | MODIFY | +150 (NL builder) |
+| `sk-kernel/src/executor.rs` | MODIFY | +40 (mode hint, builder tool) |
+| `sk-types/src/config.rs` | MODIFY | +10 (ExecutionModeHint enum) |
+
+**Success Metric:** `sovereign run "Create an agent that monitors CPU and alerts if >90%"` → Builder analyzes → spawns Cottage agent with `shell_exec` → agent starts.
+
+---
+
+### 24.4: Simplified CLI — `sovereign run` (Week 3)
+
+**Problem:** Current CLI requires multi-step workflow: `sovereign daemon start` → `sovereign hands activate` → `sovereign chat`. Too complex for one-shot tasks.
+
+**Solution:** Add `sovereign run "task"` command that wraps the NL Builder + agent spawn into a single ergonomic command.
+
+**Existing code to extend:**
+- `sk-cli/src/main.rs` — Clap command definitions
+- `sk-kernel/src/wizard.rs` — (enhanced in 24.3)
+
+**Tasks:**
+- [ ] Add `Run` subcommand to CLI:
+  ```
+  sovereign run "task description" [--mode sandbox|unrestricted|auto] [--schedule "cron or NL time"]
+  ```
+- [ ] `--mode auto` (default): LLM determines Sandbox vs Unrestricted based on task
+- [ ] `--schedule`: Parses NL time ("tomorrow 9am", "every Monday") via LLM, creates CronJob
+- [ ] Add `sovereign status` command (list all active agents, village state)
+- [ ] Add `sovereign kill <id>` command (stop agent by ID)
+- [ ] Update `--help` text with village terminology
+
+**Files created/modified:**
+| File | Action | Lines |
+|------|--------|-------|
+| `sk-cli/src/main.rs` | MODIFY | +80 (run/status/kill commands) |
+| `sk-cli/src/commands/run.rs` | NEW | ~120 |
+
+**Success Metric:**
+```
+sovereign run "Calculate monthly expenses from CSV"          # Sandbox
+sovereign run "Clean up temp files" --mode unrestricted      # Manor + approval
+sovereign run "Message mom good morning" --schedule "09:00"  # Alarm
+sovereign status                                             # List all agents
+```
+
+---
+
+### Phase 24 Summary
+
+| Sub-Phase | Week | New Files | Modified Files | Est. LOC |
+|-----------|------|-----------|----------------|----------|
+| 24.1 Host Tools | 1 | 5 | 2 | ~810 |
+| 24.2 Resurrector | 2 | 1 | 4 | ~320 |
+| 24.3 NL Builder | 3 | 0 | 3 | ~200 |
+| 24.4 Simplified CLI | 3 | 1 | 1 | ~200 |
+| **Total** | **3 weeks** | **7** | **10** | **~1,530** |
+
+**Overall Success Metric — The Village Test:**
+```bash
+# 1. Sandbox (Cottage): Safe task
+sovereign run "Read my todo.txt and summarize it"
+
+# 2. Unrestricted (Manor): Dangerous task with approval
+sovereign run "Delete ~/temp/old_files" --mode unrestricted
+# → Elder shows approval dialog → User approves → Executes → Audit logged
+
+# 3. Scheduled (Alarm): Timed task
+sovereign run "Check disk space" --schedule "every 6 hours"
+# → Creates cron job → Agent wakes, checks, reports
+
+# 4. Resurrector: Crash recovery
+# Kill -9 an agent → Resurrector revives from checkpoint within 10s
+
+# 5. Builder: Natural language agent creation
+sovereign run "Create agent that monitors CPU and alerts if >90%"
+# → Analyzes → Spawns Cottage with shell_exec → Runs autonomously
+```
+
+**Timeline: 3 weeks from execution start**
+
+---
+
 # 4. CODE STRUCTURE & FILE ORGANIZATION
 
 *(See full architecture details for expected hierarchy spanning `crates/`, `docs/`, `scripts/`, etc. as defined during project scaffold).*
@@ -739,6 +1002,34 @@ User sees results (Web UI / Chat / CLI)
 - **Orchestration**: Docker Compose, Kubernetes
 - **CI/CD**: GitHub Actions (cross-platform matrix)
 - **Monitoring**: Prometheus (metrics), Grafana (dashboards)
+
+---
+
+# PHASE 24: THE VILLAGE — AGENT ECOSYSTEM ✅ COMPLETE
+> **Status**: All 4 sub-phases implemented and compiling.
+
+## 24.1: Host Tools & Unrestricted Tooling ✅
+- Created `sk-tools/src/host/` with 4 modules: `desktop_control`, `system_config`, `app_installer`, `file_full`
+- Registered host tools in executor with mode-dependent loading (Unrestricted only)
+- Added 3-tier risk classification in `approval.rs`: Low (auto-approve) → Medium (warn) → High/Critical (explicit approval)
+
+## 24.2: The Resurrector (Crash Recovery) ✅
+- Added `checkpoints` table to memory substrate schema
+- Implemented `CheckpointStore` (`sk-memory/src/checkpoint.rs`) with save/load/prune/list
+- Added periodic checkpoint trigger in `agent_loop.rs` (every 30 seconds)
+- Enhanced `Supervisor` with resurrection logic — auto-restarts agents from last checkpoint
+
+## 24.3: Natural Language Builder ✅
+- Enhanced `SetupWizard` with `analyze_task_intent()` — LLM-powered task analysis
+- Added `mode_hint` to `spawn_witch_skeleton` (safe/full_access/scheduled)
+- Implemented `builder` tool for creating agents from natural language descriptions
+
+## 24.4: Simplified CLI ✅
+- `sovereign run "<task>"` — Natural language task execution with auto mode detection
+- `sovereign run "<task>" --schedule "0 9 * * 1"` — Cron scheduling
+- `sovereign status` — Village overview with agent listing
+- `sovereign kill <id>` — Agent termination
+- `list_agents()` method on `MemorySubstrate` for agent enumeration
 
 ---
 

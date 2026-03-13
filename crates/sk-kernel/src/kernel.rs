@@ -6,7 +6,7 @@ use sk_soul::SoulIdentity;
 use sk_types::config::KernelConfig;
 use sk_types::{SovereignError, SovereignResult};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, warn};
 
 /// The Sovereign Kernel — top-level king.
 pub struct SovereignKernel {
@@ -242,7 +242,7 @@ impl SovereignKernel {
     ) -> SovereignResult<sk_engine::agent_loop::AgentLoopResult> {
         let system_prompt = self.soul.to_system_prompt_fragment();
 
-        let agent_config = crate::executor::create_agent_config(
+        let mut agent_config = crate::executor::create_agent_config(
             self.clone(),
             self.driver.clone(),
             system_prompt,
@@ -251,6 +251,17 @@ impl SovereignKernel {
             self.browser.clone(),
             self.skills.clone(),
         );
+
+        let k = self.clone();
+        let aid = session.agent_id;
+        let sid = session.id;
+        // AgentLoopConfig contains non-serializable fields (Box<dyn...>), so we pass Null for now.
+        // In a future version, we would save the original AgentManifest.
+        let config_value = serde_json::Value::Null;
+
+        agent_config.checkpoint_handler = Some(Box::new(move |_sess| {
+            k.memory.checkpoint.save(&aid, &sid.0, &config_value, &serde_json::Value::Null)
+        }));
 
         let result = sk_engine::agent_loop::run_agent_loop(agent_config, session, input)
             .await
@@ -262,6 +273,70 @@ impl SovereignKernel {
         }
 
         Ok(result)
+    }
+
+    /// Resurrect an agent from its latest checkpoint.
+    pub async fn resurrect_agent(
+        self: &Arc<Self>,
+        agent_id: sk_types::AgentId,
+    ) -> SovereignResult<()> {
+        info!(agent_id = %agent_id, "Resurrector: Attempting to resurrect agent");
+
+        // 1. Load latest checkpoint
+        let checkpoint = match self.memory.checkpoint.load_latest(&agent_id)? {
+            Some(cp) => cp,
+            None => {
+                warn!(agent_id = %agent_id, "Resurrector: No checkpoint found for agent");
+                return Ok(());
+            }
+        };
+
+        // 2. Restore session
+        let mut session = match self.memory.sessions.load(sk_types::SessionId(checkpoint.session_id))? {
+            Some(s) => s,
+            None => {
+                warn!(session_id = %checkpoint.session_id, "Resurrector: Session for checkpoint not found. Creating new empty session.");
+                sk_types::Session::new(agent_id)
+            }
+        };
+
+        // 3. Inject resurrection notification
+        session.push_message(sk_types::Message::system(
+            "[Resurrector] SYSTEM: Critical failure recovered. Auto-restarted from latest checkpoint. Please verify your last state and continue."
+        ));
+
+        // 4. Re-run agent loop with restored config
+        let system_prompt = self.soul.to_system_prompt_fragment();
+        
+        let mut agent_config = crate::executor::create_agent_config(
+            self.clone(),
+            self.driver.clone(),
+            system_prompt,
+            self.model_name.clone(),
+            agent_id,
+            self.browser.clone(),
+            self.skills.clone(),
+        );
+
+        let k = self.clone();
+        let aid = session.agent_id;
+        let sid = session.id;
+        // In this phase, we use Null for config_value to satisfy type requirements.
+        let config_value = serde_json::Value::Null;
+
+        agent_config.checkpoint_handler = Some(Box::new(move |_sess| {
+            k.memory.checkpoint.save(&aid, &sid.0, &config_value, &serde_json::Value::Null)
+        }));
+
+        // Trigger loop continuation
+        let _ = sk_engine::agent_loop::run_agent_loop(agent_config, &mut session, "System: Please continue where you left off.")
+            .await?;
+
+        // Save session after resurrection
+        let _ = self.memory.sessions.save(&session);
+        
+        info!(agent_id = %agent_id, "Resurrector: Agent successfully resurrected");
+        Ok(())
     }
 
     /// Start background services, including the cron job executor.
@@ -305,10 +380,16 @@ impl SovereignKernel {
                             .is_ok()
                         {
                             tracing::info!(
-                                "Agent {} marked for restart by supervisor.",
+                                "Agent {} marked for restart by supervisor. Resurrecting...",
                                 status.name
                             );
-                            // A real system would enqueue a wake-up or reset the loop state here
+                            let k_clone = kernel.clone();
+                            let aid = status.agent_id;
+                            tokio::spawn(async move {
+                                if let Err(e) = k_clone.resurrect_agent(aid).await {
+                                    tracing::error!("Resurrection failed for agent {aid}: {e}");
+                                }
+                            });
                         } else {
                             tracing::error!(
                                 "Agent {} exceeded max restarts. Suspending.",

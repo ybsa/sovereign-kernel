@@ -37,6 +37,8 @@ pub struct MemorySubstrate {
     pub audit: AuditStore,
     /// BM25 full-text search index.
     pub bm25: Bm25Index,
+    /// State checkpoints for crash recovery (Resurrector).
+    pub checkpoint: crate::checkpoint::CheckpointStore,
     /// Memory decay rate for temporal scoring.
     decay_rate: f32,
 }
@@ -60,6 +62,7 @@ impl MemorySubstrate {
         let sessions = SessionStore::new(Arc::clone(&conn));
         let audit = AuditStore::new(Arc::clone(&conn));
         let bm25 = Bm25Index::new(Arc::clone(&conn));
+        let checkpoint = crate::checkpoint::CheckpointStore::new(Arc::clone(&conn));
 
         let substrate = Self {
             conn,
@@ -70,6 +73,7 @@ impl MemorySubstrate {
             sessions,
             audit,
             bm25,
+            checkpoint,
             decay_rate,
         };
 
@@ -96,6 +100,7 @@ impl MemorySubstrate {
         let sessions = SessionStore::new(Arc::clone(&conn));
         let audit = AuditStore::new(Arc::clone(&conn));
         let bm25 = Bm25Index::new(Arc::clone(&conn));
+        let checkpoint = crate::checkpoint::CheckpointStore::new(Arc::clone(&conn));
 
         let substrate = Self {
             conn,
@@ -106,6 +111,7 @@ impl MemorySubstrate {
             sessions,
             audit,
             bm25,
+            checkpoint,
             decay_rate,
         };
 
@@ -218,6 +224,17 @@ impl MemorySubstrate {
                 previous_hash TEXT NOT NULL
             );
             CREATE INDEX IF NOT EXISTS idx_audit_agent ON audit_logs(agent_id);
+ 
+             -- State Checkpoints (for Resurrector crash recovery)
+             CREATE TABLE IF NOT EXISTS checkpoints (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 agent_id TEXT NOT NULL,
+                 session_id TEXT NOT NULL,
+                 agent_config TEXT NOT NULL DEFAULT '{}',
+                 tool_state TEXT DEFAULT '{}',
+                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
+             );
+             CREATE INDEX IF NOT EXISTS idx_checkpoints_agent ON checkpoints(agent_id);
             ",
         )
         .map_err(|e| SovereignError::Memory(format!("Schema init failed: {e}")))?;
@@ -233,6 +250,53 @@ impl MemorySubstrate {
     /// Get a reference to the shared database connection.
     pub fn conn(&self) -> &Arc<Mutex<Connection>> {
         &self.conn
+    }
+
+    /// List all agents registered in the system.
+    pub fn list_agents(&self) -> SovereignResult<Vec<sk_types::AgentEntry>> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
+        
+        let mut stmt = conn.prepare(
+            "SELECT id, manifest, created_at, last_active FROM agents ORDER BY last_active DESC"
+        ).map_err(|e| SovereignError::Memory(e.to_string()))?;
+
+        let rows = stmt.query_map([], |row| {
+            let id_str: String = row.get(0)?;
+            let manifest_json: String = row.get(1)?;
+            let created_at: String = row.get(2)?;
+            let last_active: String = row.get(3)?;
+
+            Ok((id_str, manifest_json, created_at, last_active))
+        }).map_err(|e| SovereignError::Memory(e.to_string()))?;
+
+        let mut agents = Vec::new();
+        for row in rows {
+            let (id_str, manifest_json, created_at, last_active) = row.map_err(|e| SovereignError::Memory(e.to_string()))?;
+            
+            let id = id_str.parse().map_err(|_| SovereignError::Internal("Invalid AgentID in DB".into()))?;
+            let manifest: sk_types::AgentManifest = serde_json::from_str(&manifest_json).map_err(|e| SovereignError::Internal(e.to_string()))?;
+            
+            agents.push(sk_types::AgentEntry {
+                id,
+                name: manifest.name.clone(),
+                manifest: manifest.clone(),
+                state: sk_types::agent::AgentState::Created,
+                mode: sk_types::AgentMode::Full,
+                created_at: chrono::DateTime::parse_from_rfc3339(&created_at).map(|dt| dt.with_timezone(&chrono::Utc)).unwrap_or_else(|_| chrono::Utc::now()),
+                last_active: chrono::DateTime::parse_from_rfc3339(&last_active).map(|dt| dt.with_timezone(&chrono::Utc)).unwrap_or_else(|_| chrono::Utc::now()),
+                parent: None,
+                children: vec![],
+                session_id: sk_types::agent::SessionId::new(), // Transient for status
+                tags: manifest.tags.clone(),
+                identity: Default::default(),
+                onboarding_completed: true,
+                onboarding_completed_at: None,
+            });
+        }
+        Ok(agents)
     }
 }
 

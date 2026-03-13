@@ -34,6 +34,7 @@ pub fn create_agent_config(
         sk_tools::scheduler::schedule_delete_tool(),
     ];
     tools.extend(sk_tools::browser_tools::browser_tools());
+    tools.extend(sk_tools::host::host_tools());
     tools.push(sk_tools::skills::get_skill_tool());
     tools.push(sk_tools::skills::list_skills_tool());
     tools.push(sk_tools::ottos_outpost::ottos_outpost_tool());
@@ -67,15 +68,28 @@ pub fn create_agent_config(
 
     tools.push(sk_types::ToolDefinition {
         name: "spawn_witch_skeleton".into(),
-        description: "Dynamically spawn a background witch_skeleton. It will run in Sandbox mode and will ask the user for permission on actions. You can continue working while it runs. Use check_witch_skeleton to see its status.".into(),
+        description: "Dynamically spawn a background witch_skeleton. It will run in Sandbox mode by default. You can continue working while it runs. Use check_witch_skeleton to see its status.".into(),
         input_schema: serde_json::json!({
             "type": "object",
             "properties": {
                 "skeleton_name": { "type": "string", "description": "Name of the skeleton (e.g. 'researcher')" },
                 "task_description": { "type": "string", "description": "What the skeleton should do. Provide complete details and goals." },
-                "capabilities": { "type": "array", "items": { "type": "string" }, "description": "Capabilities the skeleton needs (e.g. 'web', 'file_read', 'browser')" }
+                "capabilities": { "type": "array", "items": { "type": "string" }, "description": "Capabilities the skeleton needs (e.g. 'web', 'file_read', 'browser')" },
+                "mode_hint": { "type": "string", "enum": ["safe", "unrestricted", "scheduled"], "description": "Execution mode hint. 'safe' is forced sandbox. 'unrestricted' allows host access tools (requires approval). 'scheduled' creates a persistent cron job." }
             },
             "required": ["skeleton_name", "task_description", "capabilities"]
+        }),
+    });
+
+    tools.push(sk_types::ToolDefinition {
+        name: "builder".into(),
+        description: "Transform a natural language task into a spawned agent village member. The kernel will automatically analyze the task, determine necessary tools, and set appropriate security modes.".into(),
+        input_schema: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "task": { "type": "string", "description": "The mission for the agent (e.g. 'Monitor my CPU and notify me if it exceeds 90% for a minute')" }
+            },
+            "required": ["task"]
         }),
     });
 
@@ -102,6 +116,8 @@ pub fn create_agent_config(
         model: model_name,
         max_tokens: 4096,
         temperature: 0.7,
+        stream_handler: None,
+        checkpoint_handler: None,
         tool_executor: Box::new(move |tool_call| {
             let kernel = k.clone();
             let browser = b.clone();
@@ -213,6 +229,8 @@ pub fn create_agent_config(
                             })
                             .unwrap_or_default();
 
+                        let mode_hint = args.get("mode_hint").and_then(|v| v.as_str());
+
                         let intent = crate::wizard::AgentIntent {
                             name: skeleton_name.to_string(),
                             description: format!("Temporary skeleton for manager {}", aid),
@@ -222,17 +240,21 @@ pub fn create_agent_config(
                             scheduled: false,
                             schedule: None,
                             capabilities: caps,
+                            mode: mode_hint.map(|s| s.to_string()),
                         };
 
                         let _plan = crate::wizard::SetupWizard::build_plan(intent);
                         let skeleton_id = sk_types::AgentId::new();
 
-                        // Per User request, FORCED to Sandbox mode.
-                        let _ = kernel.memory.structured.set(
-                            skeleton_id,
-                            "forced_sandbox",
-                            serde_json::Value::Bool(true),
-                        );
+                        // If mode_hint is 'unrestricted', we DON'T force sandbox.
+                        let is_unrestricted = mode_hint == Some("unrestricted");
+                        if !is_unrestricted {
+                            let _ = kernel.memory.structured.set(
+                                skeleton_id,
+                                "forced_sandbox",
+                                serde_json::Value::Bool(true),
+                            );
+                        }
 
                         // Create initialization session
                         let mut skeleton_session = sk_types::Session::new(skeleton_id);
@@ -291,6 +313,34 @@ pub fn create_agent_config(
                                 "Invalid skeleton_id format".into(),
                             ))
                         }
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "builder" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let task_str = args.get("task").and_then(|v| v.as_str()).unwrap_or("");
+                        let _k = kernel.clone();
+                        let model_name = kernel.model_name.clone();
+                        let driver = kernel.driver.clone();
+
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(async {
+                                let intent = crate::wizard::SetupWizard::analyze_task_intent(driver, &model_name, task_str).await?;
+                                let plan = crate::wizard::SetupWizard::build_plan(intent);
+                                
+                                Ok(format!(
+                                    "I have analyzed your request and prepared a setup plan:\n\n{}\n\nTo spawn this agent, use the `spawn_witch_skeleton` tool with the following parameters:\n- skeleton_name: {}\n- task_description: {}\n- capabilities: {:?}\n- mode_hint: {}",
+                                    plan.summary,
+                                    plan.intent.name,
+                                    plan.intent.task,
+                                    plan.intent.capabilities,
+                                    plan.intent.mode.as_deref().unwrap_or("safe")
+                                ))
+                            })
+                        })
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -1101,6 +1151,71 @@ pub fn create_agent_config(
                         ))
                     }
                 }
+                "host_read_file" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                        sk_tools::host::file_full::handle_host_read_file(path)
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "host_write_file" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                        let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
+                        let append = args.get("append").and_then(|v| v.as_bool()).unwrap_or(false);
+                        sk_tools::host::file_full::handle_host_write_file(path, content, append)
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "host_list_dir" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
+                        sk_tools::host::file_full::handle_host_list_dir(path)
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "host_desktop_control" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("");
+                        let value = args.get("value").and_then(|v| v.as_str()).unwrap_or("");
+                        sk_tools::host::desktop_control::handle_desktop_control(action, value)
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "host_system_config" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("");
+                        let target = args.get("target").and_then(|v| v.as_str());
+                        let value = args.get("value").and_then(|v| v.as_str());
+                        sk_tools::host::system_config::handle_system_config(action, target, value)
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "host_install_app" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let package_id = args.get("package_id").and_then(|v| v.as_str()).unwrap_or("");
+                        sk_tools::host::app_installer::handle_app_installer(package_id)
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
                 "list_skills" => {
                     let locks = skills.clone();
                     tokio::task::block_in_place(|| {
@@ -1282,7 +1397,6 @@ edition = "2021"
                 }
             }
         }),
-        stream_handler: None,
     }
 }
 

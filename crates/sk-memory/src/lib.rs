@@ -11,6 +11,7 @@
 
 pub mod audit;
 pub mod bm25;
+pub mod checkpoint;
 pub mod consolidation;
 pub mod embedding;
 pub mod hybrid;

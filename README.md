@@ -1,9 +1,10 @@
 <p align="center">
   <img src="https://img.shields.io/badge/language-Rust-orange?style=flat-square" alt="Rust" />
   <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT" />
-  <img src="https://img.shields.io/badge/status-Phase%2020%20Complete-brightgreen?style=flat-square" alt="Status" />
+  <img src="https://img.shields.io/badge/status-Phase%2024%20Complete-brightgreen?style=flat-square" alt="Status" />
   <img src="https://img.shields.io/badge/hands-10%20Bundled-brightgreen?style=flat-square" alt="Hands" />
   <img src="https://img.shields.io/badge/security-Merkle%20Audit%20Trail-brightgreen?style=flat-square" alt="Security" />
+  <img src="https://img.shields.io/badge/village-Agent%20Ecosystem-blueviolet?style=flat-square" alt="Village" />
 </p>
 
 # Sovereign Kernel: The Agentic Operating System
@@ -20,7 +21,10 @@ It is not just a framework — it is the mediation layer between Autonomous Enti
 ## 🎯 What It Does
 
 - **Runs agents 24/7** as background OS daemons with heartbeat monitoring and auto-restart
+- **Spawns agents from natural language** — describe a task, the Builder creates the right agent automatically
 - **Executes laboratory tools safely** — shell, file, code, web, browser — with capability gates and sandbox policy
+- **Full host access** — desktop control, system config, app installation (with approval gates)
+- **Crash recovery** — The Resurrector auto-restarts dead agents from their last checkpoint
 - **Remembers everything** via a hybrid SQLite + BM25 vector memory substrate across sessions
 - **Optimizes token usage** with "The Healer" (Smart Truncation & Ground-Truth Context Compaction)
 - **Executes safely** in native environments or isolated **Docker sandboxes**
@@ -70,18 +74,23 @@ cargo run -p sk-cli -- hands list
 ## ⚡ CLI Commands
 
 ```
-sovereign init                       # First-run setup wizard
-sovereign chat                       # Interactive agent REPL
-sovereign start                      # Start as background daemon
-sovereign status                     # Check daemon status
-sovereign stop                       # Stop the daemon
-sovereign dashboard [--port 8080]    # Open terminal web dashboard
-sovereign hands list                 # List all 10 bundled hands
-sovereign hands activate <name>      # Start a hand's autonomous agent
-sovereign hands status               # Show running hand instances
-sovereign hands deactivate <id>      # Stop a hand instance
-sovereign audit logs                 # View cryptographic audit trail
-sovereign audit verify               # Verify Merkle chain integrity
+sovereign init                                  # First-run setup wizard
+sovereign chat                                  # Interactive agent REPL
+sovereign start                                 # Start as background daemon
+sovereign run "<task>"                           # Run a task autonomously
+sovereign run "<task>" --mode unrestricted       # Run with full host access
+sovereign run "<task>" --schedule "0 9 * * 1"    # Schedule a recurring task
+sovereign status                                # Village overview (agents + jobs)
+sovereign kill <agent-id>                       # Kill a specific agent
+sovereign kill                                  # Stop the daemon
+sovereign stop                                  # Stop the daemon (legacy)
+sovereign dashboard [--port 8080]               # Open terminal web dashboard
+sovereign hands list                            # List all 10 bundled hands
+sovereign hands activate <name>                 # Start a hand's autonomous agent
+sovereign hands status                          # Show running hand instances
+sovereign hands deactivate <id>                 # Stop a hand instance
+sovereign audit logs                            # View cryptographic audit trail
+sovereign audit verify                          # Verify Merkle chain integrity
 ```
 
 ---
@@ -129,19 +138,20 @@ sovereign dashboard --no-open    # Don't auto-open browser
 
 ---
 
-## 🤖 Multi-Agent Coordination (Phase 15)
+## 🏘️ The Village — Agent Ecosystem (Phase 24)
 
-Sovereign Kernel now supports **swarm intelligence** — agents can communicate, delegate tasks, and share knowledge.
+Sovereign Kernel is a living **Agent Village** — agents can communicate, delegate tasks, recover from crashes, and be spawned from plain English.
 
-| Feature | Laboratory Tool | Description |
-|---------|------|-------------|
-| **Agent Messaging** | `agent_message` | Send direct messages between agents via the Inter-Agent Bus |
-| **Witch Skeleton Spawning** | `spawn_witch_skeleton` | Dynamically spawn sandboxed witch skeleton agents for parallel tasks |
-| **Witch Status** | `check_witch_skeleton` | Poll the status and results of spawned witch skeletons |
-| **Shared Memory Store** | `shared_memory_store` | Store facts globally for all authorized agents |
-| **Shared Memory Recall** | `shared_memory_recall` | Search the global knowledge pool |
+| Feature | Tool / System | Description |
+|---------|---------------|-------------|
+| **Natural Language Builder** | `builder` | Describe a task in English → kernel auto-creates the right agent |
+| **Agent Messaging** | `agent_message` | Direct messages between agents via the Inter-Agent Bus |
+| **Witch Skeleton Spawning** | `spawn_witch_skeleton` | Dynamically spawn sandboxed agents for parallel tasks |
+| **Crash Recovery** | Resurrector | Auto-restart dead agents from their last checkpoint |
+| **Host Tools** | `host_*` | Desktop control, system config, app installation (with approval) |
+| **Shared Memory** | `shared_memory_store/recall` | Global knowledge pool across all authorized agents |
 
-> **Security**: All spawned witch skeletons are **forced into Sandbox mode** — they must ask the user for permission on every action, regardless of the parent agent's mode.
+> **Security**: Spawned agents are **forced into Sandbox mode** by default. Unrestricted mode requires explicit `--mode unrestricted` and approval gates.
 
 ---
 
@@ -182,6 +192,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deep dive.
 | 21 | ✅ Complete | Self-Refactoring & P2P Skill Graph |
 | 22 | ⏳ Planned | Full GUI & Screen Control (browser, screenshots, desktop automation) |
 | 23 | ⏳ Planned | Universal Cross-Platform (Windows, Linux, macOS, Raspberry Pi, ARM) |
+| **24** | **✅ Complete** | **The Village: Host Tools, Resurrector, NL Builder, Simplified CLI** |
 
 ---
 

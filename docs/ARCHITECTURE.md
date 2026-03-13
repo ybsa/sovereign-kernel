@@ -23,6 +23,9 @@ The OS monitor that manages agent lifecycles and system-level concerns.
 - Config hot-reload without daemon restart
 - **Inter-Agent Bus** (`bus.rs`): Persistent message routing between agents
 - **Worker Spawning**: Dynamic sub-agent creation with forced Sandbox mode
+- **Natural Language Builder** (`wizard.rs`): LLM-powered task analysis → automatic agent creation from plain English
+- **The Resurrector** (`supervisor.rs`): Crash recovery via periodic checkpointing and automatic agent resurrection
+- **Host Tool Orchestration**: Desktop control, system config, app installation with 3-tier risk approval
 - OpenAI-compatible `/v1/chat/completions` API bridge
 - Pairing/auth system for secure remote agent access
 
@@ -34,6 +37,7 @@ A unified memory system for persistent agent state.
 - **SQLite** for sessions, key-value store, and audit logs
 - **BM25 full-text search** for semantic memory recall
 - **Knowledge Graph** for entity-relation storage
+- **Checkpoint Store** (`checkpoint.rs`): Periodic agent state snapshots for crash recovery
 - **Shared Semantic Memory** (`shared.rs`): Global knowledge pool accessible across all authorized agents
 - **Cryptographic Merkle Audit Trail** — every action is SHA-256 chained; any tampering is detectable
 
@@ -47,6 +51,7 @@ Implements the concrete action handlers available to agents.
 - **Web Hand** (`web_fetch.rs`): Fetches web pages via `reqwest` with automatic HTML-to-text stripping and response truncation.
 - **Code Hand** (`code_exec.rs`): Sandboxed script runner for Python, Node.js, and Bash with configurable timeouts and policy gating.
 - **Scheduler Hand** (`scheduler.rs`): Exposes `schedule_create`, `schedule_list`, and `schedule_delete` for autonomous time-based triggers.
+- **Host Tools** (`host/`): Desktop control, system configuration, app installation, and full filesystem access with 3-tier risk classification (Low/Medium/High/Critical approval gates).
 - **Skills System**: Dynamic registry of **52 expert skills** (Obsidian, GitHub, Weather, etc.) parsed from `SKILL.md` files — on-demand instructions without prompt bloat.
 
 ### 8. `sk-hands` — Autonomous Capability Packages
@@ -77,7 +82,10 @@ sovereign hands status
 
 ### 10. `sk-cli` — The Shell + Dashboard
 The user-facing binary (`sovereign`) and the embedded terminal web dashboard.
-- **CLI**: `init`, `chat`, `start`, `stop`, `status`, `hands`, `audit`, `dashboard` subcommands
+- **CLI**: `init`, `chat`, `start`, `stop`, `run`, `status`, `kill`, `hands`, `audit`, `dashboard` subcommands
+- **`sovereign run`**: Natural language task execution with auto mode detection and cron scheduling
+- **`sovereign status`**: Village overview showing all agents and scheduled jobs
+- **`sovereign kill`**: Agent termination and daemon control
 - **Dashboard**: Full Axum HTTP server with embedded frontend (no Node.js required)
   - Terminal aesthetic: jet black, Geist Mono, green/cyan/amber accents
   - Three-pane layout: agents/hands panel | live log stream | command bar
@@ -86,23 +94,28 @@ The user-facing binary (`sovereign`) and the embedded terminal web dashboard.
 
 ---
 
-## 🤖 Multi-Agent Coordination
+## 🏘️ The Village — Agent Ecosystem
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | **Inter-Agent Bus** | `sk-kernel/src/bus.rs` | Persistent message routing — messages saved to target agent's SQLite session |
 | **Worker Spawning** | `sk-kernel/src/executor.rs` | Dynamic sub-agent creation via `SetupWizard`, auto-forced to Sandbox mode |
+| **NL Builder** | `sk-kernel/src/wizard.rs` | `analyze_task_intent()` — LLM-powered task analysis for automatic agent creation |
+| **Resurrector** | `sk-kernel/src/supervisor.rs` | Periodic checkpointing + crash recovery from last saved state |
+| **Checkpoint Store** | `sk-memory/src/checkpoint.rs` | SQLite checkpoint table for agent state persistence |
+| **Host Tools** | `sk-tools/src/host/` | Desktop control, system config, app installer, full file access |
+| **Safety Gate** | `sk-kernel/src/approval.rs` | 3-tier risk classification: Low/Medium/High/Critical with approval gates |
 | **Shared Memory** | `sk-memory/src/shared.rs` | Global `global_knowledge` table accessible by agents with `SharedMemory` capability |
 | **Capability Gate** | `sk-types/src/capability.rs` | `Capability::SharedMemory` controls access to the global knowledge pool |
 
 ```
-Manager Agent
-    ├── spawn_witch_skeleton("researcher", "Find X")
-    │       └── Worker Agent (Sandbox Mode)
-    │           ├── web_search("X")
-    │           └── agent_message(manager_id, "Found X: ...")
-    └── check_witch_skeleton(witch_id)
-            └── "Status: completed"
+User: "sovereign run 'Research quantum computing trends'"
+    └── NL Builder analyzes task intent
+        └── Spawns researcher agent (Sandbox Mode)
+            ├── web_search("quantum computing trends 2026")
+            ├── web_fetch(url)
+            └── Returns structured summary
+                └── [Resurrector checkpoints every 30s]
 ```
 
 ---

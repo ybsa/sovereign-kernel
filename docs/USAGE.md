@@ -19,8 +19,12 @@ Sets up your LLM API key, execution mode, and agent identity.
 |---------|-------------|
 | `sovereign chat` | Interactive terminal REPL |
 | `sovereign start` | Start as background daemon |
-| `sovereign status` | Check if daemon is running |
-| `sovereign stop` | Stop the daemon |
+| `sovereign run "<task>"` | Run a task autonomously (NL Builder auto-detects mode) |
+| `sovereign run "<task>" --schedule "..."` | Schedule a recurring cron task |
+| `sovereign status` | Village overview — agents, jobs, daemon status |
+| `sovereign kill <agent-id>` | Kill a specific agent |
+| `sovereign kill` | Stop the daemon |
+| `sovereign stop` | Stop the daemon (legacy) |
 | `sovereign dashboard` | Open terminal web dashboard |
 | `sovereign hands list` | List all 10 bundled hands |
 | `sovereign audit logs` | View cryptographic audit trail |
@@ -145,6 +149,12 @@ sovereign --config config.unrestricted.toml chat
 | `check_witch_skeleton` | Check the status of a spawned witch_skeleton |
 | `shared_memory_store` | Store facts in global shared memory |
 | `shared_memory_recall` | Search the global shared knowledge pool |
+| `builder` | Create an agent from a natural language task description |
+| `host_desktop_control` | Change wallpaper, toggle dark mode, OS notifications (Unrestricted) |
+| `host_system_config` | Read/edit system configs, manage services (Unrestricted) |
+| `host_install_app` | Install apps via winget/apt/brew (Unrestricted, Critical risk) |
+| `host_read_file` / `host_write_file` | Full filesystem access outside sandbox (Unrestricted) |
+| `host_list_dir` | List any directory on the host (Unrestricted) |
 
 ---
 
@@ -160,21 +170,31 @@ Audit entries include: agent ID, action type, timestamp, and SHA-256 chained has
 
 ---
 
-## 🤖 Multi-Agent Coordination
+## 🏘️ The Village — Agent Ecosystem
 
-Agents can now communicate, delegate tasks, and share knowledge across the swarm.
+Sovereign Kernel is a living **Agent Village** — agents communicate, delegate, recover from crashes, and can be spawned from plain English.
 
-### Agent Messaging
-Agents send direct messages to each other via the **Inter-Agent Bus**. Messages are persisted in the recipient's session — they'll see them on their next activation.
+### Natural Language Builder
+Instead of writing agent manifests, just describe what you want:
+```bash
+sovereign run "Monitor my inbox and summarize new emails every hour"
+```
+The kernel auto-detects the right tools, mode, and scheduling.
 
-### Witch Skeleton Spawning
-A manager agent can spawn a background witch_skeleton for parallel tasks:
-- Skeletons are **forced into Sandbox mode** — every action requires your approval
-- Use `check_witch_skeleton` to poll the skeleton's progress
-- Skeletons message results back to the manager via `agent_message`
+### Crash Recovery (The Resurrector)
+Agents save checkpoints every 30 seconds. If an agent crashes, the Supervisor automatically restarts it from the last checkpoint with a `[Resurrector] Restarted from checkpoint` system message.
 
-### Shared Memory
-Agents with the `SharedMemory` capability can store and recall facts from a global knowledge pool, enabling cross-agent context sharing.
+### Host Tools (Unrestricted Mode)
+In unrestricted mode, agents gain full host access:
+- Desktop control (wallpaper, dark mode, notifications)
+- System configuration
+- App installation (`winget`/`apt`/`brew`)
+- Unrestricted filesystem access
+
+All host tools have **risk-tiered approval gates** (Low → Medium → High → Critical).
+
+### Agent Messaging & Spawning
+Agents send direct messages via the **Inter-Agent Bus**. Manager agents spawn sandboxed witch_skeletons for parallel tasks. Shared Memory enables cross-agent knowledge sharing.
 
 ---
 
