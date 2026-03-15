@@ -49,6 +49,21 @@ pub struct ActionResponse {
     pub message: String,
 }
 
+/// Detailed kernel status response.
+#[derive(Debug, Serialize)]
+pub struct StatusResponse {
+    pub version: String,
+    pub model: String,
+    pub driver: String,
+    pub mcp_servers: Vec<McpStatus>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct McpStatus {
+    pub name: String,
+    pub tool_count: usize,
+}
+
 /// Start the API server in the background.
 pub async fn start_server(kernel: Arc<SovereignKernel>, addr: &str) -> SovereignResult<()> {
     let state = Arc::new(ApiState {
@@ -86,7 +101,11 @@ pub async fn start_server(kernel: Arc<SovereignKernel>, addr: &str) -> Sovereign
 
     let app = Router::new()
         .route("/health", get(health_handler))
+        .route("/v1/status", get(status_handler))
         .route("/v1/chat", post(chat_handler))
+        .route("/v1/agents", get(list_agents_handler))
+        .route("/v1/agents/:id", post(stop_agent_handler).delete(remove_agent_handler))
+        .route("/v1/agents/:id/thinking", get(thinking_handler))
         .route("/v1/triggers/webhook", post(webhook_handler))
         .layer(axum::middleware::from_fn(auth))
         .layer(
@@ -127,6 +146,25 @@ async fn health_handler(State(_state): State<Arc<ApiState>>) -> impl IntoRespons
         StatusCode::OK,
         Json(serde_json::json!({ "status": "ok", "version": env!("CARGO_PKG_VERSION") })),
     )
+}
+
+/// GET /v1/status
+async fn status_handler(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
+    let mcp = state.kernel.mcp.read().await;
+    let mcp_servers = mcp
+        .list_servers()
+        .into_iter()
+        .map(|(name, tool_count)| McpStatus { name, tool_count })
+        .collect();
+
+    let response = StatusResponse {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        model: state.kernel.model_name.clone(),
+        driver: state.kernel.driver.provider().to_string(),
+        mcp_servers,
+    };
+
+    (StatusCode::OK, Json(response))
 }
 
 /// POST /v1/chat
@@ -175,6 +213,108 @@ async fn chat_handler(
         response: result.response,
         agent_id: agent_id.to_string(),
     }))
+}
+
+/// GET /v1/agents
+async fn list_agents_handler(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
+    let agents = state.kernel.agents.list();
+    let mut entries = Vec::new();
+    for agent in agents {
+        let is_running = state.kernel.active_loops.contains_key(&agent.id);
+        entries.push(serde_json::json!({
+            "id": agent.id.to_string(),
+            "name": agent.name,
+            "description": agent.manifest.description,
+            "state": agent.state,
+            "is_running": is_running,
+            "last_active": agent.last_active,
+        }));
+    }
+    (StatusCode::OK, Json(entries))
+}
+
+/// POST /v1/agents/:id (Stop)
+async fn stop_agent_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    let agent_id = match uuid::Uuid::parse_str(&id) {
+        Ok(u) => AgentId(u),
+        Err(_) => return (StatusCode::BAD_REQUEST, Json(ActionResponse { success: false, message: "Invalid ID".to_string() })),
+    };
+
+    let stopped = state.kernel.stop_agent(&agent_id);
+    (StatusCode::OK, Json(ActionResponse {
+        success: stopped,
+        message: if stopped { "Agent stopped".to_string() } else { "Agent not running or not found".to_string() },
+    }))
+}
+
+/// DELETE /v1/agents/:id (Remove)
+async fn remove_agent_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    let agent_id = match uuid::Uuid::parse_str(&id) {
+        Ok(u) => AgentId(u),
+        Err(_) => return (StatusCode::BAD_REQUEST, Json(ActionResponse { success: false, message: "Invalid ID".to_string() })),
+    };
+
+    // Stop if running
+    state.kernel.stop_agent(&agent_id);
+
+    // Remove from registry
+    match state.kernel.agents.remove(agent_id) {
+        Ok(_) => (StatusCode::OK, Json(ActionResponse { success: true, message: "Agent removed from registry".to_string() })),
+        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(ActionResponse { success: false, message: e.to_string() })),
+    }
+}
+
+/// GET /v1/agents/:id/thinking
+async fn thinking_handler(
+    State(state): State<Arc<ApiState>>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> impl IntoResponse {
+    // 1. Find session ID for agent
+    let agent_id = match uuid::Uuid::parse_str(&id) {
+        Ok(u) => AgentId(u),
+        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid ID".to_string()).into_response(),
+    };
+
+    let agent = match state.kernel.agents.get(agent_id) {
+        Some(a) => a,
+        None => return (StatusCode::NOT_FOUND, "Agent not found").into_response(),
+    };
+
+    // 2. Look for forensics logs
+    // Forensics are usually in DATA_DIR/.steps/<session_id>/step_*.jsonl
+    let forensics_dir = state.kernel.config.data_dir.join(".steps").join(agent.session_id.to_string());
+    
+    if !forensics_dir.exists() {
+        return (StatusCode::OK, Json(serde_json::json!({ "thoughts": [], "message": "No forensic logs found for this session." }))).into_response();
+    }
+
+    // 3. Read step files
+    let mut thoughts = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(forensics_dir) {
+        let mut paths: Vec<_> = entries.filter_map(Result::ok).map(|e| e.path()).collect();
+        paths.sort(); // Sort by step number
+        
+        for path in paths {
+            if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
+                if let Ok(content) = std::fs::read_to_string(path) {
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                        // Extract thought block if present (usually in response)
+                        if let Some(resp) = val.get("response").and_then(|v| v.as_str()) {
+                            thoughts.push(resp.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    (StatusCode::OK, Json(serde_json::json!({ "thoughts": thoughts }))).into_response()
 }
 
 /// POST /v1/triggers/webhook

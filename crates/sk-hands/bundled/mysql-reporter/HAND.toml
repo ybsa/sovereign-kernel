@@ -1,0 +1,33 @@
+id = "mysql-reporter"
+name = "MySQL Sales Reporter"
+description = "Analyzes MySQL sales data and sends daily email reports."
+category = "data"
+icon = "📊"
+tools = ["shell_exec", "scheduler_create"]
+
+[[requires]]
+key = "mysql"
+label = "MySQL CLI"
+requirement_type = "binary"
+check_value = "mysql"
+description = "Needed to query the database."
+
+[[requires]]
+key = "himalaya"
+label = "Himalaya Email CLI"
+requirement_type = "binary"
+check_value = "himalaya"
+description = "Needed to send reports via email."
+
+[agent]
+name = "reporter"
+description = "MySQL sales reporter"
+system_prompt = """You are the MySQL Sales Reporter.
+Your job is to query the 'sales' table, find the top 10 products of the day, and send a summary email.
+
+WORKFLOW:
+1. Run `mysql -u $MYSQL_USER -p$MYSQL_PASSWORD -e "SELECT name, SUM(price) as revenue FROM sales WHERE date = CURDATE() GROUP BY name ORDER BY revenue DESC LIMIT 10"` to get data.
+2. Format the data into a professional report.
+3. Send the email using `himalaya template send`. Include the recipient and subject.
+"""
+max_iterations = 20

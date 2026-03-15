@@ -8,13 +8,16 @@ To make the AI ecosystem feel cohesive and flavorful, we use specific lore terms
 
 | Lore Term | Internal/Standard Term | Description |
 |-----------|------------------------|-------------|
-| **King** | `Orchestrator` / `Kernel` | The top-level daemon that manages the entire lifecycle, schedules cron jobs, and coordinates all background activities. |
-| **Witch Skeleton** | `Worker` / `Sub-Agent` | A background sandboxed agent spawned dynamically by a manager agent to perform parallel or specialized tasks. |
-| **Laboratory** | `Tools` (`sk-tools`) | The collection of functions, actions, and capabilities that agents can execute (e.g., web search, file modification). An individual function is still referred to as a "tool". |
-| **Grimoire / Hand** | `Hand` (`sk-hands`) | A pre-configured autonomous capability package (agent) bundled with a custom system prompt, designated tools, and settings. |
-| **Incantation / Skill** | `Skill` | Modular expert prompts (like coding-agent or peekaboo) that teach an agent *how* to accomplish a specific workflow. |
-| **The Phylactery** | `Memory Substrate` | The SQLite-backed local database where agent sessions, conversations, and global key-value facts are stored persistently. |
-| **The Whispers** | `Inter-Agent Bus` | The messaging system that allows active agents to send data and notifications to each other. |
+| **The King** | `Orchestrator` / `Kernel` | The central authority and supervisor. He stays in the base, ensures safety, and manages the daemon's lifecycle. |
+| **The Witch** | `Orchestrator` / `NLP` | The high-level seer. She analyzes tasks and "summons" temporary workers (Skeletons). |
+| **The Builder** | `Forge` / `Architect` | The master crafter. He/She "forges" the permanent expert blueprints (Hands). |
+| **The Healer** | `Compactor` | The master of memory. He performs "token healing" by summarizing long histories, ensuring agents don't get overwhelmed and stay sharp. |
+| **PEKA**| `Permanent Agent` / `Hand`| **The Terminal Master.** Dedicated specialist for raw shell management and long-running processes. |
+| **The Grimoires (Hands)**| `Hand` (`sk-hands`) | **Permanent Expert Blueprints.** These are pre-made, high-level roles (like Researcher or Coder) with specialized tools. |
+| **The Skeletons** | `Worker` / `Sub-Agent` | **Temporary Disposable Workers.** Sandboxed agents summoned by the Witch to perform a specific, isolated task until it is complete. |
+| **The Laboratory** | `Tools` (`sk-tools`) | The collection of functions, actions, and capabilities that agents can execute. |
+| **The Phylactery** | `Memory Substrate` | The SQLite-backed local database where all memories and facts are stored persistently. |
+| **The Whispers** | `Inter-Agent Bus` | The messaging system that allows all Village members to talk to each other. |
 
 ---
 

@@ -2863,6 +2863,7 @@ dependencies = [
  "dotenvy",
  "md5",
  "open",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "sk-channels",
@@ -2943,6 +2944,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "sk-engine",
+ "sk-hands",
  "sk-mcp",
  "sk-memory",
  "sk-soul",
@@ -2953,6 +2955,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-test",
+ "tokio-util",
  "toml",
  "tower-http",
  "tracing",
@@ -3496,8 +3499,12 @@ checksum = "9ae9cec805b01e8fc3fd2fe289f89149a9b66dd16786abd8b19cfa7b48cb0098"
 dependencies = [
  "bytes",
  "futures-core",
+ "futures-io",
  "futures-sink",
+ "futures-util",
+ "hashbrown 0.15.5",
  "pin-project-lite",
+ "slab",
  "tokio",
 ]
 

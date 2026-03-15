@@ -4,8 +4,10 @@ use sk_mcp::McpRegistry;
 use sk_memory::MemorySubstrate;
 use sk_soul::SoulIdentity;
 use sk_types::config::KernelConfig;
-use sk_types::{SovereignError, SovereignResult};
+use sk_types::{SovereignError, SovereignResult, AgentId};
 use std::sync::Arc;
+use dashmap::DashMap;
+use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 /// The Sovereign Kernel — top-level king.
@@ -41,6 +43,12 @@ pub struct SovereignKernel {
         tokio::sync::RwLock<Option<Arc<dyn sk_types::scheduler::CronDeliveryHandler>>>,
     /// Docker sandbox container pool.
     pub sandbox_pool: Arc<sk_engine::runtime::docker_sandbox::ContainerPool>,
+    /// Global metering engine for cost tracking and budget enforcement.
+    pub metering: Arc<crate::metering::MeteringEngine>,
+    /// Global hand registry for managing capability packages.
+    pub hands: Arc<tokio::sync::RwLock<sk_hands::registry::HandRegistry>>,
+    /// Track active agent loops for cancellation/inspection.
+    pub active_loops: Arc<DashMap<AgentId, CancellationToken>>,
 }
 
 impl SovereignKernel {
@@ -107,11 +115,23 @@ impl SovereignKernel {
                     sk_types::config::McpTransportEntry::Stdio { args, .. } => args.clone(),
                     _ => Vec::new(),
                 },
-                env: server
-                    .env
-                    .iter()
-                    .map(|k| (k.clone(), std::env::var(k).unwrap_or_default()))
-                    .collect(),
+                env: match &server.env {
+                    sk_types::config::McpEnv::List(nodes) => nodes
+                        .iter()
+                        .map(|k| (k.clone(), std::env::var(k).unwrap_or_default()))
+                        .collect(),
+                    sk_types::config::McpEnv::Map(map) => map
+                        .iter()
+                        .map(|(k, v)| {
+                            let val = if v.starts_with('$') {
+                                std::env::var(&v[1..]).unwrap_or_default()
+                            } else {
+                                v.clone()
+                            };
+                            (k.clone(), val)
+                        })
+                        .collect(),
+                },
                 url: match &server.transport {
                     sk_types::config::McpTransportEntry::Sse { url, .. } => Some(url.clone()),
                     _ => None,
@@ -128,49 +148,22 @@ impl SovereignKernel {
         );
         let mcp = Arc::new(tokio::sync::RwLock::new(mcp));
 
-        // Initialize LLM Driver from environment
-        // model_name is built up through if-else branches then moved into the struct.
-        #[allow(unused_assignments)]
-        let mut model_name = String::new();
-        let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> =
-            if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
-                model_name = "claude-3-5-sonnet-20241022".to_string();
-                Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
-                    key,
-                    "https://api.anthropic.com".to_string(),
-                ))
-            } else if let Ok(key) = std::env::var("OPENAI_API_KEY") {
-                model_name = "gpt-4o".to_string();
-                Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                    key,
-                    "https://api.openai.com/v1".to_string(),
-                ))
-            } else if let Ok(key) = std::env::var("GITHUB_TOKEN") {
-                model_name = "gpt-4o".to_string();
-                Arc::new(sk_engine::drivers::copilot::CopilotDriver::new(
-                    key,
-                    "".to_string(),
-                ))
-            } else if let Ok(key) = std::env::var("GROQ_API_KEY") {
-                model_name = "llama3-70b-8192".to_string();
-                Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                    key,
-                    "https://api.groq.com/openai/v1".to_string(),
-                ))
-            } else if let Ok(key) = std::env::var("GEMINI_API_KEY") {
-                model_name = "gemini-2.0-flash-lite".to_string();
-                Arc::new(sk_engine::drivers::gemini::GeminiDriver::new(
-                    key,
-                    "https://generativelanguage.googleapis.com".to_string(),
-                ))
-            } else {
-                model_name = "claude-3-5-sonnet-20241022".to_string();
-                // Default to Anthropic if no keys found (will fail at runtime, but kernel can still boot)
-                Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
-                    "".to_string(),
-                    "https://api.anthropic.com".to_string(),
-                ))
-            };
+        // Initialize LLM Driver from configuration or environment
+        let (driver, model) = match init_llm_driver(&config).await {
+            Ok(res) => res,
+            Err(e) => {
+                warn!("Failed to initialize LLM driver from config: {e}. Falling back to default.");
+                // Fallback to Anthropic placeholder (current behavior)
+                (
+                    Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
+                        "".to_string(),
+                        "https://api.anthropic.com".to_string(),
+                    )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+                    "claude-3-5-sonnet-20241022".to_string(),
+                )
+            }
+        };
+        let model_name = model;
 
         // Initialize Browser Manager
         let browser = Arc::new(sk_engine::runtime::browser::BrowserManager::new(
@@ -205,6 +198,18 @@ impl SovereignKernel {
         let supervisor = Arc::new(crate::supervisor::Supervisor::new());
         let agents = Arc::new(crate::registry::AgentRegistry::new());
         let sandbox_pool = Arc::new(sk_engine::runtime::docker_sandbox::ContainerPool::new());
+        let metering = Arc::new(crate::metering::MeteringEngine::new());
+
+        // Initialize Hands Registry
+        let mut hand_registry = sk_hands::registry::HandRegistry::new();
+        hand_registry.load_bundled();
+        
+        let custom_hands_path = config.data_dir.join("hands");
+        if !custom_hands_path.exists() {
+            let _ = std::fs::create_dir_all(&custom_hands_path);
+        }
+        hand_registry.load_custom_hands(&custom_hands_path);
+        let hands = Arc::new(tokio::sync::RwLock::new(hand_registry));
 
         Ok(Self {
             config,
@@ -222,6 +227,9 @@ impl SovereignKernel {
             supervisor,
             delivery_handler: tokio::sync::RwLock::new(None),
             sandbox_pool,
+            metering,
+            hands,
+            active_loops: Arc::new(DashMap::new()),
         })
     }
 
@@ -263,9 +271,25 @@ impl SovereignKernel {
             k.memory.checkpoint.save(&aid, &sid.0, &config_value, &serde_json::Value::Null)
         }));
 
-        let result = sk_engine::agent_loop::run_agent_loop(agent_config, session, input)
-            .await
-            .map_err(|e| sk_types::error::SovereignError::Internal(e.to_string()))?;
+        // 1. Create and store cancellation token
+        let token = CancellationToken::new();
+        self.active_loops.insert(aid, token.clone());
+
+        // 2. Wrap the loop in a select! to handle cancellation
+        let result = tokio::select! {
+            res = sk_engine::agent_loop::run_agent_loop(agent_config, session, input) => {
+                res.map_err(|e| sk_types::error::SovereignError::Internal(e.to_string()))
+            }
+            _ = token.cancelled() => {
+                info!(agent_id = %aid, "Agent loop cancelled externally.");
+                Err(sk_types::error::SovereignError::Internal("Agent loop cancelled".to_string()))
+            }
+        };
+
+        // 3. Remove token after completion
+        self.active_loops.remove(&aid);
+
+        let result = result?;
 
         // Save after every turn
         if let Err(e) = self.memory.sessions.save(session) {
@@ -273,6 +297,16 @@ impl SovereignKernel {
         }
 
         Ok(result)
+    }
+
+    /// Stop a running agent loop.
+    pub fn stop_agent(&self, id: &AgentId) -> bool {
+        if let Some((_, token)) = self.active_loops.remove(id) {
+            token.cancel();
+            true
+        } else {
+            false
+        }
     }
 
     /// Resurrect an agent from its latest checkpoint.
@@ -495,5 +529,107 @@ impl SovereignKernel {
         info!("Sovereign Kernel shutting down...");
         // MCP connections are dropped automatically
         Ok(())
+    }
+}
+
+/// Helper to initialize the LLM driver from configuration.
+async fn init_llm_driver(
+    config: &sk_types::config::KernelConfig,
+) -> SovereignResult<(Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>, String)> {
+    let dm = &config.default_model;
+    let api_key = std::env::var(&dm.api_key_env).unwrap_or_default();
+    
+    // 1. If we have a base_url, we can usually default to OpenAICompatDriver
+    if let Some(base_url) = &dm.base_url {
+        info!(provider = %dm.provider, model = %dm.model, url = %base_url, "Using custom LLM provider (OpenAI-compatible)");
+        return Ok((
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(api_key, base_url.clone())),
+            dm.model.clone(),
+        ));
+    }
+
+    // 2. Known provider logic
+    match dm.provider.to_lowercase().as_str() {
+        "anthropic" => Ok((
+            Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
+                api_key,
+                "https://api.anthropic.com".to_string(),
+            )),
+            dm.model.clone(),
+        )),
+        "openai" => Ok((
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key,
+                "https://api.openai.com/v1".to_string(),
+            )),
+            dm.model.clone(),
+        )),
+        "gemini" => Ok((
+            Arc::new(sk_engine::drivers::gemini::GeminiDriver::new(
+                api_key,
+                "https://generativelanguage.googleapis.com".to_string(),
+            )),
+            dm.model.clone(),
+        )),
+        "groq" => Ok((
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key,
+                "https://api.groq.com/openai/v1".to_string(),
+            )),
+            dm.model.clone(),
+        )),
+        "deepseek" => Ok((
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key,
+                "https://api.deepseek.com".to_string(),
+            )),
+            dm.model.clone(),
+        )),
+        "xai" | "grok" => Ok((
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key,
+                "https://api.x.ai/v1".to_string(),
+            )),
+            dm.model.clone(),
+        )),
+        "openrouter" => Ok((
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key,
+                "https://openrouter.ai/api/v1".to_string(),
+            )),
+            dm.model.clone(),
+        )),
+        "mistral" => Ok((
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key,
+                "https://api.mistral.ai/v1".to_string(),
+            )),
+            dm.model.clone(),
+        )),
+        _ => {
+            // Last resort: If we have an API key for a known env var, try to auto-detect
+            if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
+                Ok((
+                    Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
+                        key,
+                        "https://api.anthropic.com".to_string(),
+                    )),
+                    "claude-3-5-sonnet-20241022".to_string(),
+                ))
+            } else if let Ok(key) = std::env::var("OPENAI_API_KEY") {
+                Ok((
+                    Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                        key,
+                        "https://api.openai.com/v1".to_string(),
+                    )),
+                    "gpt-4o".to_string(),
+                ))
+            } else {
+                Err(SovereignError::Config(format!(
+                    "Unknown LLM provider '{}' and no fallback API keys found",
+                    dm.provider
+                )))
+            }
+        }
     }
 }

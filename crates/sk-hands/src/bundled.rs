@@ -55,6 +55,16 @@ pub fn bundled_hands() -> Vec<(&'static str, &'static str, &'static str)> {
             include_str!("../bundled/otto/HAND.toml"),
             include_str!("../bundled/otto/SKILL.md"),
         ),
+        (
+            "mysql-reporter",
+            include_str!("../bundled/mysql-reporter/HAND.toml"),
+            include_str!("../bundled/mysql-reporter/SKILL.md"),
+        ),
+        (
+            "peka",
+            include_str!("../bundled/artificer/HAND.toml"),
+            include_str!("../bundled/artificer/SKILL.md"),
+        ),
     ]
 }
 
@@ -86,7 +96,7 @@ mod tests {
     #[test]
     fn bundled_hands_count() {
         let hands = bundled_hands();
-        assert_eq!(hands.len(), 10);
+        assert_eq!(hands.len(), 12);
     }
 
     #[test]

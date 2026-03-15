@@ -8,6 +8,7 @@ pub mod agent_loop;
 pub mod compactor;
 pub mod context_budget;
 pub mod drivers;
+pub mod forensics;
 pub mod llm_driver;
 pub mod local_inference;
 pub mod loop_guard;

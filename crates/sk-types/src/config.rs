@@ -240,6 +240,14 @@ impl Default for PerplexitySearchConfig {
     }
 }
 
+fn default_max_iterations() -> u32 {
+    15
+}
+
+fn default_max_tokens() -> u32 {
+    200_000
+}
+
 /// Web fetch configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -1037,6 +1045,20 @@ pub struct KernelConfig {
     /// Cron scheduler max total jobs across all agents. Default: 500.
     #[serde(default = "default_max_cron_jobs")]
     pub max_cron_jobs: usize,
+    /// Maximum number of iterations (LLM calls) per task. Prevents runaway loops.
+    #[serde(default = "default_max_iterations")]
+    pub max_iterations_per_task: u32,
+    /// Maximum total tokens (input + output) per task. Prevents runaway costs.
+    #[serde(default = "default_max_tokens")]
+    pub max_tokens_per_task: u32,
+    /// Whether to enable forensic step dumping to disk (.steps/ folder).
+    #[serde(default)]
+    pub step_dump_enabled: bool,
+    /// Global total token budget in USD cents (e.g. 500 = $5). None = uncapped.
+    pub total_token_budget_usd_cents: Option<u64>,
+    /// List of tools or command patterns that are whitelisted and bypass safety gates.
+    #[serde(default)]
+    pub approval_whitelist: Vec<String>,
     /// Config include files — loaded and deep-merged before the root config.
     /// Paths are relative to the root config file's directory.
     /// Security: absolute paths and `..` components are rejected.
@@ -1121,9 +1143,26 @@ pub struct McpServerConfigEntry {
     /// Request timeout in seconds.
     #[serde(default = "default_mcp_timeout")]
     pub timeout_secs: u64,
-    /// Environment variables to pass through (e.g., ["GITHUB_PERSONAL_ACCESS_TOKEN"]).
+    /// Environment variables. Can be a list of names to pass through,
+    /// or a map of key-value pairs.
     #[serde(default)]
-    pub env: Vec<String>,
+    pub env: McpEnv,
+}
+
+/// Flexibility for MCP environment variables.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum McpEnv {
+    /// List of variable names to pass through from the host.
+    List(Vec<String>),
+    /// Map of specific variable names and their values.
+    Map(HashMap<String, String>),
+}
+
+impl Default for McpEnv {
+    fn default() -> Self {
+        Self::List(Vec::new())
+    }
 }
 
 fn default_mcp_timeout() -> u64 {
@@ -1208,6 +1247,11 @@ impl Default for KernelConfig {
             webhook_triggers: None,
             approval: crate::approval::ApprovalPolicy::default(),
             max_cron_jobs: default_max_cron_jobs(),
+            max_iterations_per_task: default_max_iterations(),
+            max_tokens_per_task: default_max_tokens(),
+            step_dump_enabled: false,
+            total_token_budget_usd_cents: None,
+            approval_whitelist: Vec::new(),
             include: Vec::new(),
             exec_policy: ExecPolicy::default(),
             bindings: Vec::new(),
@@ -1225,7 +1269,21 @@ impl Default for KernelConfig {
 }
 
 impl KernelConfig {
-    /// Load config from file or return default if missing
+    pub fn check_budget(&self, current_spend_usd: f64) -> crate::SovereignResult<()> {
+        if let Some(limit_cents) = self.total_token_budget_usd_cents {
+            let limit_usd = limit_cents as f64 / 100.0;
+            if current_spend_usd >= limit_usd {
+                return Err(crate::SovereignError::LoopLimitExceeded {
+                    reason: "Global token budget exceeded".to_string(),
+                    current: (current_spend_usd * 100.0) as u64,
+                    limit: limit_cents,
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Load the configuration from a file.
     pub fn load(path: &std::path::Path) -> crate::SovereignResult<Self> {
         if !path.exists() {
             return Ok(Self::default());

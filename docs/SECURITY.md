@@ -16,6 +16,7 @@ Sovereign Kernel is designed as a "Security-First" AI Operating System. This doc
 
 -   **Zero Telemetry**: Sovereign Kernel does not "phone home." No data about your tasks, prompts, or files is sent to any centralized server owned by the developers.
 -   **User-Controlled Risk**: Users can toggle between `Sandbox` and `Unrestricted` modes. In Sandbox mode, the kernel acts as a strict guard.
+-   **Safety & Budgeting**: Hard reasoning limits and global USD budgets are enforced to prevent cost overruns and infinite loops. See [SAFETY_CONTROLS.md](SAFETY_CONTROLS.md).
 -   **Audit Trails**: Every action an agent takes is recorded in a tamper-evident audit log, allowing for full post-mortem analysis of agent behavior.
 
 ## Responsible Use

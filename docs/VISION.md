@@ -36,7 +36,8 @@ Privacy is not a feature; it's the foundation. Sovereign Kernel has **Zero Telem
 
 -   **Phase 1-15 (Complete)**: Core infrastructure, industrial tools, audit trails, and multi-agent coordination.
 -   **Phase 16-20 (Complete)**: Production Hardening, Channel Robustness, Docker Sandboxing, Global Audit, and The Healer (Token Optimization).
--   **Phase 21+**: Self-Assembling Orchestration (Builder Agent), Distributed Networks, and UI Ecosystem.
+-   **Phase 21-24 (Complete)**: **The Village Evolution.** Split Summoner/Architect roles, NL Builder, Resurrector, and the creation of **PEKA (The Terminal Master)**.
+-   **Phase 25+**: Self-Assembling Orchestration, Distributed Networks, and UI Ecosystem.
 
 ---
 

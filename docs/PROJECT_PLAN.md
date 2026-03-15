@@ -679,11 +679,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 24: THE VILLAGE — AGENT ECOSYSTEM (Next Major Milestone)
-
-**Goal: Transform Sovereign Kernel from an agent framework into a living agent village — where agents self-organize, recover from failures, and users interact through natural language rather than configuration files.**
-
-### 🔬 Problem Analysis (from Deep Technical Audit — March 2026)
+## PHASE 24: THE VILLAGE — AGENT ECOSYSTEM ✅ COMPLETE
 
 The following gaps were identified during a comprehensive code-level audit:
 
@@ -1020,16 +1016,15 @@ sovereign run "Create agent that monitors CPU and alerts if >90%"
 - Enhanced `Supervisor` with resurrection logic — auto-restarts agents from last checkpoint
 
 ## 24.3: Natural Language Builder ✅
-- Enhanced `SetupWizard` with `analyze_task_intent()` — LLM-powered task analysis
-- Added `mode_hint` to `spawn_witch_skeleton` (safe/full_access/scheduled)
-- Implemented `builder` tool for creating agents from natural language descriptions
+- Enhanced `SetupWizard` with `analyze_task_intent()` — LLM-powered task analysis.
+- Split roles: **The Witch (Summoner)** plans missions, while **The Builder (Architect)** forges permanent blueprints.
+- Added `mode_hint` to `summon_skeleton` (safe/full_access/scheduled).
+- Implemented `builder` tool for creating agents from natural language descriptions.
 
-## 24.4: Simplified CLI ✅
-- `sovereign run "<task>"` — Natural language task execution with auto mode detection
-- `sovereign run "<task>" --schedule "0 9 * * 1"` — Cron scheduling
-- `sovereign status` — Village overview with agent listing
-- `sovereign kill <id>` — Agent termination
-- `list_agents()` method on `MemorySubstrate` for agent enumeration
+## 24.5: Lore Expansion & PEKA ✅
+- Formalized the Village Lore in `SOUL.md` and `PROJECT_MAP.md`.
+- Created **PEKA (The Terminal Master)** — a permanent Hand dedicated to shell and system iron.
+- Expanded the bundled Hands library to 12 specialized experts.
 
 ---
 

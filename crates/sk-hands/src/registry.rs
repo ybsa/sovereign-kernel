@@ -9,8 +9,9 @@ use dashmap::DashMap;
 use serde::Serialize;
 use sk_types::agent::AgentId;
 use std::collections::HashMap;
-use tracing::{info, warn};
+use tracing::{info, warn, error};
 use uuid::Uuid;
+use std::path::Path;
 
 // ─── Settings availability types ────────────────────────────────────────────
 
@@ -65,6 +66,47 @@ impl HandRegistry {
                 }
                 Err(e) => {
                     warn!(hand = %id, error = %e, "Failed to parse bundled hand");
+                }
+            }
+        }
+        count
+    }
+
+    /// Load custom hands from a local directory.
+    pub fn load_custom_hands<P: AsRef<Path>>(&mut self, directory: P) -> usize {
+        let dir = directory.as_ref();
+        if !dir.exists() || !dir.is_dir() {
+            return 0;
+        }
+
+        let mut count = 0;
+        let entries = match std::fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(e) => {
+                error!(path = %dir.display(), error = %e, "Failed to read hands directory");
+                return 0;
+            }
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("toml") {
+                match std::fs::read_to_string(&path) {
+                    Ok(content) => {
+                        match toml::from_str::<HandDefinition>(&content) {
+                            Ok(def) => {
+                                info!(hand = %def.id, name = %def.name, "Loaded custom hand");
+                                self.definitions.insert(def.id.clone(), def);
+                                count += 1;
+                            }
+                            Err(e) => {
+                                error!(path = %path.display(), error = %e, "Failed to parse custom hand TOML");
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!(path = %path.display(), error = %e, "Failed to read custom hand file");
+                    }
                 }
             }
         }
@@ -331,7 +373,7 @@ mod tests {
     fn load_bundled_hands() {
         let mut reg = HandRegistry::new();
         let count = reg.load_bundled();
-        assert_eq!(count, 10);
+        assert_eq!(count, 12);
         assert!(!reg.list_definitions().is_empty());
 
         // Clip hand should be loaded
@@ -489,5 +531,33 @@ mod tests {
         };
         assert!(!check_requirement(&req_missing));
         std::env::remove_var("sk_TEST_HAND_REQ");
+    }
+
+    #[test]
+    fn test_load_custom_hands() {
+        let mut reg = HandRegistry::new();
+        let temp_dir = tempfile::tempdir().unwrap();
+        let path = temp_dir.path().join("test_hand.toml");
+        
+        // Create a fake hand TOML
+        let toml_content = r#"
+id = "custom-test"
+name = "Custom Test"
+description = "A custom test hand"
+category = "productivity"
+tools = ["shell_exec"]
+[agent]
+name = "custom-agent"
+description = "Custom agent"
+system_prompt = "Custom."
+"#;
+        std::fs::write(&path, toml_content).unwrap();
+
+        let count = reg.load_custom_hands(temp_dir.path());
+        assert_eq!(count, 1);
+        
+        let found = reg.get_definition("custom-test");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().name, "Custom Test");
     }
 }

@@ -67,15 +67,15 @@ pub fn create_agent_config(
     });
 
     tools.push(sk_types::ToolDefinition {
-        name: "spawn_witch_skeleton".into(),
-        description: "Dynamically spawn a background witch_skeleton. It will run in Sandbox mode by default. You can continue working while it runs. Use check_witch_skeleton to see its status.".into(),
+        name: "summon_skeleton".into(),
+        description: "The Witch (The Summoner) uses her magic to dynamically spawn a background skeleton worker. It will run in Sandbox mode by default. You can continue working while it runs. Use check_skeleton to see its status.".into(),
         input_schema: serde_json::json!({
             "type": "object",
             "properties": {
                 "skeleton_name": { "type": "string", "description": "Name of the skeleton (e.g. 'researcher')" },
-                "task_description": { "type": "string", "description": "What the skeleton should do. Provide complete details and goals." },
+                "task_description": { "type": "string", "description": "What the skeleton should do (summoned by the Witch)." },
                 "capabilities": { "type": "array", "items": { "type": "string" }, "description": "Capabilities the skeleton needs (e.g. 'web', 'file_read', 'browser')" },
-                "mode_hint": { "type": "string", "enum": ["safe", "unrestricted", "scheduled"], "description": "Execution mode hint. 'safe' is forced sandbox. 'unrestricted' allows host access tools (requires approval). 'scheduled' creates a persistent cron job." }
+                "mode_hint": { "type": "string", "enum": ["safe", "unrestricted", "scheduled"], "description": "Execution mode hint." }
             },
             "required": ["skeleton_name", "task_description", "capabilities"]
         }),
@@ -83,19 +83,19 @@ pub fn create_agent_config(
 
     tools.push(sk_types::ToolDefinition {
         name: "builder".into(),
-        description: "Transform a natural language task into a spawned agent village member. The kernel will automatically analyze the task, determine necessary tools, and set appropriate security modes.".into(),
+        description: "The Builder (The Architect) transforms a natural language task into a permanent Village member (Hand). The Architect forges the permanent infrastructure, while the Witch summons the workers.".into(),
         input_schema: serde_json::json!({
             "type": "object",
             "properties": {
-                "task": { "type": "string", "description": "The mission for the agent (e.g. 'Monitor my CPU and notify me if it exceeds 90% for a minute')" }
+                "task": { "type": "string", "description": "The permanent Hand to forge (e.g. 'Create a WhatsApp specialist')" }
             },
             "required": ["task"]
         }),
     });
 
     tools.push(sk_types::ToolDefinition {
-        name: "check_witch_skeleton".into(),
-        description: "Check the latest status of a spawned witch_skeleton.".into(),
+        name: "check_skeleton".into(),
+        description: "Check the status of a worker summoned by the Witch.".into(),
         input_schema: serde_json::json!({
             "type": "object",
             "properties": {
@@ -107,16 +107,38 @@ pub fn create_agent_config(
 
     let b = browser_manager;
     let aid = agent_id;
-    let k = kernel;
+    let k = kernel.clone();
 
     AgentLoopConfig {
         driver,
         system_prompt,
         tools,
-        model: model_name,
+        model: model_name.clone(),
         max_tokens: 4096,
         temperature: 0.7,
+        max_iterations_per_task: kernel.config.max_iterations_per_task,
+        max_tokens_per_task: kernel.config.max_tokens_per_task,
+        step_dump_enabled: kernel.config.step_dump_enabled,
+        forensics_root: kernel.config.effective_workspaces_dir(),
         stream_handler: None,
+        on_usage: {
+            let kernel = kernel.clone();
+            let aid = agent_id;
+            let model = model_name.clone();
+            Some(Box::new(move |usage| {
+                let cost = crate::metering::MeteringEngine::estimate_cost(
+                    &model,
+                    usage.prompt_tokens as u64,
+                    usage.completion_tokens as u64,
+                );
+                kernel.metering.record_cost(aid, cost);
+
+                // Enforce global budget
+                kernel.config.check_budget(kernel.metering.total_cost())?;
+
+                Ok(())
+            }))
+        },
         checkpoint_handler: None,
         tool_executor: Box::new(move |tool_call| {
             let kernel = k.clone();
@@ -139,28 +161,61 @@ pub fn create_agent_config(
                 default_mode
             };
 
-            // Enforce conversational SafetyGate in Sandbox mode
-            if mode == sk_types::config::ExecutionMode::Sandbox {
-                if let Err(detail) =
-                    kernel
-                        .safety
-                        .check(&tool_call.name, &tool_call.input, Some(&aid))
+            let mode_str = match mode {
+                sk_types::config::ExecutionMode::Sandbox => "Sandbox",
+                sk_types::config::ExecutionMode::Unrestricted => "Unrestricted",
+            };
+
+            // 1. Check Whitelist
+            let is_whitelisted = config.approval_whitelist.iter().any(|w| {
+                tool_call.name == *w
+                    || (tool_call.name == "shell_exec"
+                        && tool_call
+                            .input
+                            .get("command")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.contains(w))
+                            .unwrap_or(false))
+            });
+
+            // 2. Enforce conversational SafetyGate for non-whitelisted dangerous actions
+            if !is_whitelisted {
+                match kernel
+                    .safety
+                    .check(&tool_call.name, &tool_call.input, Some(&aid))
                 {
-                    // Log the blocked action
-                    let payload = serde_json::json!({
-                        "tool": tool_call.name,
-                        "args": tool_call.input,
-                        "reason": "Safety Block",
-                    });
-                    if let Err(e) = kernel.memory.audit.append_log(
-                        &aid,
-                        "Sandbox",
-                        "tool_call_blocked",
-                        &payload,
-                    ) {
-                        tracing::warn!("Failed to append to audit log: {}", e);
+                    Ok(_) => {
+                        // Check for Medium risk to log a warning (Phase 3)
+                        let risk = crate::approval::ApprovalManager::classify_risk(
+                            &tool_call.name,
+                            Some(&tool_call.input),
+                        );
+                        if risk == sk_types::approval::RiskLevel::Medium {
+                            tracing::warn!(
+                                agent = %aid,
+                                tool = %tool_call.name,
+                                "Medium risk tool call executed in {} mode",
+                                mode_str
+                            );
+                        }
                     }
-                    return Err(sk_types::SovereignError::ToolExecutionError(detail));
+                    Err(detail) => {
+                        // Log the blocked action
+                        let payload = serde_json::json!({
+                            "tool": tool_call.name,
+                            "args": tool_call.input,
+                            "reason": "Safety Block",
+                        });
+                        if let Err(e) = kernel.memory.audit.append_log(
+                            &aid,
+                            mode_str,
+                            "tool_call_blocked",
+                            &payload,
+                        ) {
+                            tracing::warn!("Failed to append to audit log: {}", e);
+                        }
+                        return Err(sk_types::SovereignError::ToolExecutionError(detail));
+                    }
                 }
             }
 
@@ -209,7 +264,7 @@ pub fn create_agent_config(
                         ))
                     }
                 }
-                "spawn_witch_skeleton" => {
+                "summon_skeleton" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let skeleton_name = args
                             .get("skeleton_name")
@@ -276,14 +331,14 @@ pub fn create_agent_config(
                             }
                         });
 
-                        Ok(format!("Witch Skeleton spawned successfully! Skeleton ID: {}. It is running in Sandbox mode in the background.", skeleton_id_str))
+                        Ok(format!("Witch Skeleton summoned successfully! Skeleton ID: {}. It is running in Sandbox mode in the background.", skeleton_id_str))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
                         ))
                     }
                 }
-                "check_witch_skeleton" => {
+                "check_skeleton" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let skeleton_id_str = args
                             .get("skeleton_id")
@@ -332,7 +387,7 @@ pub fn create_agent_config(
                                 let plan = crate::wizard::SetupWizard::build_plan(intent);
                                 
                                 Ok(format!(
-                                    "I have analyzed your request and prepared a setup plan:\n\n{}\n\nTo spawn this agent, use the `spawn_witch_skeleton` tool with the following parameters:\n- skeleton_name: {}\n- task_description: {}\n- capabilities: {:?}\n- mode_hint: {}",
+                                    "I have analyzed your request and prepared a setup plan:\n\n{}\n\nTo summon this worker, use the `summon_skeleton` tool with the following parameters:\n- skeleton_name: {}\n- task_description: {}\n- capabilities: {:?}\n- mode_hint: {}",
                                     plan.summary,
                                     plan.intent.name,
                                     plan.intent.task,

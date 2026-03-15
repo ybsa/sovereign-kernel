@@ -109,6 +109,14 @@ impl McpRegistry {
     pub fn tool_count(&self) -> usize {
         self.clients.values().map(|c| c.tools().len()).sum()
     }
+
+    /// List all connected servers and their tool counts.
+    pub fn list_servers(&self) -> Vec<(String, usize)> {
+        self.clients
+            .iter()
+            .map(|(name, client)| (name.clone(), client.tools().len()))
+            .collect()
+    }
 }
 
 impl Default for McpRegistry {

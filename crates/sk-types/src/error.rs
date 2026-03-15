@@ -70,6 +70,14 @@ pub enum SovereignError {
     #[error("Serialization error: {0}")]
     Serialization(String),
 
+    /// The agent loop exceeded a safety limit (iterations or tokens).
+    #[error("Loop limit exceeded: {reason} (current: {current}, limit: {limit})")]
+    LoopLimitExceeded {
+        reason: String,
+        current: u64,
+        limit: u64,
+    },
+
     /// The agent loop exceeded the maximum iteration count.
     #[error("Max iterations exceeded: {0}")]
     MaxIterationsExceeded(u32),

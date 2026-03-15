@@ -8,8 +8,7 @@ use crate::llm_driver::{CompletionRequest, LlmDriver, StopReason};
 use sk_types::{Message, Session, SovereignResult, ToolCall, ToolDefinition};
 use tracing::{debug, info, warn};
 
-/// Maximum iterations in the agent loop before giving up.
-const MAX_ITERATIONS: u32 = 50;
+
 
 /// Result of an agent loop execution.
 #[derive(Debug)]
@@ -47,8 +46,18 @@ pub struct AgentLoopConfig {
     pub temperature: f32,
     /// Tool executor callback.
     pub tool_executor: ToolExecutor,
+    /// Maximum number of iterations (LLM calls) per task. Prevents runaway loops.
+    pub max_iterations_per_task: u32,
+    /// Maximum total tokens (input + output) per task. Prevents runaway costs.
+    pub max_tokens_per_task: u32,
+    /// Whether to enable forensic step dumping to disk (.steps/ folder).
+    pub step_dump_enabled: bool,
+    /// Root directory for forensics dumps.
+    pub forensics_root: std::path::PathBuf,
     /// Optional streaming callback to receive tokens as they are generated.
     pub stream_handler: Option<StreamHandler>,
+    /// Optional callback to report token usage per iteration for global budgeting.
+    pub on_usage: Option<Box<dyn Fn(crate::llm_driver::TokenUsage) -> SovereignResult<()> + Send + Sync>>,
     /// Optional callback to save state checkpoints for recovery.
     pub checkpoint_handler: Option<Box<dyn Fn(&Session) -> SovereignResult<()> + Send + Sync>>,
 }
@@ -66,6 +75,15 @@ pub async fn run_agent_loop(
     session: &mut Session,
     user_message: &str,
 ) -> SovereignResult<AgentLoopResult> {
+    let forensics = if config.step_dump_enabled {
+        Some(crate::forensics::StepForensics::new(
+            &config.forensics_root,
+            &session.id.to_string(),
+        ))
+    } else {
+        None
+    };
+
     // 1. Add user message to session
     session.push_message(Message::user(user_message));
 
@@ -77,7 +95,7 @@ pub async fn run_agent_loop(
     let mut tool_calls_made = 0u32;
     let mut iterations = 0u32;
     let mut consecutive_errors = 0u32;
-    let mut final_response = String::new();
+    let final_response;
 
     let mut loop_guard = LoopGuard::new();
     let mut last_checkpoint = std::time::Instant::now();
@@ -97,12 +115,16 @@ pub async fn run_agent_loop(
         }
 
         iterations += 1;
-        if iterations > MAX_ITERATIONS {
-            warn!("Agent loop hit MAX_ITERATIONS ({MAX_ITERATIONS})");
-            messages.push(Message::system(
-                "System Error: Maximum reasoning steps exceeded.",
-            ));
-            break;
+        if iterations > config.max_iterations_per_task {
+            warn!(
+                "Agent loop hit max_iterations_per_task ({})",
+                config.max_iterations_per_task
+            );
+            return Err(sk_types::SovereignError::LoopLimitExceeded {
+                reason: "Maximum iterations exceeded".to_string(),
+                current: iterations as u64,
+                limit: config.max_iterations_per_task as u64,
+            });
         }
 
         debug!(iteration = iterations, "Agent loop iteration");
@@ -139,6 +161,32 @@ pub async fn run_agent_loop(
         };
 
         total_tokens += response.usage.total_tokens;
+
+        if let Some(ref handler) = config.on_usage {
+            handler(response.usage.clone())?;
+        }
+
+        if let Some(ref f) = forensics {
+            let _ = f.dump_step(
+                iterations,
+                &messages,
+                &response.content,
+                &response.tool_calls,
+                response.usage.clone(),
+            );
+        }
+
+        if total_tokens > config.max_tokens_per_task {
+            warn!(
+                "Agent loop hit max_tokens_per_task ({})",
+                config.max_tokens_per_task
+            );
+            return Err(sk_types::SovereignError::LoopLimitExceeded {
+                reason: "Maximum tokens exceeded".to_string(),
+                current: total_tokens as u64,
+                limit: config.max_tokens_per_task as u64,
+            });
+        }
 
         // Context budget check: Trigger THE HEALER (Compaction) if we exceed 80% of budget
         if !crate::context_budget::fits_in_context(
@@ -308,6 +356,15 @@ pub async fn run_agent_loop(
         tokens = total_tokens,
         "Agent loop completed"
     );
+
+    if let Some(ref f) = forensics {
+        let status = if final_response.starts_with("System Error") {
+            "error"
+        } else {
+            "success"
+        };
+        let _ = f.dump_summary(total_tokens, iterations, status);
+    }
 
     Ok(AgentLoopResult {
         response: final_response,

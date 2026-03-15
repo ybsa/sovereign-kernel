@@ -26,7 +26,7 @@ Sets up your LLM API key, execution mode, and agent identity.
 | `sovereign kill` | Stop the daemon |
 | `sovereign stop` | Stop the daemon (legacy) |
 | `sovereign dashboard` | Open terminal web dashboard |
-| `sovereign hands list` | List all 10 bundled hands |
+| `sovereign hands list` | List all 12 bundled hands |
 | `sovereign audit logs` | View cryptographic audit trail |
 
 ---
@@ -84,7 +84,7 @@ The agent will use the `schedule_create` tool. The daemon will monitor the time 
 Hands are autonomous capability agents you can activate:
 
 ```bash
-sovereign hands list                  # Show all 10 hands with requirements
+sovereign hands list                  # Show all 12 hands with requirements
 sovereign hands activate browser      # Start the browser automation hand
 sovereign hands activate web-search   # Start the web research hand
 sovereign hands activate email        # Start the email management hand
@@ -145,11 +145,11 @@ sovereign --config config.unrestricted.toml chat
 | `schedule_create` / `schedule_list` | Manage cron-based tasks |
 | `get_skill` / `list_skills` | Access 52 expert skill prompts |
 | `agent_message` | Send a direct message to another active agent |
-| `spawn_witch_skeleton` | Spawn a sandboxed background witch_skeleton |
-| `check_witch_skeleton` | Check the status of a spawned witch_skeleton |
+| `summon_skeleton` | The Witch dynamically summons sandboxed workers for parallel tasks |
+| `check_skeleton` | Check the status of a worker summoned by the Witch |
 | `shared_memory_store` | Store facts in global shared memory |
 | `shared_memory_recall` | Search the global shared knowledge pool |
-| `builder` | Create an agent from a natural language task description |
+| `builder` | The Builder (Architect) forges a permanent Village member (Hand) |
 | `host_desktop_control` | Change wallpaper, toggle dark mode, OS notifications (Unrestricted) |
 | `host_system_config` | Read/edit system configs, manage services (Unrestricted) |
 | `host_install_app` | Install apps via winget/apt/brew (Unrestricted, Critical risk) |
@@ -179,7 +179,7 @@ Instead of writing agent manifests, just describe what you want:
 ```bash
 sovereign run "Monitor my inbox and summarize new emails every hour"
 ```
-The kernel auto-detects the right tools, mode, and scheduling.
+The kernel auto-detects the right tools, mode, and scheduling. The **Witch (Summoner)** plans the mission, while the **Builder (Architect)** forges the Hand.
 
 ### Crash Recovery (The Resurrector)
 Agents save checkpoints every 30 seconds. If an agent crashes, the Supervisor automatically restarts it from the last checkpoint with a `[Resurrector] Restarted from checkpoint` system message.
@@ -194,7 +194,7 @@ In unrestricted mode, agents gain full host access:
 All host tools have **risk-tiered approval gates** (Low → Medium → High → Critical).
 
 ### Agent Messaging & Spawning
-Agents send direct messages via the **Inter-Agent Bus**. Manager agents spawn sandboxed witch_skeletons for parallel tasks. Shared Memory enables cross-agent knowledge sharing.
+Agents send direct messages via the **Inter-Agent Bus**. Manager agents **summon** sandboxed workers (Skeletons) via the Witch's specialized tools. Shared Memory enables cross-agent knowledge sharing.
 
 ---
 

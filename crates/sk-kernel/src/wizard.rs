@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use sk_types::agent::{
     AgentManifest, ManifestCapabilities, ModelConfig, Priority, ResourceQuota, ScheduleMode,
 };
+use sk_hands::{HandAgentConfig, HandCategory, HandDefinition};
 use std::collections::HashMap;
 
 /// The extracted intent from a user's natural language description.
@@ -172,7 +173,11 @@ impl SetupWizard {
             skills: intent.skills.clone(),
             mcp_servers: vec![],
             metadata: HashMap::new(),
-            tags: vec![],
+            tags: intent
+                .mode
+                .as_ref()
+                .map(|m| vec![format!("mode:{}", m)])
+                .unwrap_or_default(),
             routing: None,
             autonomous: None,
             pinned_model: None,
@@ -190,8 +195,14 @@ impl SetupWizard {
             .cloned()
             .collect();
 
+        let mode_str = intent
+            .mode
+            .as_deref()
+            .map(|m| format!(" (mode: {})", m))
+            .unwrap_or_default();
+
         let summary = format!(
-            "Agent '{}': {}\n  Model: {}/{}\n  Skills: {}\n  Schedule: {}",
+            "Agent '{}': {}\n  Model: {}/{}\n  Skills: {}\n  Schedule: {}{}",
             intent.name,
             intent.description,
             provider,
@@ -205,7 +216,8 @@ impl SetupWizard {
                 intent.schedule.as_deref().unwrap_or("on-demand")
             } else {
                 "on-demand"
-            }
+            },
+            mode_str
         );
 
         SetupPlan {
@@ -214,6 +226,101 @@ impl SetupWizard {
             skills_to_install,
             summary,
         }
+    }
+
+    /// Converts an AgentIntent into a permanent HandDefinition.
+    pub fn intent_to_hand(intent: &AgentIntent) -> HandDefinition {
+        let (provider, model) = match intent.model_tier.as_str() {
+            "simple" => ("groq", "llama-3.3-70b-versatile"),
+            "complex" => ("anthropic", "claude-sonnet-4-20250514"),
+            _ => ("groq", "llama-3.3-70b-versatile"),
+        };
+
+        let mut tools = Vec::new();
+        for cap in &intent.capabilities {
+            match cap.as_str() {
+                "web" | "network" => {
+                    tools.push("web_search".to_string());
+                    tools.push("web_fetch".to_string());
+                }
+                "file" | "files" => {
+                    tools.extend(
+                        vec!["file_read", "file_write", "file_list"]
+                            .into_iter()
+                            .map(String::from),
+                    );
+                }
+                "memory" => {
+                    tools.extend(
+                        vec!["memory_store", "memory_recall"]
+                            .into_iter()
+                            .map(String::from),
+                    );
+                }
+                "browser" | "browse" => {
+                    tools.extend(
+                        vec![
+                            "browser_navigate",
+                            "browser_click",
+                            "browser_type",
+                            "browser_read_page",
+                            "browser_screenshot",
+                        ]
+                        .into_iter()
+                        .map(String::from),
+                    );
+                }
+                other => tools.push(other.to_string()),
+            }
+        }
+
+        // De-duplicate tools
+        tools.sort();
+        tools.dedup();
+
+        let category = match intent.capabilities.first().map(|s| s.as_str()) {
+            Some("web") | Some("network") => HandCategory::Productivity,
+            Some("file") | Some("shell") => HandCategory::Development,
+            Some("memory") | Some("data") => HandCategory::Data,
+            _ => HandCategory::Productivity,
+        };
+
+        HandDefinition {
+            id: intent.name.clone(),
+            name: intent.name.clone().replace('-', " ").to_uppercase(),
+            description: intent.description.clone(),
+            category,
+            icon: "🤖".to_string(),
+            tools,
+            skills: intent.skills.clone(),
+            mcp_servers: vec![],
+            requires: vec![],
+            settings: vec![],
+            agent: HandAgentConfig {
+                name: intent.name.clone(),
+                description: intent.description.clone(),
+                module: "builtin:chat".to_string(),
+                provider: provider.to_string(),
+                model: model.to_string(),
+                api_key_env: None,
+                base_url: None,
+                max_tokens: 4096,
+                temperature: 0.7,
+                system_prompt: format!(
+                    "You are the {name} Hand.\n\nTASK: {task}",
+                    name = intent.name,
+                    task = intent.task
+                ),
+                max_iterations: Some(30),
+            },
+            dashboard: Default::default(),
+            skill_content: None,
+        }
+    }
+
+    /// Exports a HandDefinition to a TOML string.
+    pub fn export_hand(def: &HandDefinition) -> Result<String, toml::ser::Error> {
+        toml::to_string_pretty(def)
     }
 
     /// Build a short tool usage hint block for the system prompt based on granted tools.
@@ -267,8 +374,9 @@ impl SetupWizard {
         model: &str,
         task: &str,
     ) -> sk_types::SovereignResult<AgentIntent> {
-        let system_prompt = r#"You are the Sovereign Kernel Setup Wizard. 
-Transform the user's task into a structured JSON AgentIntent.
+        let system_prompt = r#"You are the Sovereign Kernel Witch (The Summoner). 
+Your magic allows you to transform a user's task into a structured JSON AgentIntent.
+While the Builder forges the permanent Hands, you are the seer who plans missions and summons temporary workers (Skeletons).
 JSON Schema:
 {
   "name": "slug-name",
@@ -332,6 +440,7 @@ mod tests {
             scheduled: false,
             schedule: None,
             capabilities: vec!["web".to_string(), "memory".to_string()],
+            mode: None,
         }
     }
 
@@ -414,6 +523,7 @@ mod tests {
             scheduled: false,
             schedule: None,
             capabilities: vec!["web".to_string()],
+            mode: None,
         };
         let plan = SetupWizard::build_plan(intent);
         assert!(plan
@@ -439,6 +549,7 @@ mod tests {
             scheduled: false,
             schedule: None,
             capabilities: vec!["memory".to_string()],
+            mode: None,
         };
         let plan = SetupWizard::build_plan(intent);
         assert!(plan
@@ -464,6 +575,7 @@ mod tests {
             scheduled: false,
             schedule: None,
             capabilities: vec!["browser".to_string()],
+            mode: None,
         };
         let plan = SetupWizard::build_plan(intent);
         assert!(plan

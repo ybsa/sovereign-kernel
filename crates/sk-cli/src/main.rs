@@ -13,6 +13,7 @@ use clap::{Parser, Subcommand};
 // Removed unused EnvFilter import
 
 mod audit;
+mod agents;
 mod bridge;
 mod chat;
 mod daemon;
@@ -98,6 +99,14 @@ enum Commands {
         #[arg(long)]
         no_open: bool,
     },
+    /// Manage Village inhabitants (list, inspect, stop, remove)
+    Agents {
+        /// Action: list, inspect, stop, remove
+        #[arg(default_value = "list")]
+        action: String,
+        /// Agent ID or name
+        id: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -171,7 +180,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::Stop => daemon::stop().await?,
-        Commands::Hands { action, args } => hands::run(&action, &args).await?,
+        Commands::Hands { action, args } => hands::run(config, &action, &args).await?,
         Commands::Audit { action, args } => audit::run(config, &action, &args).await?,
         Commands::Dashboard { port, no_open } => {
             let state = std::sync::Arc::new(dashboard::AppState {
@@ -193,6 +202,7 @@ async fn main() -> anyhow::Result<()> {
                 tracing::error!("Dashboard server failed to start: {}", e);
             }
         }
+        Commands::Agents { action, id } => agents::run(config, &action, id).await?,
     }
 
     Ok(())

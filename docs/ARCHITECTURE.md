@@ -23,7 +23,7 @@ The OS monitor that manages agent lifecycles and system-level concerns.
 - Config hot-reload without daemon restart
 - **Inter-Agent Bus** (`bus.rs`): Persistent message routing between agents
 - **Worker Spawning**: Dynamic sub-agent creation with forced Sandbox mode
-- **Natural Language Builder** (`wizard.rs`): LLM-powered task analysis → automatic agent creation from plain English
+- **Natural Language Builder** (`wizard.rs`): Dual-personality task analysis. The **Witch (Summoner)** plans missions, while the **Builder (Architect)** forges permanent Hands.
 - **The Resurrector** (`supervisor.rs`): Crash recovery via periodic checkpointing and automatic agent resurrection
 - **Host Tool Orchestration**: Desktop control, system config, app installation with 3-tier risk approval
 - OpenAI-compatible `/v1/chat/completions` API bridge
@@ -57,7 +57,7 @@ Implements the concrete action handlers available to agents.
 ### 8. `sk-hands` — Autonomous Capability Packages
 Pre-built, self-contained agents called **Hands** — each with a validated `HAND.toml`, `SKILL.md`, tool list, requirements checker, dashboard metrics, and agent prompt.
 
-**10 Bundled Hands:**
+**12 Bundled Hands:**
 | Hand | Category | Core Tools |
 |------|----------|------------|
 | `browser` | Automation | `browser_navigate`, `browser_click`, `browser_type`, `browser_screenshot` |
@@ -69,6 +69,8 @@ Pre-built, self-contained agents called **Hands** — each with a validated `HAN
 | `predictor` | Analytics | `web_search`, `memory_*`, `knowledge_*` |
 | `email` | Communication | `shell_exec` (SMTP/IMAP via Python), `schedule_*` |
 | `twitter` | Social | `web_fetch`, `shell_exec`, `knowledge_*` |
+| `peka` | Terminal | `shell_exec`, `process_list` (The Terminal Master) |
+| `mysql-reporter` | Data | `sql_exec`, `knowledge_*` (Visual Sales Reporting) |
 
 Hands are managed via the CLI:
 ```bash
@@ -99,8 +101,8 @@ The user-facing binary (`sovereign`) and the embedded terminal web dashboard.
 | Component | Location | Purpose |
 |-----------|----------|---------|
 | **Inter-Agent Bus** | `sk-kernel/src/bus.rs` | Persistent message routing — messages saved to target agent's SQLite session |
-| **Worker Spawning** | `sk-kernel/src/executor.rs` | Dynamic sub-agent creation via `SetupWizard`, auto-forced to Sandbox mode |
-| **NL Builder** | `sk-kernel/src/wizard.rs` | `analyze_task_intent()` — LLM-powered task analysis for automatic agent creation |
+| **Worker Summoning** | `sk-kernel/src/executor.rs` | The Witch dynamically summons sub-agents via `summon_skeleton` |
+| **NL Builder** | `sk-kernel/src/wizard.rs` | `analyze_task_intent()` — The Architect forges permanent Village blueprints |
 | **Resurrector** | `sk-kernel/src/supervisor.rs` | Periodic checkpointing + crash recovery from last saved state |
 | **Checkpoint Store** | `sk-memory/src/checkpoint.rs` | SQLite checkpoint table for agent state persistence |
 | **Host Tools** | `sk-tools/src/host/` | Desktop control, system config, app installer, full file access |

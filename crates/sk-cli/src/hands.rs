@@ -1,11 +1,21 @@
 //! Hands management — list, activate, deactivate autonomous capability packages.
 
 use sk_hands::registry::HandRegistry;
+use sk_types::config::KernelConfig;
+use sk_kernel::wizard::SetupWizard;
+use sk_kernel::SovereignKernel;
 
 /// Run the hands subcommand.
-pub async fn run(action: &str, args: &[String]) -> anyhow::Result<()> {
+pub async fn run(config: KernelConfig, action: &str, args: &[String]) -> anyhow::Result<()> {
     let mut registry = HandRegistry::new();
-    let loaded = registry.load_bundled();
+    let loaded_bundled = registry.load_bundled();
+    
+    let custom_hands_dir = config.data_dir.join("hands");
+    if !custom_hands_dir.exists() {
+        let _ = std::fs::create_dir_all(&custom_hands_dir);
+    }
+    let loaded_custom = registry.load_custom_hands(&custom_hands_dir);
+    let total_loaded = loaded_bundled + loaded_custom;
 
     match action {
         "list" => {
@@ -17,7 +27,7 @@ pub async fn run(action: &str, args: &[String]) -> anyhow::Result<()> {
             if defs.is_empty() {
                 println!("  No hands available.");
             } else {
-                println!("  {} hand(s) loaded:\n", loaded);
+                println!("  {} hand(s) loaded ({} bundled, {} custom):\n", total_loaded, loaded_bundled, loaded_custom);
                 for def in &defs {
                     let status_icon = "⬚"; // inactive by default
                     println!("  {} {} — {}", status_icon, def.name, def.description);
@@ -94,6 +104,40 @@ pub async fn run(action: &str, args: &[String]) -> anyhow::Result<()> {
                 }
             }
         }
+        "forge" => {
+            if args.is_empty() {
+                println!("Usage: sovereign hands forge \"description of the hand\"");
+                return Ok(());
+            }
+            let description = args.join(" ");
+            println!("⚡ Forging new Hand from description: \"{}\"...", description);
+
+            // Initialize kernel to get the driver
+            let kernel = SovereignKernel::init(config).await?;
+            let driver = kernel.driver.clone();
+            let model = kernel.model_name.clone();
+            
+            match SetupWizard::analyze_task_intent(driver, &model, &description).await {
+                Ok(intent) => {
+                    let hand_def = SetupWizard::intent_to_hand(&intent);
+                    let toml_content = SetupWizard::export_hand(&hand_def)?;
+                    
+                    let filename = format!("{}.toml", hand_def.id);
+                    let dest_path = custom_hands_dir.join(&filename);
+                    
+                    std::fs::write(&dest_path, toml_content)?;
+                    
+                    println!("✅ Hand forged successfully!");
+                    println!("   Name: {}", hand_def.name);
+                    println!("   ID:   {}", hand_def.id);
+                    println!("   Path: {}", dest_path.display());
+                    println!("\nRun `sovereign hands list` to see your new capability.");
+                }
+                Err(e) => {
+                    println!("❌ Forge failed: {}", e);
+                }
+            }
+        }
         "status" => {
             let instances = registry.list_instances();
             if instances.is_empty() {
@@ -114,6 +158,7 @@ pub async fn run(action: &str, args: &[String]) -> anyhow::Result<()> {
             println!();
             println!("Usage:");
             println!("  sovereign hands list         — show available hands");
+            println!("  sovereign hands forge <desc> — create a new hand from natural language");
             println!("  sovereign hands activate <n> — activate a hand");
             println!("  sovereign hands deactivate <id> — deactivate");
             println!("  sovereign hands status       — show active instances");
