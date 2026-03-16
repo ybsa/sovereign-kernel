@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// A handler that executes a specific tool call.
-pub type ToolHandler = Arc<dyn Fn(&ToolCall) -> SovereignResult<String> + Send + Sync>;
+pub type ToolHandler = Arc<dyn Fn(&ToolCall) -> SovereignResult<sk_types::ToolResult> + Send + Sync>;
 
 /// Central registry for tools available to the agent.
 #[derive(Clone)]
@@ -29,7 +29,7 @@ impl ToolRegistry {
     /// Register a new tool with its metadata and execution handler.
     pub fn register<F>(&mut self, definition: ToolDefinition, handler: F)
     where
-        F: Fn(&ToolCall) -> SovereignResult<String> + Send + Sync + 'static,
+        F: Fn(&ToolCall) -> SovereignResult<sk_types::ToolResult> + Send + Sync + 'static,
     {
         self.handlers
             .insert(definition.name.clone(), Arc::new(handler));
@@ -42,7 +42,7 @@ impl ToolRegistry {
     }
 
     /// Execute a tool call using the registered handlers.
-    pub fn execute(&self, call: &ToolCall) -> SovereignResult<String> {
+    pub fn execute(&self, call: &ToolCall) -> SovereignResult<sk_types::ToolResult> {
         if let Some(handler) = self.handlers.get(&call.name) {
             handler(call)
         } else {

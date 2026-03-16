@@ -33,6 +33,20 @@ pub struct ToolResult {
     pub content: String,
     /// Whether the tool execution resulted in an error.
     pub is_error: bool,
+    /// Optional signal to the kernel (e.g. for self-expansion).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signal: Option<ToolSignal>,
+}
+
+/// A signal from a tool back to the kernel to perform a platform action.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ToolSignal {
+    /// Signal the kernel to forge a new Hand based on a task description.
+    VillageForge {
+        /// What the new Hand should be able to do.
+        task_description: String,
+    },
 }
 
 /// Normalize a JSON Schema for cross-provider compatibility.

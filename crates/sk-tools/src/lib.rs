@@ -16,6 +16,7 @@ pub mod shell;
 pub mod skills;
 pub mod web_fetch;
 pub mod web_search;
+pub mod village_forge;
 
 use sk_types::ToolDefinition;
 
@@ -31,6 +32,7 @@ pub fn builtin_tools() -> Vec<ToolDefinition> {
         file_ops::write_file_tool(),
         file_ops::list_dir_tool(),
         shell::shell_exec_tool(),
+        village_forge::village_forge_tool(),
     ];
     tools.extend(browser_tools::browser_tools());
     tools.push(skills::get_skill_tool());

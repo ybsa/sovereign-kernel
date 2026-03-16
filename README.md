@@ -111,7 +111,7 @@ sovereign audit verify                          # Verify Merkle chain integrity
 
 ---
 
-## 🖐️ Bundled Hands (10 Included)
+## 🖐️ Bundled Hands (11 Included)
 
 Hands are autonomous capability packages — each one is a pre-configured agent with specific tools, prompts, and dashboard metrics.
 
@@ -127,6 +127,7 @@ Hands are autonomous capability packages — each one is a pre-configured agent 
 | **email** | Communication | SMTP/IMAP email management with draft mode |
 | **twitter** | Social | Twitter/X monitoring and engagement |
 | **otto** | Builder | Docker-sandboxed code execution with dynamic dependencies |
+| **mysql-reporter** | Data | MySQL reporting and dashboards integration |
 | **peka** | Terminal | **The Terminal Master.** Expert in raw shell and machinery |
 | **mysql-reporter** | Data | Autonomous SQL analysis and sales reporting |
 

@@ -1,37 +1,10 @@
-# Ignore build output
-/target/
+# Build artifacts
+target/
 **/target/
 
-# Ignore environment variables and API keys
-.env
-.env.*
-*.env
-
-# Ignore SQLite databases and memory storage
-*.db
-*.sqlite
-*.sqlite3
-.sovereign/
-memory.db
-
-# OS generated files
+# OS junk
 .DS_Store
 Thumbs.db
 
-# IDEs and editors
+# IDEs
 .vscode/
-.idea/
-*.swp
-*.swo
-
-# Debug logs
-*.log
-err.txt
-cargo_check*.txt
-clippy_warns*.txt
-
-# Ignore OS-specific test artifacts
-test_sandbox/
-
-# Ignore daemon pid files
-*.pid
