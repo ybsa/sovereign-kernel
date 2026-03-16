@@ -67,6 +67,14 @@ cargo run -p sk-cli -- dashboard   # Terminal web dashboard → http://localhost
 cargo run -p sk-cli -- hands list  # Show all 9 bundled hands
 ```
 
+## 🧪 On-Demand Heavy Tests
+
+- What: A longer-running test suite intended for integration and stress-path validation.
+- How to run:
+  - In GitHub, use Heavy Tests (on-demand) workflow to run cargo test --workspace.
+  - Locally, you can run heavy tests selectively by executing targeted tests or by introducing a local flag to separate heavy tests (not yet in CI by default).
+- Why: Keeps PR CI fast and reliable by default while providing a path to exercise slow/long-running paths when needed.
+
 **Linux / macOS:**
 ```bash
 export GEMINI_API_KEY="your-key"
