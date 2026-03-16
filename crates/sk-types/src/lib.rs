@@ -38,4 +38,4 @@ pub use error::{SovereignError, SovereignResult};
 pub use message::{ContentBlock, Message, MessageContent, Role, TokenUsage};
 pub use scheduler::{CronAction, CronDelivery, CronJob, CronJobId, CronSchedule};
 pub use session::{Session, SessionId};
-pub use tool::{ToolCall, ToolDefinition, ToolResult};
+pub use tool::{ToolCall, ToolDefinition, ToolResult, ToolSignal};

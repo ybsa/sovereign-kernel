@@ -26,8 +26,10 @@ pub struct AgentLoopResult {
 }
 
 /// Configuration for an agent loop run.
-pub type ToolExecutor = Box<dyn Fn(&ToolCall) -> SovereignResult<String> + Send + Sync>;
+pub type ToolExecutor = Box<dyn Fn(&ToolCall) -> SovereignResult<sk_types::ToolResult> + Send + Sync>;
 pub type StreamHandler = Box<dyn Fn(&str) + Send + Sync>;
+pub type UsageHandler = Box<dyn Fn(crate::llm_driver::TokenUsage) -> SovereignResult<()> + Send + Sync>;
+pub type CheckpointHandler = Box<dyn Fn(&Session) -> SovereignResult<()> + Send + Sync>;
 
 use std::sync::Arc;
 
@@ -57,9 +59,9 @@ pub struct AgentLoopConfig {
     /// Optional streaming callback to receive tokens as they are generated.
     pub stream_handler: Option<StreamHandler>,
     /// Optional callback to report token usage per iteration for global budgeting.
-    pub on_usage: Option<Box<dyn Fn(crate::llm_driver::TokenUsage) -> SovereignResult<()> + Send + Sync>>,
+    pub on_usage: Option<UsageHandler>,
     /// Optional callback to save state checkpoints for recovery.
-    pub checkpoint_handler: Option<Box<dyn Fn(&Session) -> SovereignResult<()> + Send + Sync>>,
+    pub checkpoint_handler: Option<CheckpointHandler>,
 }
 
 use crate::loop_guard::LoopGuard;
@@ -299,19 +301,26 @@ pub async fn run_agent_loop(
                     }
 
                     // 2. Execute tool
-                    let result = match (config.tool_executor)(tool_call) {
-                        Ok(output) => {
+                    let tool_result = match (config.tool_executor)(tool_call) {
+                        Ok(res) => {
                             consecutive_errors = 0;
-                            if output.is_empty() {
-                                "Success (No output returned)".to_string()
-                            } else {
-                                output
-                            }
+                            res
                         }
                         Err(e) => {
                             consecutive_errors += 1;
-                            format!("Error executing tool: {e}")
+                            sk_types::ToolResult {
+                                tool_use_id: tool_call.id.clone(),
+                                content: format!("Error executing tool: {e}"),
+                                is_error: true,
+                                signal: None,
+                            }
                         }
+                    };
+
+                    let content = if tool_result.content.is_empty() {
+                        "Success (No output returned)".to_string()
+                    } else {
+                        tool_result.content
                     };
 
                     let tool_msg = sk_types::message::Message {
@@ -319,8 +328,8 @@ pub async fn run_agent_loop(
                         content: sk_types::message::MessageContent::Blocks(vec![
                             sk_types::message::ContentBlock::ToolResult {
                                 tool_use_id: tool_call.id.clone(),
-                                content: result,
-                                is_error: consecutive_errors > 0, // Mark as error block if it was an error
+                                content,
+                                is_error: tool_result.is_error,
                             },
                         ]),
                     };

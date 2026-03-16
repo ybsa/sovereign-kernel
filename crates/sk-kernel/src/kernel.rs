@@ -1,12 +1,12 @@
 //! Main kernel struct — lifecycle management for the Sovereign Kernel.
 
+use dashmap::DashMap;
 use sk_mcp::McpRegistry;
 use sk_memory::MemorySubstrate;
 use sk_soul::SoulIdentity;
 use sk_types::config::KernelConfig;
-use sk_types::{SovereignError, SovereignResult, AgentId};
+use sk_types::{AgentId, SovereignError, SovereignResult};
 use std::sync::Arc;
-use dashmap::DashMap;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
@@ -123,8 +123,8 @@ impl SovereignKernel {
                     sk_types::config::McpEnv::Map(map) => map
                         .iter()
                         .map(|(k, v)| {
-                            let val = if v.starts_with('$') {
-                                std::env::var(&v[1..]).unwrap_or_default()
+                            let val = if let Some(env_name) = v.strip_prefix('$') {
+                                std::env::var(env_name).unwrap_or_default()
                             } else {
                                 v.clone()
                             };
@@ -154,13 +154,12 @@ impl SovereignKernel {
             Err(e) => {
                 warn!("Failed to initialize LLM driver from config: {e}. Falling back to default.");
                 // Fallback to Anthropic placeholder (current behavior)
-                (
+                let fallback_driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = 
                     Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
                         "".to_string(),
                         "https://api.anthropic.com".to_string(),
-                    )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
-                    "claude-3-5-sonnet-20241022".to_string(),
-                )
+                    ));
+                (fallback_driver, "claude-3-5-sonnet-20241022".to_string())
             }
         };
         let model_name = model;
@@ -203,7 +202,7 @@ impl SovereignKernel {
         // Initialize Hands Registry
         let mut hand_registry = sk_hands::registry::HandRegistry::new();
         hand_registry.load_bundled();
-        
+
         let custom_hands_path = config.data_dir.join("hands");
         if !custom_hands_path.exists() {
             let _ = std::fs::create_dir_all(&custom_hands_path);
@@ -268,7 +267,9 @@ impl SovereignKernel {
         let config_value = serde_json::Value::Null;
 
         agent_config.checkpoint_handler = Some(Box::new(move |_sess| {
-            k.memory.checkpoint.save(&aid, &sid.0, &config_value, &serde_json::Value::Null)
+            k.memory
+                .checkpoint
+                .save(&aid, &sid.0, &config_value, &serde_json::Value::Null)
         }));
 
         // 1. Create and store cancellation token
@@ -326,7 +327,11 @@ impl SovereignKernel {
         };
 
         // 2. Restore session
-        let mut session = match self.memory.sessions.load(sk_types::SessionId(checkpoint.session_id))? {
+        let mut session = match self
+            .memory
+            .sessions
+            .load(sk_types::SessionId(checkpoint.session_id))?
+        {
             Some(s) => s,
             None => {
                 warn!(session_id = %checkpoint.session_id, "Resurrector: Session for checkpoint not found. Creating new empty session.");
@@ -341,7 +346,7 @@ impl SovereignKernel {
 
         // 4. Re-run agent loop with restored config
         let system_prompt = self.soul.to_system_prompt_fragment();
-        
+
         let mut agent_config = crate::executor::create_agent_config(
             self.clone(),
             self.driver.clone(),
@@ -359,16 +364,22 @@ impl SovereignKernel {
         let config_value = serde_json::Value::Null;
 
         agent_config.checkpoint_handler = Some(Box::new(move |_sess| {
-            k.memory.checkpoint.save(&aid, &sid.0, &config_value, &serde_json::Value::Null)
+            k.memory
+                .checkpoint
+                .save(&aid, &sid.0, &config_value, &serde_json::Value::Null)
         }));
 
         // Trigger loop continuation
-        let _ = sk_engine::agent_loop::run_agent_loop(agent_config, &mut session, "System: Please continue where you left off.")
-            .await?;
+        let _ = sk_engine::agent_loop::run_agent_loop(
+            agent_config,
+            &mut session,
+            "System: Please continue where you left off.",
+        )
+        .await?;
 
         // Save session after resurrection
         let _ = self.memory.sessions.save(&session);
-        
+
         info!(agent_id = %agent_id, "Resurrector: Agent successfully resurrected");
         Ok(())
     }
@@ -535,101 +546,108 @@ impl SovereignKernel {
 /// Helper to initialize the LLM driver from configuration.
 async fn init_llm_driver(
     config: &sk_types::config::KernelConfig,
-) -> SovereignResult<(Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>, String)> {
+) -> SovereignResult<(
+    Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+    String,
+)> {
     let dm = &config.default_model;
     let api_key = std::env::var(&dm.api_key_env).unwrap_or_default();
-    
+
     // 1. If we have a base_url, we can usually default to OpenAICompatDriver
     if let Some(base_url) = &dm.base_url {
         info!(provider = %dm.provider, model = %dm.model, url = %base_url, "Using custom LLM provider (OpenAI-compatible)");
-        return Ok((
-            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(api_key, base_url.clone())),
-            dm.model.clone(),
-        ));
+        let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = 
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key,
+                base_url.clone(),
+            ));
+        return Ok((driver, dm.model.clone()));
     }
 
     // 2. Known provider logic
-    match dm.provider.to_lowercase().as_str() {
-        "anthropic" => Ok((
-            Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
-                api_key,
-                "https://api.anthropic.com".to_string(),
-            )),
-            dm.model.clone(),
-        )),
-        "openai" => Ok((
-            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key,
-                "https://api.openai.com/v1".to_string(),
-            )),
-            dm.model.clone(),
-        )),
-        "gemini" => Ok((
-            Arc::new(sk_engine::drivers::gemini::GeminiDriver::new(
-                api_key,
-                "https://generativelanguage.googleapis.com".to_string(),
-            )),
-            dm.model.clone(),
-        )),
-        "groq" => Ok((
-            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key,
-                "https://api.groq.com/openai/v1".to_string(),
-            )),
-            dm.model.clone(),
-        )),
-        "deepseek" => Ok((
-            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key,
-                "https://api.deepseek.com".to_string(),
-            )),
-            dm.model.clone(),
-        )),
-        "xai" | "grok" => Ok((
-            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key,
-                "https://api.x.ai/v1".to_string(),
-            )),
-            dm.model.clone(),
-        )),
-        "openrouter" => Ok((
-            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key,
-                "https://openrouter.ai/api/v1".to_string(),
-            )),
-            dm.model.clone(),
-        )),
-        "mistral" => Ok((
-            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key,
-                "https://api.mistral.ai/v1".to_string(),
-            )),
-            dm.model.clone(),
-        )),
-        _ => {
-            // Last resort: If we have an API key for a known env var, try to auto-detect
-            if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
-                Ok((
-                    Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
-                        key,
-                        "https://api.anthropic.com".to_string(),
-                    )),
-                    "claude-3-5-sonnet-20241022".to_string(),
-                ))
-            } else if let Ok(key) = std::env::var("OPENAI_API_KEY") {
-                Ok((
-                    Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                        key,
-                        "https://api.openai.com/v1".to_string(),
-                    )),
-                    "gpt-4o".to_string(),
-                ))
-            } else {
-                Err(SovereignError::Config(format!(
-                    "Unknown LLM provider '{}' and no fallback API keys found",
-                    dm.provider
-                )))
+    let (driver, model_name): (Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>, String) = 
+        match dm.provider.to_lowercase().as_str() {
+            "anthropic" => (
+                Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
+                    api_key.clone(),
+                    "https://api.anthropic.com".to_string(),
+                )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+                dm.model.clone(),
+            ),
+            "openai" => (
+                Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                    api_key.clone(),
+                    "https://api.openai.com/v1".to_string(),
+                )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+                dm.model.clone(),
+            ),
+            "gemini" => (
+                Arc::new(sk_engine::drivers::gemini::GeminiDriver::new(
+                    api_key.clone(),
+                    "https://generativelanguage.googleapis.com".to_string(),
+                )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+                dm.model.clone(),
+            ),
+            "groq" => (
+                Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                    api_key.clone(),
+                    "https://api.groq.com/openai/v1".to_string(),
+                )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+                dm.model.clone(),
+            ),
+            "deepseek" => (
+                Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                    api_key.clone(),
+                    "https://api.deepseek.com".to_string(),
+                )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+                dm.model.clone(),
+            ),
+            "xai" | "grok" => (
+                Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                    api_key.clone(),
+                    "https://api.x.ai/v1".to_string(),
+                )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+                dm.model.clone(),
+            ),
+            "openrouter" => (
+                Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                    api_key.clone(),
+                    "https://openrouter.ai/api/v1".to_string(),
+                )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+                dm.model.clone(),
+            ),
+            "mistral" => (
+                Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                    api_key.clone(),
+                    "https://api.mistral.ai/v1".to_string(),
+                )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+                dm.model.clone(),
+            ),
+            _ => { // Last resort
+                if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
+                    let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = Arc::new(
+                        sk_engine::drivers::anthropic::AnthropicDriver::new(
+                            key,
+                            "https://api.anthropic.com".to_string(),
+                        ),
+                    );
+                    (driver, "claude-3-5-sonnet-20241022".to_string())
+                } else if let Ok(key) = std::env::var("OPENAI_API_KEY") {
+                    let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = Arc::new(
+                        sk_engine::drivers::openai::OpenAIDriver::new(
+                            key,
+                            "https://api.openai.com/v1".to_string(),
+                        ),
+                    );
+                    (driver, "gpt-4o".to_string())
+                } else {
+                    return Err(SovereignError::Config(format!(
+                        "Unknown LLM provider '{}' and no fallback API keys found",
+                        dm.provider
+                    )));
+                }
             }
-        }
-    }
+        };
+
+    Ok((driver, model_name))
 }
