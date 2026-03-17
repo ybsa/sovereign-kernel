@@ -234,42 +234,45 @@ async fn kill_tree_unix(pid: u32, grace_ms: u64) -> Result<bool, String> {
             .await;
     }
 
-    // Wait for grace period.
-    tokio::time::sleep(std::time::Duration::from_millis(grace_ms)).await;
+    // Wait for grace period by polling every 50ms.
+    let max_iterations = std::cmp::max(1, grace_ms / 50);
+    for _ in 0..max_iterations {
+        let check = Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .output()
+            .await;
 
-    // Check if still alive.
-    let check = Command::new("kill")
-        .args(["-0", &pid.to_string()])
+        match check {
+            Ok(output) if !output.status.success() => {
+                // Return code != 0 means process is dead.
+                return Ok(true);
+            }
+            Err(_) => return Ok(true), // kill command failed, assume dead
+            _ => {}                    // Still alive
+        }
+        
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+
+    // If we reach here, it's still alive after grace period — force kill.
+    tracing::warn!(
+        pid,
+        "Process still alive after grace period, sending SIGKILL"
+    );
+
+    // Try group kill first.
+    let _ = Command::new("kill")
+        .args(["-9", &format!("-{pid_i32}")])
         .output()
         .await;
 
-    match check {
-        Ok(output) if output.status.success() => {
-            // Still alive — force kill.
-            tracing::warn!(
-                pid,
-                "Process still alive after grace period, sending SIGKILL"
-            );
+    // Also try direct kill.
+    let _ = Command::new("kill")
+        .args(["-9", &pid.to_string()])
+        .output()
+        .await;
 
-            // Try group kill first.
-            let _ = Command::new("kill")
-                .args(["-9", &format!("-{pid_i32}")])
-                .output()
-                .await;
-
-            // Also try direct kill.
-            let _ = Command::new("kill")
-                .args(["-9", &pid.to_string()])
-                .output()
-                .await;
-
-            Ok(true)
-        }
-        _ => {
-            // Process is already dead (kill -0 failed = no such process).
-            Ok(true)
-        }
-    }
+    Ok(true)
 }
 
 #[cfg(windows)]
