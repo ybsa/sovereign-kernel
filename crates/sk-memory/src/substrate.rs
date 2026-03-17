@@ -258,35 +258,45 @@ impl MemorySubstrate {
             .conn
             .lock()
             .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
-        
+
         let mut stmt = conn.prepare(
             "SELECT id, manifest, created_at, last_active FROM agents ORDER BY last_active DESC"
         ).map_err(|e| SovereignError::Memory(e.to_string()))?;
 
-        let rows = stmt.query_map([], |row| {
-            let id_str: String = row.get(0)?;
-            let manifest_json: String = row.get(1)?;
-            let created_at: String = row.get(2)?;
-            let last_active: String = row.get(3)?;
+        let rows = stmt
+            .query_map([], |row| {
+                let id_str: String = row.get(0)?;
+                let manifest_json: String = row.get(1)?;
+                let created_at: String = row.get(2)?;
+                let last_active: String = row.get(3)?;
 
-            Ok((id_str, manifest_json, created_at, last_active))
-        }).map_err(|e| SovereignError::Memory(e.to_string()))?;
+                Ok((id_str, manifest_json, created_at, last_active))
+            })
+            .map_err(|e| SovereignError::Memory(e.to_string()))?;
 
         let mut agents = Vec::new();
         for row in rows {
-            let (id_str, manifest_json, created_at, last_active) = row.map_err(|e| SovereignError::Memory(e.to_string()))?;
-            
-            let id = id_str.parse().map_err(|_| SovereignError::Internal("Invalid AgentID in DB".into()))?;
-            let manifest: sk_types::AgentManifest = serde_json::from_str(&manifest_json).map_err(|e| SovereignError::Internal(e.to_string()))?;
-            
+            let (id_str, manifest_json, created_at, last_active) =
+                row.map_err(|e| SovereignError::Memory(e.to_string()))?;
+
+            let id = id_str
+                .parse()
+                .map_err(|_| SovereignError::Internal("Invalid AgentID in DB".into()))?;
+            let manifest: sk_types::AgentManifest = serde_json::from_str(&manifest_json)
+                .map_err(|e| SovereignError::Internal(e.to_string()))?;
+
             agents.push(sk_types::AgentEntry {
                 id,
                 name: manifest.name.clone(),
                 manifest: manifest.clone(),
                 state: sk_types::agent::AgentState::Created,
                 mode: sk_types::AgentMode::Full,
-                created_at: chrono::DateTime::parse_from_rfc3339(&created_at).map(|dt| dt.with_timezone(&chrono::Utc)).unwrap_or_else(|_| chrono::Utc::now()),
-                last_active: chrono::DateTime::parse_from_rfc3339(&last_active).map(|dt| dt.with_timezone(&chrono::Utc)).unwrap_or_else(|_| chrono::Utc::now()),
+                created_at: chrono::DateTime::parse_from_rfc3339(&created_at)
+                    .map(|dt| dt.with_timezone(&chrono::Utc))
+                    .unwrap_or_else(|_| chrono::Utc::now()),
+                last_active: chrono::DateTime::parse_from_rfc3339(&last_active)
+                    .map(|dt| dt.with_timezone(&chrono::Utc))
+                    .unwrap_or_else(|_| chrono::Utc::now()),
                 parent: None,
                 children: vec![],
                 session_id: sk_types::agent::SessionId::new(), // Transient for status

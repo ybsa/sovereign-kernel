@@ -212,6 +212,9 @@ impl ProcessManager {
             let _ = crate::runtime::subprocess_sandbox::kill_process_tree(pid, 3000).await;
         }
         let _ = proc.child.kill().await;
+        // Wait for the child to exit and be reaped.
+        // This is critical on CI to avoid tokio shutdown hangs due to zombie child processes.
+        let _ = proc.child.wait().await;
         Ok(())
     }
 

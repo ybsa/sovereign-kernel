@@ -12,8 +12,8 @@
 use clap::{Parser, Subcommand};
 // Removed unused EnvFilter import
 
-mod audit;
 mod agents;
+mod audit;
 mod bridge;
 mod chat;
 mod daemon;
@@ -169,7 +169,11 @@ async fn main() -> anyhow::Result<()> {
         Commands::Chat => chat::run(config).await?,
         Commands::Init => init::run().await?,
         Commands::Start => daemon::start(config).await?,
-        Commands::Run { task, mode, schedule } => run::execute(config, &task, &mode, schedule).await?,
+        Commands::Run {
+            task,
+            mode,
+            schedule,
+        } => run::execute(config, &task, &mode, schedule).await?,
         Commands::Status => status::print_status().await?,
         Commands::Kill { id } => {
             if let Some(agent_id) = id {

@@ -8,8 +8,6 @@ use crate::llm_driver::{CompletionRequest, LlmDriver, StopReason};
 use sk_types::{Message, Session, SovereignResult, ToolCall, ToolDefinition};
 use tracing::{debug, info, warn};
 
-
-
 /// Result of an agent loop execution.
 #[derive(Debug)]
 pub struct AgentLoopResult {
@@ -26,9 +24,11 @@ pub struct AgentLoopResult {
 }
 
 /// Configuration for an agent loop run.
-pub type ToolExecutor = Box<dyn Fn(&ToolCall) -> SovereignResult<sk_types::ToolResult> + Send + Sync>;
+pub type ToolExecutor =
+    Box<dyn Fn(&ToolCall) -> SovereignResult<sk_types::ToolResult> + Send + Sync>;
 pub type StreamHandler = Box<dyn Fn(&str) + Send + Sync>;
-pub type UsageHandler = Box<dyn Fn(crate::llm_driver::TokenUsage) -> SovereignResult<()> + Send + Sync>;
+pub type UsageHandler =
+    Box<dyn Fn(crate::llm_driver::TokenUsage) -> SovereignResult<()> + Send + Sync>;
 pub type CheckpointHandler = Box<dyn Fn(&Session) -> SovereignResult<()> + Send + Sync>;
 
 use std::sync::Arc;

@@ -217,7 +217,16 @@ async fn kill_tree_unix(pid: u32, grace_ms: u64) -> Result<bool, String> {
         .output()
         .await;
 
-    if group_kill.is_err() {
+    // Command::output returns Ok even if the exit code is non-zero (i.e. the command ran, but failed).
+    // This happens when the process group (negative PID) does not exist, causing `kill` to fail with status 1.
+    // If we used `is_err()` here, it would incorrectly assume success and skip the fallback process kill,
+    // thereby causing zombie processes to survive until `SIGKILL`.
+    let group_kill_failed = match group_kill {
+        Ok(output) => !output.status.success(),
+        Err(_) => true,
+    };
+
+    if group_kill_failed {
         // Fallback: kill just the process.
         let _ = Command::new("kill")
             .args(["-TERM", &pid.to_string()])

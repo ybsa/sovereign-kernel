@@ -22,7 +22,10 @@ pub fn village_forge_tool() -> ToolDefinition {
 pub fn handle_village_forge(tool_use_id: &str, task_description: &str) -> ToolResult {
     ToolResult {
         tool_use_id: tool_use_id.to_string(),
-        content: format!("Requesting the Builder to forge a new capability for: {}", task_description),
+        content: format!(
+            "Requesting the Builder to forge a new capability for: {}",
+            task_description
+        ),
         is_error: false,
         signal: Some(ToolSignal::VillageForge {
             task_description: task_description.to_string(),

@@ -9,9 +9,9 @@ use dashmap::DashMap;
 use serde::Serialize;
 use sk_types::agent::AgentId;
 use std::collections::HashMap;
-use tracing::{info, warn, error};
-use uuid::Uuid;
 use std::path::Path;
+use tracing::{error, info, warn};
+use uuid::Uuid;
 
 // ─── Settings availability types ────────────────────────────────────────────
 
@@ -92,18 +92,16 @@ impl HandRegistry {
             let path = entry.path();
             if path.extension().and_then(|s| s.to_str()) == Some("toml") {
                 match std::fs::read_to_string(&path) {
-                    Ok(content) => {
-                        match toml::from_str::<HandDefinition>(&content) {
-                            Ok(def) => {
-                                info!(hand = %def.id, name = %def.name, "Loaded custom hand");
-                                self.definitions.insert(def.id.clone(), def);
-                                count += 1;
-                            }
-                            Err(e) => {
-                                error!(path = %path.display(), error = %e, "Failed to parse custom hand TOML");
-                            }
+                    Ok(content) => match toml::from_str::<HandDefinition>(&content) {
+                        Ok(def) => {
+                            info!(hand = %def.id, name = %def.name, "Loaded custom hand");
+                            self.definitions.insert(def.id.clone(), def);
+                            count += 1;
                         }
-                    }
+                        Err(e) => {
+                            error!(path = %path.display(), error = %e, "Failed to parse custom hand TOML");
+                        }
+                    },
                     Err(e) => {
                         error!(path = %path.display(), error = %e, "Failed to read custom hand file");
                     }
@@ -538,7 +536,7 @@ mod tests {
         let mut reg = HandRegistry::new();
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().join("test_hand.toml");
-        
+
         // Create a fake hand TOML
         let toml_content = r#"
 id = "custom-test"
@@ -555,7 +553,7 @@ system_prompt = "Custom."
 
         let count = reg.load_custom_hands(temp_dir.path());
         assert_eq!(count, 1);
-        
+
         let found = reg.get_definition("custom-test");
         assert!(found.is_some());
         assert_eq!(found.unwrap().name, "Custom Test");

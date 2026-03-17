@@ -28,58 +28,103 @@ pub fn system_config_tool() -> ToolDefinition {
     }
 }
 
-pub fn handle_system_config(action: &str, target: Option<&str>, value: Option<&str>) -> Result<String, sk_types::SovereignError> {
+pub fn handle_system_config(
+    action: &str,
+    target: Option<&str>,
+    value: Option<&str>,
+) -> Result<String, sk_types::SovereignError> {
     match action {
         "list_services" => {
-            let output = Command::new("net")
-                .arg("start")
-                .output()
-                .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to list services: {}", e)))?;
+            let output = Command::new("net").arg("start").output().map_err(|e| {
+                sk_types::SovereignError::ToolExecutionError(format!(
+                    "Failed to list services: {}",
+                    e
+                ))
+            })?;
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
-        },
+        }
         "start_service" => {
-            let t = target.ok_or_else(|| sk_types::SovereignError::ToolExecutionError("Target service name required for start_service".into()))?;
+            let t = target.ok_or_else(|| {
+                sk_types::SovereignError::ToolExecutionError(
+                    "Target service name required for start_service".into(),
+                )
+            })?;
             let output = Command::new("net")
                 .args(["start", t])
                 .output()
-                .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to start service {}: {}", t, e)))?;
+                .map_err(|e| {
+                    sk_types::SovereignError::ToolExecutionError(format!(
+                        "Failed to start service {}: {}",
+                        t, e
+                    ))
+                })?;
             if output.status.success() {
                 Ok(format!("Successfully started service {}", t))
             } else {
-                Err(sk_types::SovereignError::ToolExecutionError(String::from_utf8_lossy(&output.stderr).to_string()))
+                Err(sk_types::SovereignError::ToolExecutionError(
+                    String::from_utf8_lossy(&output.stderr).to_string(),
+                ))
             }
-        },
+        }
         "stop_service" => {
-            let t = target.ok_or_else(|| sk_types::SovereignError::ToolExecutionError("Target service name required for stop_service".into()))?;
+            let t = target.ok_or_else(|| {
+                sk_types::SovereignError::ToolExecutionError(
+                    "Target service name required for stop_service".into(),
+                )
+            })?;
             let output = Command::new("net")
                 .args(["stop", t])
                 .output()
-                .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to stop service {}: {}", t, e)))?;
+                .map_err(|e| {
+                    sk_types::SovereignError::ToolExecutionError(format!(
+                        "Failed to stop service {}: {}",
+                        t, e
+                    ))
+                })?;
             if output.status.success() {
                 Ok(format!("Successfully stopped service {}", t))
             } else {
-                Err(sk_types::SovereignError::ToolExecutionError(String::from_utf8_lossy(&output.stderr).to_string()))
+                Err(sk_types::SovereignError::ToolExecutionError(
+                    String::from_utf8_lossy(&output.stderr).to_string(),
+                ))
             }
-        },
+        }
         "set_env_var" => {
-            let t = target.ok_or_else(|| sk_types::SovereignError::ToolExecutionError("Target variable name required for set_env_var".into()))?;
+            let t = target.ok_or_else(|| {
+                sk_types::SovereignError::ToolExecutionError(
+                    "Target variable name required for set_env_var".into(),
+                )
+            })?;
             let v = value.unwrap_or("");
-            let output = Command::new("setx")
-                .args([t, v])
-                .output()
-                .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to set env var {}: {}", t, e)))?;
-             if output.status.success() {
-                Ok(format!("Successfully set environment variable {} to {} (persistent)", t, v))
+            let output = Command::new("setx").args([t, v]).output().map_err(|e| {
+                sk_types::SovereignError::ToolExecutionError(format!(
+                    "Failed to set env var {}: {}",
+                    t, e
+                ))
+            })?;
+            if output.status.success() {
+                Ok(format!(
+                    "Successfully set environment variable {} to {} (persistent)",
+                    t, v
+                ))
             } else {
-                Err(sk_types::SovereignError::ToolExecutionError(String::from_utf8_lossy(&output.stderr).to_string()))
+                Err(sk_types::SovereignError::ToolExecutionError(
+                    String::from_utf8_lossy(&output.stderr).to_string(),
+                ))
             }
-        },
+        }
         "get_system_info" => {
-             let output = Command::new("systeminfo")
-                .output()
-                .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to get system info: {}", e)))?;
+            let output = Command::new("systeminfo").output().map_err(|e| {
+                sk_types::SovereignError::ToolExecutionError(format!(
+                    "Failed to get system info: {}",
+                    e
+                ))
+            })?;
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
-        },
-        _ => Err(sk_types::SovereignError::ToolExecutionError(format!("Unknown system_config action: {}", action)))
+        }
+        _ => Err(sk_types::SovereignError::ToolExecutionError(format!(
+            "Unknown system_config action: {}",
+            action
+        ))),
     }
 }
