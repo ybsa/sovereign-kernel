@@ -1,13 +1,11 @@
-<p align="center">
-  <img src="https://img.shields.io/badge/language-Rust-orange?style=flat-square" alt="Rust" />
-  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT" />
-  <img src="https://img.shields.io/badge/status-Phase%2024%20Complete-brightgreen?style=flat-square" alt="Status" />
-  <img src="https://img.shields.io/badge/hands-12%20Bundled-brightgreen?style=flat-square" alt="Hands" />
-  <img src="https://img.shields.io/badge/security-Merkle%20Audit%20Trail-brightgreen?style=flat-square" alt="Security" />
-  <img src="https://img.shields.io/badge/village-Agent%20Ecosystem-blueviolet?style=flat-square" alt="Village" />
-</p>
-
 # Sovereign Kernel: The Agentic Operating System
+
+![Rust](https://img.shields.io/badge/language-Rust-orange?style=flat-square)
+![MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
+![Status](https://img.shields.io/badge/status-Phase%2024%20Complete-brightgreen?style=flat-square)
+![Hands](https://img.shields.io/badge/hands-12%20Bundled-brightgreen?style=flat-square)
+![Security](https://img.shields.io/badge/security-Merkle%20Audit%20Trail-brightgreen?style=flat-square)
+![Village](https://img.shields.io/badge/village-Agent%20Ecosystem-blueviolet?style=flat-square)
 
 > [!WARNING]
 > **Active Development**: Sovereign Kernel is experimental software under active development. Expect breaking changes between versions.
@@ -24,9 +22,9 @@ It is not just a framework — it is the mediation layer between Autonomous Enti
 - **Spawns agents from natural language** — describe a task, the Builder creates the right agent automatically
 - **Executes laboratory tools safely** — shell, file, code, web, browser — with capability gates and sandbox policy
 - **Full host access** — desktop control, system config, app installation (with approval gates)
--   **User-Controlled Risk**: Users can toggle between `Sandbox` and `Unrestricted` modes. In Sandbox mode, the kernel acts as a strict guard.
--   **Safety & Budgeting**: Hard reasoning limits and global USD budgets are enforced to prevent cost overruns and infinite loops. See [SAFETY_CONTROLS.md](SAFETY_CONTROLS.md).
--   **Audit Trails**: Every action an agent takes is recorded in a tamper-evident audit log, allowing for full post-mortem analysis of agent behavior.
+- **User-Controlled Risk**: Users can toggle between `Sandbox` and `Unrestricted` modes. In Sandbox mode, the kernel acts as a strict guard.
+- **Safety & Budgeting**: Hard reasoning limits and global USD budgets are enforced to prevent cost overruns and infinite loops. See [SAFETY_CONTROLS.md](SAFETY_CONTROLS.md).
+- **Audit Trails**: Every action an agent takes is recorded in a tamper-evident audit log, allowing for full post-mortem analysis of agent behavior.
 - **Crash recovery** — The Resurrector auto-restarts dead agents from their last checkpoint
 - **Remembers everything** via a hybrid SQLite + BM25 vector memory substrate across sessions
 - **Optimizes token usage** with "The Healer" (Smart Truncation & Ground-Truth Context Compaction)
@@ -39,6 +37,7 @@ It is not just a framework — it is the mediation layer between Autonomous Enti
 ---
 
 ## ⚠️ Safety & Budget Controls
+
 Sovereign Kernel includes hard limits, global budgeting, and strict gating to prevent runaway costs and unintended damage.
 
 - **Hard Limits**: Default 15 iterations / 200k tokens per task.
@@ -53,12 +52,14 @@ See [docs/SAFETY_CONTROLS.md](docs/SAFETY_CONTROLS.md) for details.
 ## 🚀 Quick Start
 
 ### Requirements
+
 - Rust `1.75+`
 - An API key for at least one LLM provider
 
 ### Run from source
 
 **Windows (PowerShell):**
+
 ```powershell
 $env:GEMINI_API_KEY="your-key"
 cargo run -p sk-cli -- init        # First-time setup wizard
@@ -77,6 +78,7 @@ cargo run -p sk-cli -- hands list  # Show all 9 bundled hands
   - *Note: As of the recent CI reliability updates, the test suite now gracefully reaps all lingering child processes, preventing `tokio` shutdown hangs and eliminating the need for manual CI cancellations.*
 
 **Linux / macOS:**
+
 ```bash
 export GEMINI_API_KEY="your-key"
 cargo run -p sk-cli -- init
@@ -86,8 +88,9 @@ cargo run -p sk-cli -- hands list
 ```
 
 ### Supported LLM Providers (auto-detected from env)
+
 | Provider | Env Variable |
-|----------|-------------|
+| -------- | ----------- |
 | Anthropic Claude | `ANTHROPIC_API_KEY` |
 | OpenAI GPT-4o | `OPENAI_API_KEY` |
 | Google Gemini | `GEMINI_API_KEY` |
@@ -98,7 +101,7 @@ cargo run -p sk-cli -- hands list
 
 ## ⚡ CLI Commands
 
-```
+```bash
 sovereign init                                  # First-run setup wizard
 sovereign chat                                  # Interactive agent REPL
 sovereign start                                 # Start as background daemon
@@ -125,7 +128,7 @@ sovereign audit verify                          # Verify Merkle chain integrity
 Hands are autonomous capability packages — each one is a pre-configured agent with specific tools, prompts, and dashboard metrics.
 
 | Hand | Category | What It Does |
-|------|----------|-------------|
+| ---- | -------- | ----------- |
 | **browser** | Automation | Playwright-based web browser automation |
 | **researcher** | Research | Multi-source deep research with citation tracking |
 | **web-search** | Research | Brave/Tavily web search + intelligence reports |
@@ -171,7 +174,7 @@ sovereign dashboard --no-open    # Don't auto-open browser
 Sovereign Kernel is a living **Agent Village** — agents can communicate, delegate tasks, recover from crashes, and be spawned from plain English.
 
 | Feature | Tool / System | Description |
-|---------|---------------|-------------|
+| ------- | ------------- | ----------- |
 | **Natural Language Builder** | `builder` | The Architect forges a permanent Village member (Hand) from your intent |
 | **Agent Messaging** | `agent_message` | Direct messages between agents via the Inter-Agent Bus |
 | **Summoning Workers** | `summon_skeleton` | The Witch dynamically summons sandboxed workers for parallel tasks |
@@ -185,7 +188,7 @@ Sovereign Kernel is a living **Agent Village** — agents can communicate, deleg
 
 ## 🏗️ Architecture (10-Crate Workspace)
 
-```
+```text
 sk-types    → Shared types, capability gates, taint tracking
 sk-engine   → Agent loop, LLM drivers, tool execution
 sk-kernel   → Daemon lifecycle, scheduling, heartbeat
@@ -205,7 +208,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deep dive.
 ## 🗺️ Roadmap
 
 | Phase | Status | Milestone |
-|-------|--------|-----------|
+| ----- | ------ | --------- |
 | 1–6 | ✅ Complete | Kernel, Engine, Security, Media, LLM Drivers |
 | 7–11 | ✅ Complete | Industrial Core: 52 skills, BM25, Audit Trail, API Bridge |
 | 12 | ✅ Complete | Terminal Web Dashboard (`sovereign dashboard`) |
