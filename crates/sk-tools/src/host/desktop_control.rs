@@ -24,7 +24,10 @@ pub fn desktop_control_tool() -> ToolDefinition {
     }
 }
 
-pub fn handle_desktop_control(action: &str, value: &str) -> Result<String, sk_types::SovereignError> {
+pub fn handle_desktop_control(
+    action: &str,
+    value: &str,
+) -> Result<String, sk_types::SovereignError> {
     match action {
         "set_wallpaper" => {
             // Using PowerShell to set wallpaper
@@ -35,41 +38,73 @@ pub fn handle_desktop_control(action: &str, value: &str) -> Result<String, sk_ty
             let output = Command::new("powershell")
                 .args(["-Command", &script])
                 .output()
-                .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to execute powershell: {}", e)))?;
-            
+                .map_err(|e| {
+                    sk_types::SovereignError::ToolExecutionError(format!(
+                        "Failed to execute powershell: {}",
+                        e
+                    ))
+                })?;
+
             if output.status.success() {
                 Ok(format!("Successfully set wallpaper to {}", value))
             } else {
-                Err(sk_types::SovereignError::ToolExecutionError(String::from_utf8_lossy(&output.stderr).to_string()))
+                Err(sk_types::SovereignError::ToolExecutionError(
+                    String::from_utf8_lossy(&output.stderr).to_string(),
+                ))
             }
-        },
+        }
         "toggle_dark_mode" => {
             let is_dark = value.to_lowercase() == "true" || value == "1";
             let val = if is_dark { 0 } else { 1 }; // AppsUseLightTheme: 0 is dark, 1 is light
-            
+
             let output = Command::new("reg")
-                .args(["add", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "/v", "AppsUseLightTheme", "/t", "REG_DWORD", "/d", &val.to_string(), "/f"])
+                .args([
+                    "add",
+                    "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+                    "/v",
+                    "AppsUseLightTheme",
+                    "/t",
+                    "REG_DWORD",
+                    "/d",
+                    &val.to_string(),
+                    "/f",
+                ])
                 .output()
-                .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to execute reg command: {}", e)))?;
-            
-             if output.status.success() {
+                .map_err(|e| {
+                    sk_types::SovereignError::ToolExecutionError(format!(
+                        "Failed to execute reg command: {}",
+                        e
+                    ))
+                })?;
+
+            if output.status.success() {
                 Ok(format!("Successfully toggled app dark mode to {}", is_dark))
             } else {
-                Err(sk_types::SovereignError::ToolExecutionError(String::from_utf8_lossy(&output.stderr).to_string()))
+                Err(sk_types::SovereignError::ToolExecutionError(
+                    String::from_utf8_lossy(&output.stderr).to_string(),
+                ))
             }
-        },
+        }
         "notify" => {
-             let script = format!(
+            let script = format!(
                 "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show(\"{}\", \"Sovereign Kernel Notification\")",
                 value
             );
-             Command::new("powershell")
+            Command::new("powershell")
                 .args(["-Command", &script])
                 .spawn()
-                .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to send notification: {}", e)))?;
-            
+                .map_err(|e| {
+                    sk_types::SovereignError::ToolExecutionError(format!(
+                        "Failed to send notification: {}",
+                        e
+                    ))
+                })?;
+
             Ok(format!("Sent notification: {}", value))
-        },
-        _ => Err(sk_types::SovereignError::ToolExecutionError(format!("Unknown desktop action: {}", action)))
+        }
+        _ => Err(sk_types::SovereignError::ToolExecutionError(format!(
+            "Unknown desktop action: {}",
+            action
+        ))),
     }
 }

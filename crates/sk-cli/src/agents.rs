@@ -1,6 +1,6 @@
-use sk_types::config::KernelConfig;
+use anyhow::{anyhow, Result};
 use serde::Deserialize;
-use anyhow::{Result, anyhow};
+use sk_types::config::KernelConfig;
 use std::env;
 
 #[derive(Debug, Deserialize)]
@@ -33,7 +33,8 @@ pub async fn run(_config: KernelConfig, action: &str, id: Option<String>) -> Res
 
     match action {
         "list" => {
-            let resp = client.get(format!("{}/agents", base_url))
+            let resp = client
+                .get(format!("{}/agents", base_url))
                 .header("Authorization", format!("Bearer {}", api_key))
                 .send()
                 .await?;
@@ -43,7 +44,7 @@ pub async fn run(_config: KernelConfig, action: &str, id: Option<String>) -> Res
             }
 
             let agents: Vec<ApiAgentEntry> = resp.json().await?;
-            
+
             println!("\n🏘️  Sovereign Village Inhabitants:");
             println!(
                 "  {:<36} {:<15} {:<10} {:<12} {:<20}",
@@ -55,28 +56,30 @@ pub async fn run(_config: KernelConfig, action: &str, id: Option<String>) -> Res
             );
 
             for agent in agents {
-                let status = if agent.is_running { "🟢 RUNNING" } else { "⚪ IDLE" };
+                let status = if agent.is_running {
+                    "🟢 RUNNING"
+                } else {
+                    "⚪ IDLE"
+                };
                 println!(
                     "  {:<36} {:<15} {:<10} {:<12} {:<20}",
-                    agent.id,
-                    agent.name,
-                    status,
-                    agent.state,
-                    agent.last_active
+                    agent.id, agent.name, status, agent.state, agent.last_active
                 );
             }
         }
         "inspect" => {
-            let target_id = id.ok_or_else(|| anyhow!("Please provide an Agent ID or Name to inspect"))?;
-            
+            let target_id =
+                id.ok_or_else(|| anyhow!("Please provide an Agent ID or Name to inspect"))?;
+
             // Try to resolve name to ID if it's not a UUID
             let final_id = if uuid::Uuid::parse_str(&target_id).is_err() {
-                 resolve_name_to_id(&client, base_url, &api_key, &target_id).await?
+                resolve_name_to_id(&client, base_url, &api_key, &target_id).await?
             } else {
                 target_id
             };
 
-            let resp = client.get(format!("{}/agents/{}/thinking", base_url, final_id))
+            let resp = client
+                .get(format!("{}/agents/{}/thinking", base_url, final_id))
                 .header("Authorization", format!("Bearer {}", api_key))
                 .send()
                 .await?;
@@ -90,27 +93,33 @@ pub async fn run(_config: KernelConfig, action: &str, id: Option<String>) -> Res
             if thinking.thoughts.is_empty() {
                 println!("  (No recent thoughts found)");
             } else {
-                 // Show the last 5 thoughts
+                // Show the last 5 thoughts
                 let tail = if thinking.thoughts.len() > 5 {
-                    &thinking.thoughts[thinking.thoughts.len()-5..]
+                    &thinking.thoughts[thinking.thoughts.len() - 5..]
                 } else {
                     &thinking.thoughts[..]
                 };
                 for (i, thought) in tail.iter().enumerate() {
-                    println!("\n  [Thought {}]:\n  {}", i + 1, thought.replace('\n', "\n  "));
+                    println!(
+                        "\n  [Thought {}]:\n  {}",
+                        i + 1,
+                        thought.replace('\n', "\n  ")
+                    );
                 }
             }
         }
         "stop" => {
-            let target_id = id.ok_or_else(|| anyhow!("Please provide an Agent ID or Name to stop"))?;
-            
+            let target_id =
+                id.ok_or_else(|| anyhow!("Please provide an Agent ID or Name to stop"))?;
+
             let final_id = if uuid::Uuid::parse_str(&target_id).is_err() {
-                 resolve_name_to_id(&client, base_url, &api_key, &target_id).await?
+                resolve_name_to_id(&client, base_url, &api_key, &target_id).await?
             } else {
                 target_id
             };
 
-            let resp = client.post(format!("{}/agents/{}", base_url, final_id))
+            let resp = client
+                .post(format!("{}/agents/{}", base_url, final_id))
                 .header("Authorization", format!("Bearer {}", api_key))
                 .send()
                 .await?;
@@ -123,15 +132,17 @@ pub async fn run(_config: KernelConfig, action: &str, id: Option<String>) -> Res
             }
         }
         "remove" => {
-            let target_id = id.ok_or_else(|| anyhow!("Please provide an Agent ID or Name to remove"))?;
-            
+            let target_id =
+                id.ok_or_else(|| anyhow!("Please provide an Agent ID or Name to remove"))?;
+
             let final_id = if uuid::Uuid::parse_str(&target_id).is_err() {
-                 resolve_name_to_id(&client, base_url, &api_key, &target_id).await?
+                resolve_name_to_id(&client, base_url, &api_key, &target_id).await?
             } else {
                 target_id
             };
 
-            let resp = client.delete(format!("{}/agents/{}", base_url, final_id))
+            let resp = client
+                .delete(format!("{}/agents/{}", base_url, final_id))
                 .header("Authorization", format!("Bearer {}", api_key))
                 .send()
                 .await?;
@@ -144,15 +155,24 @@ pub async fn run(_config: KernelConfig, action: &str, id: Option<String>) -> Res
             }
         }
         _ => {
-            println!("Unknown action: {}. Available: list, inspect, stop, remove", action);
+            println!(
+                "Unknown action: {}. Available: list, inspect, stop, remove",
+                action
+            );
         }
     }
 
     Ok(())
 }
 
-async fn resolve_name_to_id(client: &reqwest::Client, base_url: &str, api_key: &str, name: &str) -> Result<String> {
-    let resp = client.get(format!("{}/agents", base_url))
+async fn resolve_name_to_id(
+    client: &reqwest::Client,
+    base_url: &str,
+    api_key: &str,
+    name: &str,
+) -> Result<String> {
+    let resp = client
+        .get(format!("{}/agents", base_url))
         .header("Authorization", format!("Bearer {}", api_key))
         .send()
         .await?;

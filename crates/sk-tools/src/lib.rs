@@ -5,8 +5,8 @@
 pub mod browser_tools;
 pub mod code_exec;
 pub mod file_ops;
-pub mod mcp_bridge;
 pub mod host;
+pub mod mcp_bridge;
 pub mod memory_tools;
 pub mod otto;
 pub mod ottos_outpost;
@@ -14,9 +14,9 @@ pub mod scheduler;
 pub mod shared_memory;
 pub mod shell;
 pub mod skills;
+pub mod village_forge;
 pub mod web_fetch;
 pub mod web_search;
-pub mod village_forge;
 
 use sk_types::ToolDefinition;
 

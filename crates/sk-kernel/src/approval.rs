@@ -156,7 +156,11 @@ impl ApprovalManager {
                 }
             }
             "code_exec" | "host_install_app" => RiskLevel::Critical,
-            "forget" | "delete_file" | "move_file" | "host_write_file" | "host_desktop_control"
+            "forget"
+            | "delete_file"
+            | "move_file"
+            | "host_write_file"
+            | "host_desktop_control"
             | "host_system_config" => RiskLevel::High,
 
             _ => RiskLevel::High,

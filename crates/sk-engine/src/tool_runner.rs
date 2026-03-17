@@ -8,7 +8,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// A handler that executes a specific tool call.
-pub type ToolHandler = Arc<dyn Fn(&ToolCall) -> SovereignResult<sk_types::ToolResult> + Send + Sync>;
+pub type ToolHandler =
+    Arc<dyn Fn(&ToolCall) -> SovereignResult<sk_types::ToolResult> + Send + Sync>;
 
 /// Central registry for tools available to the agent.
 #[derive(Clone)]

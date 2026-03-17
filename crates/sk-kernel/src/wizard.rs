@@ -5,10 +5,10 @@
 //! agent manifest (TOML config) ready to spawn.
 
 use serde::{Deserialize, Serialize};
+use sk_hands::{HandAgentConfig, HandCategory, HandDefinition};
 use sk_types::agent::{
     AgentManifest, ManifestCapabilities, ModelConfig, Priority, ResourceQuota, ScheduleMode,
 };
-use sk_hands::{HandAgentConfig, HandCategory, HandDefinition};
 use std::collections::HashMap;
 
 /// The extracted intent from a user's natural language description.
@@ -407,21 +407,32 @@ Rules:
             stream: false,
         };
 
-        let resp = driver.complete(request).await
-            .map_err(|e| sk_types::SovereignError::Internal(format!("LLM Analyzer failing: {e}")))?;
+        let resp = driver.complete(request).await.map_err(|e| {
+            sk_types::SovereignError::Internal(format!("LLM Analyzer failing: {e}"))
+        })?;
 
         let intent_json = resp.content.trim();
         // LLMs sometimes wrap in ```json ... ```
         let clean_json = if intent_json.starts_with("```json") {
-            intent_json.strip_prefix("```json").unwrap().strip_suffix("```").unwrap_or(intent_json)
+            intent_json
+                .strip_prefix("```json")
+                .unwrap()
+                .strip_suffix("```")
+                .unwrap_or(intent_json)
         } else if intent_json.starts_with("```") {
-             intent_json.strip_prefix("```").unwrap().strip_suffix("```").unwrap_or(intent_json)
+            intent_json
+                .strip_prefix("```")
+                .unwrap()
+                .strip_suffix("```")
+                .unwrap_or(intent_json)
         } else {
             intent_json
         };
 
         Self::parse_intent(clean_json.trim()).map_err(|e| {
-            sk_types::SovereignError::Internal(format!("Failed to parse wizard intent: {e}\nRaw: {clean_json}"))
+            sk_types::SovereignError::Internal(format!(
+                "Failed to parse wizard intent: {e}\nRaw: {clean_json}"
+            ))
         })
     }
 }

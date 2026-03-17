@@ -11,7 +11,8 @@ pub fn host_read_file_tool() -> ToolDefinition {
     ToolDefinition {
         name: "host_read_file".into(),
         description:
-            "Read a file's contents from ANYWHERE on the host system. Requires Unrestricted mode.".into(),
+            "Read a file's contents from ANYWHERE on the host system. Requires Unrestricted mode."
+                .into(),
         input_schema: serde_json::json!({"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}),
     }
 }
@@ -41,9 +42,10 @@ const MAX_FILE_SIZE_BYTES: u64 = 10 * 1024 * 1024; // 10MB limit for host reads
 
 pub fn handle_host_read_file(path: &str) -> Result<String, sk_types::SovereignError> {
     let p = PathBuf::from(path);
-    
-    let metadata = fs::metadata(&p)
-        .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Metadata error for {}: {}", path, e)))?;
+
+    let metadata = fs::metadata(&p).map_err(|e| {
+        sk_types::SovereignError::ToolExecutionError(format!("Metadata error for {}: {}", path, e))
+    })?;
 
     if metadata.len() > MAX_FILE_SIZE_BYTES {
         return Err(sk_types::SovereignError::ToolExecutionError(format!(
@@ -54,7 +56,10 @@ pub fn handle_host_read_file(path: &str) -> Result<String, sk_types::SovereignEr
     }
 
     fs::read_to_string(&p).map_err(|e| {
-        sk_types::SovereignError::ToolExecutionError(format!("Failed to read host file {}: {}", path, e))
+        sk_types::SovereignError::ToolExecutionError(format!(
+            "Failed to read host file {}: {}",
+            path, e
+        ))
     })
 }
 
@@ -68,8 +73,12 @@ pub fn handle_host_write_file(
     // Ensure parent directories exist
     if let Some(parent) = p.parent() {
         if !parent.as_os_str().is_empty() {
-             fs::create_dir_all(parent)
-                .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to create directories for {}: {}", path, e)))?;
+            fs::create_dir_all(parent).map_err(|e| {
+                sk_types::SovereignError::ToolExecutionError(format!(
+                    "Failed to create directories for {}: {}",
+                    path, e
+                ))
+            })?;
         }
     }
 
@@ -80,10 +89,19 @@ pub fn handle_host_write_file(
         .append(append)
         .truncate(!append)
         .open(&p)
-        .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to open host file {}: {}", path, e)))?;
+        .map_err(|e| {
+            sk_types::SovereignError::ToolExecutionError(format!(
+                "Failed to open host file {}: {}",
+                path, e
+            ))
+        })?;
 
-    file.write_all(content.as_bytes())
-        .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to write to host file {}: {}", path, e)))?;
+    file.write_all(content.as_bytes()).map_err(|e| {
+        sk_types::SovereignError::ToolExecutionError(format!(
+            "Failed to write to host file {}: {}",
+            path, e
+        ))
+    })?;
 
     Ok(format!(
         "Successfully {} to host path {}",
@@ -102,9 +120,12 @@ pub fn handle_host_list_dir(path: &str) -> Result<String, sk_types::SovereignErr
     ));
     entries.push("-".repeat(58));
 
-    for entry in fs::read_dir(&p)
-        .map_err(|e| sk_types::SovereignError::ToolExecutionError(format!("Failed to list host dir {}: {}", path, e)))?
-    {
+    for entry in fs::read_dir(&p).map_err(|e| {
+        sk_types::SovereignError::ToolExecutionError(format!(
+            "Failed to list host dir {}: {}",
+            path, e
+        ))
+    })? {
         let entry =
             entry.map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
         let match_name = entry

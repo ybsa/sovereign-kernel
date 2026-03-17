@@ -92,11 +92,11 @@ pub async fn execute(
         println!("⚠️  WARNING: Running in UNRESTRICTED mode.");
     } else {
         // Force sandbox for safety
-        let _ = kernel.memory.structured.set(
-            agent_id,
-            "forced_sandbox",
-            serde_json::Value::Bool(true),
-        );
+        let _ =
+            kernel
+                .memory
+                .structured
+                .set(agent_id, "forced_sandbox", serde_json::Value::Bool(true));
     }
 
     let system_prompt = kernel.soul.to_system_prompt_fragment();

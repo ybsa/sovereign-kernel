@@ -183,7 +183,9 @@ pub fn create_agent_config(
             // 2. Enforce conversational SafetyGate for non-whitelisted dangerous actions
             if !is_whitelisted {
                 if let Err(detail) =
-                    kernel.safety.check(&tool_call.name, &tool_call.input, Some(&aid))
+                    kernel
+                        .safety
+                        .check(&tool_call.name, &tool_call.input, Some(&aid))
                 {
                     return Err(sk_types::SovereignError::ToolExecutionError(detail));
                 }
@@ -200,10 +202,17 @@ pub fn create_agent_config(
             match tool_call.name.as_str() {
                 "village_forge" => {
                     if let Some(args) = tool_call.input.as_object() {
-                        let task_desc = args.get("task_description").and_then(|v| v.as_str()).unwrap_or("");
-                        Ok(sk_tools::village_forge::handle_village_forge(&tool_id, task_desc))
+                        let task_desc = args
+                            .get("task_description")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        Ok(sk_tools::village_forge::handle_village_forge(
+                            &tool_id, task_desc,
+                        ))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "agent_message" => {
@@ -215,9 +224,11 @@ pub fn create_agent_config(
                         let message = args.get("message").and_then(|v| v.as_str()).unwrap_or("");
                         if let Ok(to_id) = std::str::FromStr::from_str(to_agent_id_str) {
                             match kernel.bus.send(Some(&aid), &to_id, message.to_string()) {
-                                Ok(_) => {
-                                    Ok(healer_result(&tool_id, format!("Message successfully sent to agent {}", to_id), false))
-                                }
+                                Ok(_) => Ok(healer_result(
+                                    &tool_id,
+                                    format!("Message successfully sent to agent {}", to_id),
+                                    false,
+                                )),
                                 Err(e) => Err(sk_types::SovereignError::ToolExecutionError(e)),
                             }
                         } else {
@@ -320,15 +331,32 @@ pub fn create_agent_config(
                                     {
                                         let last_msg =
                                             session.messages.last().map(|m| m.content.clone());
-                                        Ok(healer_result(&tool_id, format!("Skeleton latest activity: {:?}", last_msg), false))
+                                        Ok(healer_result(
+                                            &tool_id,
+                                            format!("Skeleton latest activity: {:?}", last_msg),
+                                            false,
+                                        ))
                                     } else {
-                                        Ok(healer_result(&tool_id, "Skeleton initialized, but no activity yet.".to_string(), false))
+                                        Ok(healer_result(
+                                            &tool_id,
+                                            "Skeleton initialized, but no activity yet."
+                                                .to_string(),
+                                            false,
+                                        ))
                                     }
                                 } else {
-                                    Ok(healer_result(&tool_id, "Skeleton has no active session.".to_string(), false))
+                                    Ok(healer_result(
+                                        &tool_id,
+                                        "Skeleton has no active session.".to_string(),
+                                        false,
+                                    ))
                                 }
                             } else {
-                                Ok(healer_result(&tool_id, "Failed to check skeleton.".to_string(), false))
+                                Ok(healer_result(
+                                    &tool_id,
+                                    "Failed to check skeleton.".to_string(),
+                                    false,
+                                ))
                             }
                         } else {
                             Err(sk_types::SovereignError::ToolExecutionError(
@@ -352,7 +380,7 @@ pub fn create_agent_config(
                             tokio::runtime::Handle::current().block_on(async {
                                 let intent = crate::wizard::SetupWizard::analyze_task_intent(driver, &model_name, task_str).await?;
                                 let plan = crate::wizard::SetupWizard::build_plan(intent);
-                                
+
                                 Ok(healer_result(&tool_id, format!(
                                     "I have analyzed your request and prepared a setup plan:\n\n{}\n\nTo summon this worker, use the `summon_skeleton` tool with the following parameters:\n- skeleton_name: {}\n- task_description: {}\n- capabilities: {:?}\n- mode_hint: {}",
                                     plan.summary,
@@ -399,9 +427,11 @@ pub fn create_agent_config(
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
                         let topic = args.get("topic").and_then(|v| v.as_str()).unwrap_or("");
                         match kernel.memory.shared.store(aid, content, topic) {
-                            Ok(_) => {
-                                Ok(healer_result(&tool_id, "Successfully stored fact in shared semantic memory.".to_string(), false))
-                            }
+                            Ok(_) => Ok(healer_result(
+                                &tool_id,
+                                "Successfully stored fact in shared semantic memory.".to_string(),
+                                false,
+                            )),
                             Err(e) => {
                                 Err(sk_types::SovereignError::ToolExecutionError(e.to_string()))
                             }
@@ -463,14 +493,25 @@ pub fn create_agent_config(
                             }
                         }
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "schedule_create" => {
                     if let Some(args) = tool_call.input.as_object() {
-                        let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("unnamed_job");
-                        let schedule_type = args.get("schedule_type").and_then(|v| v.as_str()).unwrap_or("");
-                        let task_desc = args.get("task_description").and_then(|v| v.as_str()).unwrap_or("");
+                        let name = args
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unnamed_job");
+                        let schedule_type = args
+                            .get("schedule_type")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let task_desc = args
+                            .get("task_description")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
                         let every_secs = args.get("every_secs").and_then(|v| v.as_u64());
                         let cron_expr = args.get("cron_expr").and_then(|v| v.as_str());
                         let schedule = match schedule_type {
@@ -478,17 +519,28 @@ pub fn create_agent_config(
                                 if let Some(secs) = every_secs {
                                     sk_types::scheduler::CronSchedule::Every { every_secs: secs }
                                 } else {
-                                    return Err(sk_types::SovereignError::ToolExecutionError("Missing every_secs argument".into()));
+                                    return Err(sk_types::SovereignError::ToolExecutionError(
+                                        "Missing every_secs argument".into(),
+                                    ));
                                 }
                             }
                             "cron" => {
                                 if let Some(expr) = cron_expr {
-                                    sk_types::scheduler::CronSchedule::Cron { expr: expr.to_string(), tz: None }
+                                    sk_types::scheduler::CronSchedule::Cron {
+                                        expr: expr.to_string(),
+                                        tz: None,
+                                    }
                                 } else {
-                                    return Err(sk_types::SovereignError::ToolExecutionError("Missing cron_expr argument".into()));
+                                    return Err(sk_types::SovereignError::ToolExecutionError(
+                                        "Missing cron_expr argument".into(),
+                                    ));
                                 }
                             }
-                            _ => return Err(sk_types::SovereignError::ToolExecutionError("Invalid schedule_type".into())),
+                            _ => {
+                                return Err(sk_types::SovereignError::ToolExecutionError(
+                                    "Invalid schedule_type".into(),
+                                ))
+                            }
                         };
                         let job = sk_types::scheduler::CronJob {
                             id: sk_types::scheduler::CronJobId::new(),
@@ -496,7 +548,11 @@ pub fn create_agent_config(
                             name: name.to_string(),
                             enabled: true,
                             schedule,
-                            action: sk_types::scheduler::CronAction::AgentTurn { message: task_desc.to_string(), model_override: None, timeout_secs: None },
+                            action: sk_types::scheduler::CronAction::AgentTurn {
+                                message: task_desc.to_string(),
+                                model_override: None,
+                                timeout_secs: None,
+                            },
                             delivery: sk_types::scheduler::CronDelivery::LastChannel,
                             created_at: chrono::Utc::now(),
                             last_run: None,
@@ -505,18 +561,33 @@ pub fn create_agent_config(
                         match kernel.cron.add_job(job, false) {
                             Ok(id) => {
                                 let _ = kernel.cron.persist();
-                                Ok(healer_result(&tool_id, format!("Scheduled job '{}' created successfully with ID: {}", name, id), false))
+                                Ok(healer_result(
+                                    &tool_id,
+                                    format!(
+                                        "Scheduled job '{}' created successfully with ID: {}",
+                                        name, id
+                                    ),
+                                    false,
+                                ))
                             }
-                            Err(e) => Err(sk_types::SovereignError::ToolExecutionError(e.to_string())),
+                            Err(e) => {
+                                Err(sk_types::SovereignError::ToolExecutionError(e.to_string()))
+                            }
                         }
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "schedule_list" => {
                     let jobs = kernel.cron.list_jobs(aid);
                     if jobs.is_empty() {
-                        Ok(healer_result(&tool_id, "You have no scheduled jobs.".to_string(), false))
+                        Ok(healer_result(
+                            &tool_id,
+                            "You have no scheduled jobs.".to_string(),
+                            false,
+                        ))
                     } else {
                         let mut out = String::from("Your scheduled jobs:\n");
                         for job in jobs {
@@ -535,110 +606,190 @@ pub fn create_agent_config(
                             match kernel.cron.remove_job(job_id) {
                                 Ok(_) => {
                                     let _ = kernel.cron.persist();
-                                    Ok(healer_result(&tool_id, format!("Successfully deleted background job {}", job_id), false))
+                                    Ok(healer_result(
+                                        &tool_id,
+                                        format!("Successfully deleted background job {}", job_id),
+                                        false,
+                                    ))
                                 }
-                                Err(e) => Err(sk_types::SovereignError::ToolExecutionError(e.to_string())),
+                                Err(e) => {
+                                    Err(sk_types::SovereignError::ToolExecutionError(e.to_string()))
+                                }
                             }
                         } else {
-                            Err(sk_types::SovereignError::ToolExecutionError("Invalid job_id format".into()))
+                            Err(sk_types::SovereignError::ToolExecutionError(
+                                "Invalid job_id format".into(),
+                            ))
                         }
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "remember" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::memory_tools::handle_remember(&kernel.memory, aid, content).map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::memory_tools::handle_remember(&kernel.memory, aid, content)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "recall" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
-                        let limit = args.get("limit").and_then(|v| v.as_u64()).map(|v| v as usize).unwrap_or(5);
-                        sk_tools::memory_tools::handle_recall(&kernel.memory, aid, query, limit).map(|out| healer_result(&tool_id, out, false))
+                        let limit = args
+                            .get("limit")
+                            .and_then(|v| v.as_u64())
+                            .map(|v| v as usize)
+                            .unwrap_or(5);
+                        sk_tools::memory_tools::handle_recall(&kernel.memory, aid, query, limit)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "forget" => {
                     if let Some(args) = tool_call.input.as_object() {
-                        let memory_id = args.get("memory_id").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::memory_tools::handle_forget(&kernel.memory, memory_id).map(|out| healer_result(&tool_id, out, false))
+                        let memory_id =
+                            args.get("memory_id").and_then(|v| v.as_str()).unwrap_or("");
+                        sk_tools::memory_tools::handle_forget(&kernel.memory, memory_id)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "web_search" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::web_search::handle_web_search(query).map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::web_search::handle_web_search(query)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "web_fetch" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
                         tokio::task::block_in_place(|| {
-                            tokio::runtime::Handle::current().block_on(sk_tools::web_fetch::handle_web_fetch(url))
-                        }).map(|out| healer_result(&tool_id, out, false))
+                            tokio::runtime::Handle::current()
+                                .block_on(sk_tools::web_fetch::handle_web_fetch(url))
+                        })
+                        .map(|out| healer_result(&tool_id, out, false))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "read_file" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::file_ops::handle_read_file(&config.effective_workspaces_dir(), path).map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::file_ops::handle_read_file(
+                            &config.effective_workspaces_dir(),
+                            path,
+                        )
+                        .map(|out| healer_result(&tool_id, out, false))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "write_file" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                        let append = args.get("append").and_then(|v| v.as_bool()).unwrap_or(false);
-                        sk_tools::file_ops::handle_write_file(&config.effective_workspaces_dir(), path, content, append).map(|out| healer_result(&tool_id, out, false))
+                        let append = args
+                            .get("append")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        sk_tools::file_ops::handle_write_file(
+                            &config.effective_workspaces_dir(),
+                            path,
+                            content,
+                            append,
+                        )
+                        .map(|out| healer_result(&tool_id, out, false))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "list_dir" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-                        sk_tools::file_ops::handle_list_dir(&config.effective_workspaces_dir(), path).map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::file_ops::handle_list_dir(
+                            &config.effective_workspaces_dir(),
+                            path,
+                        )
+                        .map(|out| healer_result(&tool_id, out, false))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "delete_file" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::file_ops::handle_delete_file(&config.effective_workspaces_dir(), path).map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::file_ops::handle_delete_file(
+                            &config.effective_workspaces_dir(),
+                            path,
+                        )
+                        .map(|out| healer_result(&tool_id, out, false))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "move_file" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let source = args.get("source").and_then(|v| v.as_str()).unwrap_or("");
-                        let dest = args.get("destination").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::file_ops::handle_move_file(&config.effective_workspaces_dir(), source, dest).map(|out| healer_result(&tool_id, out, false))
+                        let dest = args
+                            .get("destination")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        sk_tools::file_ops::handle_move_file(
+                            &config.effective_workspaces_dir(),
+                            source,
+                            dest,
+                        )
+                        .map(|out| healer_result(&tool_id, out, false))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "copy_file" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let source = args.get("source").and_then(|v| v.as_str()).unwrap_or("");
-                        let dest = args.get("destination").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::file_ops::handle_copy_file(&config.effective_workspaces_dir(), source, dest).map(|out| healer_result(&tool_id, out, false))
+                        let dest = args
+                            .get("destination")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        sk_tools::file_ops::handle_copy_file(
+                            &config.effective_workspaces_dir(),
+                            source,
+                            dest,
+                        )
+                        .map(|out| healer_result(&tool_id, out, false))
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError("Invalid arguments".into()))
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
                     }
                 }
                 "shell_exec" => {
@@ -949,78 +1100,72 @@ pub fn create_agent_config(
                         ))
                     }
                 }
-                "browser_navigate" => {
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(
-                            sk_engine::runtime::browser::tool_browser_navigate(
-                                &tool_call.input,
-                                &browser,
-                                &aid.to_string(),
-                            ),
-                        )
-                    }).map(|out| healer_result(&tool_id, out, false))
-                    .map_err(sk_types::SovereignError::ToolExecutionError)
-                }
-                "browser_click" => {
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(
-                            sk_engine::runtime::browser::tool_browser_click(
-                                &tool_call.input,
-                                &browser,
-                                &aid.to_string(),
-                            ),
-                        )
-                    }).map(|out| healer_result(&tool_id, out, false))
-                    .map_err(sk_types::SovereignError::ToolExecutionError)
-                }
-                "browser_type" => {
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(
-                            sk_engine::runtime::browser::tool_browser_type(
-                                &tool_call.input,
-                                &browser,
-                                &aid.to_string(),
-                            ),
-                        )
-                    }).map(|out| healer_result(&tool_id, out, false))
-                    .map_err(sk_types::SovereignError::ToolExecutionError)
-                }
-                "browser_screenshot" => {
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(
-                            sk_engine::runtime::browser::tool_browser_screenshot(
-                                &tool_call.input,
-                                &browser,
-                                &aid.to_string(),
-                            ),
-                        )
-                    }).map(|out| healer_result(&tool_id, out, false))
-                    .map_err(sk_types::SovereignError::ToolExecutionError)
-                }
-                "browser_read_page" => {
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(
-                            sk_engine::runtime::browser::tool_browser_read_page(
-                                &tool_call.input,
-                                &browser,
-                                &aid.to_string(),
-                            ),
-                        )
-                    }).map(|out| healer_result(&tool_id, out, false))
-                    .map_err(sk_types::SovereignError::ToolExecutionError)
-                }
-                "browser_close" => {
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(
-                            sk_engine::runtime::browser::tool_browser_close(
-                                &tool_call.input,
-                                &browser,
-                                &aid.to_string(),
-                            ),
-                        )
-                    }).map(|out| healer_result(&tool_id, out, false))
-                    .map_err(sk_types::SovereignError::ToolExecutionError)
-                }
+                "browser_navigate" => tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(
+                        sk_engine::runtime::browser::tool_browser_navigate(
+                            &tool_call.input,
+                            &browser,
+                            &aid.to_string(),
+                        ),
+                    )
+                })
+                .map(|out| healer_result(&tool_id, out, false))
+                .map_err(sk_types::SovereignError::ToolExecutionError),
+                "browser_click" => tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(
+                        sk_engine::runtime::browser::tool_browser_click(
+                            &tool_call.input,
+                            &browser,
+                            &aid.to_string(),
+                        ),
+                    )
+                })
+                .map(|out| healer_result(&tool_id, out, false))
+                .map_err(sk_types::SovereignError::ToolExecutionError),
+                "browser_type" => tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(
+                        sk_engine::runtime::browser::tool_browser_type(
+                            &tool_call.input,
+                            &browser,
+                            &aid.to_string(),
+                        ),
+                    )
+                })
+                .map(|out| healer_result(&tool_id, out, false))
+                .map_err(sk_types::SovereignError::ToolExecutionError),
+                "browser_screenshot" => tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(
+                        sk_engine::runtime::browser::tool_browser_screenshot(
+                            &tool_call.input,
+                            &browser,
+                            &aid.to_string(),
+                        ),
+                    )
+                })
+                .map(|out| healer_result(&tool_id, out, false))
+                .map_err(sk_types::SovereignError::ToolExecutionError),
+                "browser_read_page" => tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(
+                        sk_engine::runtime::browser::tool_browser_read_page(
+                            &tool_call.input,
+                            &browser,
+                            &aid.to_string(),
+                        ),
+                    )
+                })
+                .map(|out| healer_result(&tool_id, out, false))
+                .map_err(sk_types::SovereignError::ToolExecutionError),
+                "browser_close" => tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(
+                        sk_engine::runtime::browser::tool_browser_close(
+                            &tool_call.input,
+                            &browser,
+                            &aid.to_string(),
+                        ),
+                    )
+                })
+                .map(|out| healer_result(&tool_id, out, false))
+                .map_err(sk_types::SovereignError::ToolExecutionError),
                 "get_skill" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
@@ -1028,7 +1173,11 @@ pub fn create_agent_config(
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(async {
                                 let lock = locks.read().await;
-                                Ok(healer_result(&tool_id, sk_tools::skills::handle_get_skill(&lock, name), false))
+                                Ok(healer_result(
+                                    &tool_id,
+                                    sk_tools::skills::handle_get_skill(&lock, name),
+                                    false,
+                                ))
                             })
                         })
                     } else {
@@ -1042,7 +1191,11 @@ pub fn create_agent_config(
                     tokio::task::block_in_place(|| {
                         tokio::runtime::Handle::current().block_on(async {
                             let lock = locks.read().await;
-                            Ok(healer_result(&tool_id, sk_tools::skills::handle_list_skills(&lock), false))
+                            Ok(healer_result(
+                                &tool_id,
+                                sk_tools::skills::handle_list_skills(&lock),
+                                false,
+                            ))
                         })
                     })
                 }
@@ -1191,7 +1344,8 @@ edition = "2021"
                 "host_read_file" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::host::file_full::handle_host_read_file(path).map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::host::file_full::handle_host_read_file(path)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -1202,8 +1356,12 @@ edition = "2021"
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
-                        let append = args.get("append").and_then(|v| v.as_bool()).unwrap_or(false);
-                        sk_tools::host::file_full::handle_host_write_file(path, content, append).map(|out| healer_result(&tool_id, out, false))
+                        let append = args
+                            .get("append")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(false);
+                        sk_tools::host::file_full::handle_host_write_file(path, content, append)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -1213,7 +1371,8 @@ edition = "2021"
                 "host_list_dir" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::host::file_full::handle_host_list_dir(path).map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::host::file_full::handle_host_list_dir(path)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -1224,7 +1383,8 @@ edition = "2021"
                     if let Some(args) = tool_call.input.as_object() {
                         let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("");
                         let value = args.get("value").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::host::desktop_control::handle_desktop_control(action, value).map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::host::desktop_control::handle_desktop_control(action, value)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -1236,7 +1396,8 @@ edition = "2021"
                         let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("");
                         let target = args.get("target").and_then(|v| v.as_str());
                         let value = args.get("value").and_then(|v| v.as_str());
-                        sk_tools::host::system_config::handle_system_config(action, target, value).map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::host::system_config::handle_system_config(action, target, value)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -1245,8 +1406,12 @@ edition = "2021"
                 }
                 "host_install_app" => {
                     if let Some(args) = tool_call.input.as_object() {
-                        let package_id = args.get("package_id").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::host::app_installer::handle_app_installer(package_id).map(|out| healer_result(&tool_id, out, false))
+                        let package_id = args
+                            .get("package_id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        sk_tools::host::app_installer::handle_app_installer(package_id)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -1288,16 +1453,16 @@ edition = "2021"
                 match signal {
                     sk_types::ToolSignal::VillageForge { task_description } => {
                         info!(agent = %aid, task = %task_description, "Intercepted VillageForge signal — Initiating capability forge");
-                        
+
                         let kernel_clone = kernel.clone();
                         let task_clone = task_description.clone();
-                        
+
                         let forge_res = tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(async move {
                                 // 1. Analyze intent via SetupWizard
                                 let driver = kernel_clone.driver.clone();
                                 let model = kernel_clone.model_name.clone();
-                                
+
                                 info!("Forging capability: Analyzing task...");
                                 let intent = crate::wizard::SetupWizard::analyze_task_intent(
                                     driver, &model, &task_clone
@@ -1305,7 +1470,7 @@ edition = "2021"
                                 
                                 let hand_id = format!("forged-{}", intent.name.to_lowercase().replace(" ", "-"));
                                 info!(hand_id = %hand_id, "Generating Hand specification...");
-                                
+
                                 // 2. Generate Hand Spec (TOML)
                                 let toml_content = format!(r#"
 id = "{}"
@@ -1325,19 +1490,19 @@ system_prompt = "You are a specialized worker focused on: {}. Your goal is to as
                                 if !hands_dir.exists() {
                                     let _ = std::fs::create_dir_all(&hands_dir);
                                 }
-                                
+
                                 let file_path = hands_dir.join(format!("{}.toml", hand_id));
                                 info!(path = %file_path.display(), "Saving forged Hand specification...");
                                 std::fs::write(&file_path, toml_content).map_err(|e| {
                                     sk_types::SovereignError::Internal(format!("Failed to save forged hand: {}", e))
                                 })?;
-                                
+
                                 // 4. Reload Hands Registry
                                 info!("Reloading Hand Registry...");
                                 let mut lock = kernel_clone.hands.write().await;
                                 lock.load_custom_hands(&hands_dir);
                                 drop(lock);
-                                
+
                                 Ok::<String, sk_types::SovereignError>(hand_id)
                             })
                         });

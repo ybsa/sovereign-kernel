@@ -90,13 +90,7 @@ pub fn default_catalog() -> Vec<ModelCapability> {
             200000,
             true,
         ),
-        ModelCapability::new(
-            "gpt-4o-mini",
-            "openai",
-            ModelTier::CloudFast,
-            128000,
-            true,
-        ),
+        ModelCapability::new("gpt-4o-mini", "openai", ModelTier::CloudFast, 128000, true),
         ModelCapability::new(
             "deepseek-chat",
             "deepseek",
@@ -104,13 +98,7 @@ pub fn default_catalog() -> Vec<ModelCapability> {
             64000,
             true,
         ),
-        ModelCapability::new(
-            "grok-beta",
-            "xai",
-            ModelTier::CloudFast,
-            128000,
-            true,
-        ),
+        ModelCapability::new("grok-beta", "xai", ModelTier::CloudFast, 128000, true),
         ModelCapability::new(
             "claude-3-5-sonnet-20241022",
             "anthropic",
@@ -125,13 +113,7 @@ pub fn default_catalog() -> Vec<ModelCapability> {
             2000000,
             true,
         ),
-        ModelCapability::new(
-            "gpt-4o",
-            "openai",
-            ModelTier::CloudReasoning,
-            128000,
-            true,
-        ),
+        ModelCapability::new("gpt-4o", "openai", ModelTier::CloudReasoning, 128000, true),
         ModelCapability::new(
             "deepseek-reasoner",
             "deepseek",

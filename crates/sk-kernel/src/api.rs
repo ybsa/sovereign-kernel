@@ -104,7 +104,10 @@ pub async fn start_server(kernel: Arc<SovereignKernel>, addr: &str) -> Sovereign
         .route("/v1/status", get(status_handler))
         .route("/v1/chat", post(chat_handler))
         .route("/v1/agents", get(list_agents_handler))
-        .route("/v1/agents/:id", post(stop_agent_handler).delete(remove_agent_handler))
+        .route(
+            "/v1/agents/:id",
+            post(stop_agent_handler).delete(remove_agent_handler),
+        )
         .route("/v1/agents/:id/thinking", get(thinking_handler))
         .route("/v1/triggers/webhook", post(webhook_handler))
         .layer(axum::middleware::from_fn(auth))
@@ -240,14 +243,29 @@ async fn stop_agent_handler(
 ) -> impl IntoResponse {
     let agent_id = match uuid::Uuid::parse_str(&id) {
         Ok(u) => AgentId(u),
-        Err(_) => return (StatusCode::BAD_REQUEST, Json(ActionResponse { success: false, message: "Invalid ID".to_string() })),
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ActionResponse {
+                    success: false,
+                    message: "Invalid ID".to_string(),
+                }),
+            )
+        }
     };
 
     let stopped = state.kernel.stop_agent(&agent_id);
-    (StatusCode::OK, Json(ActionResponse {
-        success: stopped,
-        message: if stopped { "Agent stopped".to_string() } else { "Agent not running or not found".to_string() },
-    }))
+    (
+        StatusCode::OK,
+        Json(ActionResponse {
+            success: stopped,
+            message: if stopped {
+                "Agent stopped".to_string()
+            } else {
+                "Agent not running or not found".to_string()
+            },
+        }),
+    )
 }
 
 /// DELETE /v1/agents/:id (Remove)
@@ -257,7 +275,15 @@ async fn remove_agent_handler(
 ) -> impl IntoResponse {
     let agent_id = match uuid::Uuid::parse_str(&id) {
         Ok(u) => AgentId(u),
-        Err(_) => return (StatusCode::BAD_REQUEST, Json(ActionResponse { success: false, message: "Invalid ID".to_string() })),
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ActionResponse {
+                    success: false,
+                    message: "Invalid ID".to_string(),
+                }),
+            )
+        }
     };
 
     // Stop if running
@@ -265,8 +291,20 @@ async fn remove_agent_handler(
 
     // Remove from registry
     match state.kernel.agents.remove(agent_id) {
-        Ok(_) => (StatusCode::OK, Json(ActionResponse { success: true, message: "Agent removed from registry".to_string() })),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, Json(ActionResponse { success: false, message: e.to_string() })),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(ActionResponse {
+                success: true,
+                message: "Agent removed from registry".to_string(),
+            }),
+        ),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ActionResponse {
+                success: false,
+                message: e.to_string(),
+            }),
+        ),
     }
 }
 
@@ -288,8 +326,13 @@ async fn thinking_handler(
 
     // 2. Look for forensics logs
     // Forensics are usually in DATA_DIR/.steps/<session_id>/step_*.jsonl
-    let forensics_dir = state.kernel.config.data_dir.join(".steps").join(agent.session_id.to_string());
-    
+    let forensics_dir = state
+        .kernel
+        .config
+        .data_dir
+        .join(".steps")
+        .join(agent.session_id.to_string());
+
     if !forensics_dir.exists() {
         return (StatusCode::OK, Json(serde_json::json!({ "thoughts": [], "message": "No forensic logs found for this session." }))).into_response();
     }
@@ -299,7 +342,7 @@ async fn thinking_handler(
     if let Ok(entries) = std::fs::read_dir(forensics_dir) {
         let mut paths: Vec<_> = entries.filter_map(Result::ok).map(|e| e.path()).collect();
         paths.sort(); // Sort by step number
-        
+
         for path in paths {
             if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
                 if let Ok(content) = std::fs::read_to_string(path) {
@@ -314,7 +357,11 @@ async fn thinking_handler(
         }
     }
 
-    (StatusCode::OK, Json(serde_json::json!({ "thoughts": thoughts }))).into_response()
+    (
+        StatusCode::OK,
+        Json(serde_json::json!({ "thoughts": thoughts })),
+    )
+        .into_response()
 }
 
 /// POST /v1/triggers/webhook
