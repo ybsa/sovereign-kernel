@@ -14,6 +14,7 @@ jobs:
   check:
     name: Check, Clippy, and Test
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       
@@ -26,13 +27,13 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Cargo Check
-        run: cargo check --workspace
+        run: cargo check --workspace --verbose
 
       - name: Cargo Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --verbose -- -D warnings
 
       - name: Run Tests
-        run: cargo test --workspace
+        run: cargo test --workspace --verbose
 
   heavy-tests:
     name: Heavy Tests (on-demand)
@@ -49,4 +50,4 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
       - name: Cargo Test (Heavy)
-        run: cargo test --workspace
+        run: cargo test --workspace --verbose
