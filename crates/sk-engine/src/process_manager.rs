@@ -271,11 +271,11 @@ mod tests {
     async fn test_start_and_list() {
         let pm = ProcessManager::new(5);
 
-        let cmd = if cfg!(windows) { "cmd" } else { "cat" };
+        let cmd = if cfg!(windows) { "cmd" } else { "sleep" };
         let args: Vec<String> = if cfg!(windows) {
             vec!["/C".to_string(), "echo".to_string(), "hello".to_string()]
         } else {
-            vec![]
+            vec!["10".to_string()]
         };
 
         let id = pm.start("agent1", cmd, &args).await.unwrap();
@@ -293,7 +293,7 @@ mod tests {
     async fn test_per_agent_limit() {
         let pm = ProcessManager::new(1);
 
-        let cmd = if cfg!(windows) { "cmd" } else { "cat" };
+        let cmd = if cfg!(windows) { "cmd" } else { "sleep" };
         let args: Vec<String> = if cfg!(windows) {
             vec![
                 "/C".to_string(),
@@ -302,7 +302,7 @@ mod tests {
                 "10".to_string(),
             ]
         } else {
-            vec![]
+            vec!["10".to_string()]
         };
 
         let id1 = pm.start("agent1", cmd, &args).await.unwrap();
