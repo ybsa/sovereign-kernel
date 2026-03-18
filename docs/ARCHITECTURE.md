@@ -1,198 +1,142 @@
-# 🏛️ Sovereign Kernel Architecture (v0.1.0)
+# Architecture — Sovereign Kernel
 
-The Sovereign Kernel is a virtual operating system for AI agents, built with a microkernel-inspired architecture in Rust. It is a **10-crate Cargo workspace** engineered for modularity, security, and long-running autonomous operation.
+## Overview
 
----
-
-## 📦 Crate Overview
-
-### 1. `sk-types` — The Core Ledger
-Defines all shared data structures: `Message`, `ToolCall`, `ToolDefinition`, `AgentManifest`, `SovereignError`, `KernelConfig`, and capability tracking. Ensures type safety and taint propagation across crate boundaries.
-
-### 2. `sk-engine` — The Brain
-Manages the agent reasoning loop, LLM driver abstraction, tool execution pipeline, and browser automation.
-- **LLM Drivers**: `AnthropicDriver`, `OpenAIDriver` (GPT-4o + Groq), `GeminiDriver`, `CopilotDriver`, `FallbackDriver`
-- **Tool Runner**: Dispatches validated tool calls to handlers in `sk-tools`
-- **Loop Guards**: `loop_guard`, `tool_policy`, and `session_repair` prevent autonomous runaway
-- **Browser**: `BrowserManager` with full Playwright CDP bridge for web automation
-
-### 3. `sk-kernel` — The Supervisor
-The OS monitor that manages agent lifecycles and system-level concerns.
-- **CronScheduler**: A background daemon thread (`start_background_services`) polling for due agent alarms and spawning dynamic wake-up sessions.
-- Heartbeat monitor with configurable timeouts
-- Config hot-reload without daemon restart
-- **Inter-Agent Bus** (`bus.rs`): Persistent message routing between agents
-- **Worker Spawning**: Dynamic sub-agent creation with forced Sandbox mode
-- **Natural Language Builder** (`wizard.rs`): Dual-personality task analysis. The **Witch (Summoner)** plans missions, while the **Builder (Architect)** forges permanent Hands.
-- **The Resurrector** (`supervisor.rs`): Crash recovery via periodic checkpointing and automatic agent resurrection
-- **Host Tool Orchestration**: Desktop control, system config, app installation with 3-tier risk approval
-- OpenAI-compatible `/v1/chat/completions` API bridge
-- Pairing/auth system for secure remote agent access
-
-### 4. `sk-soul` — The Identity
-Parses `SOUL.md` files to inject consistent agent persona, behavioral directives, and ethical constraints into the reasoning engine at runtime.
-
-### 5. `sk-memory` — The Substrate
-A unified memory system for persistent agent state.
-- **SQLite** for sessions, key-value store, and audit logs
-- **BM25 full-text search** for semantic memory recall
-- **Knowledge Graph** for entity-relation storage
-- **Checkpoint Store** (`checkpoint.rs`): Periodic agent state snapshots for crash recovery
-- **Shared Semantic Memory** (`shared.rs`): Global knowledge pool accessible across all authorized agents
-- **Cryptographic Merkle Audit Trail** — every action is SHA-256 chained; any tampering is detectable
-
-### 6. `sk-mcp` — The Nervous System
-A native Rust implementation of the Model Context Protocol (MCP). Allows the kernel to consume tools from any MCP-compatible server and expose its own tools as an MCP server via JSON-RPC 2.0.
-
-### 7. `sk-tools` — The Tool Implementations
-Implements the concrete action handlers available to agents.
-- **Shell Hand** (`shell.rs`): Commands with per-tool timeout, working directory scoping, stdout/stderr capture. Enforces an `ExecPolicy` allowlist in Sandbox mode.
-- **File Hand** (`file_ops.rs`): Full filesystem operations — read (1 MB limit), write, append, delete, move, copy, list with rich metadata. Path validation prevents traversal attacks.
-- **Web Hand** (`web_fetch.rs`): Fetches web pages via `reqwest` with automatic HTML-to-text stripping and response truncation.
-- **Code Hand** (`code_exec.rs`): Sandboxed script runner for Python, Node.js, and Bash with configurable timeouts and policy gating.
-- **Scheduler Hand** (`scheduler.rs`): Exposes `schedule_create`, `schedule_list`, and `schedule_delete` for autonomous time-based triggers.
-- **Host Tools** (`host/`): Desktop control, system configuration, app installation, and full filesystem access with 3-tier risk classification (Low/Medium/High/Critical approval gates).
-- **Skills System**: Dynamic registry of **52 expert skills** (Obsidian, GitHub, Weather, etc.) parsed from `SKILL.md` files — on-demand instructions without prompt bloat.
-
-### 8. `sk-hands` — Autonomous Capability Packages
-Pre-built, self-contained agents called **Hands** — each with a validated `HAND.toml`, `SKILL.md`, tool list, requirements checker, dashboard metrics, and agent prompt.
-
-**12 Bundled Hands:**
-| Hand | Category | Core Tools |
-|------|----------|------------|
-| `browser` | Automation | `browser_navigate`, `browser_click`, `browser_type`, `browser_screenshot` |
-| `researcher` | Research | `web_search`, `web_fetch`, `knowledge_*`, `memory_*` |
-| `web-search` | Research | `web_search`, `web_fetch` (Brave/Tavily API) |
-| `clip` | Content | `memory_store`, `file_write`, `knowledge_add_entity` |
-| `collector` | Data | `web_fetch`, `file_write`, `knowledge_*`, `schedule_*` |
-| `lead` | Sales | `web_search`, `web_fetch`, `knowledge_*`, `file_write` |
-| `predictor` | Analytics | `web_search`, `memory_*`, `knowledge_*` |
-| `email` | Communication | `shell_exec` (SMTP/IMAP via Python), `schedule_*` |
-| `twitter` | Social | `web_fetch`, `shell_exec`, `knowledge_*` |
-| `peka` | Terminal | `shell_exec`, `process_list` (The Terminal Master) |
-| `mysql-reporter` | Data | `sql_exec`, `knowledge_*` (Visual Sales Reporting) |
-
-Hands are managed via the CLI:
-```bash
-sovereign hands list
-sovereign hands activate web-search
-sovereign hands status
-```
-
-### 9. `sk-channels` — The Channel Bridge
-30+ channel adapters for Telegram, Discord, WhatsApp, Signal, Slack, iMessage, and more. Each adapter implements `ChannelBridgeHandle` for a uniform message routing interface.
-
-### 10. `sk-cli` — The Shell + Dashboard
-The user-facing binary (`sovereign`) and the embedded terminal web dashboard.
-- **CLI**: `init`, `chat`, `start`, `stop`, `run`, `status`, `kill`, `hands`, `audit`, `dashboard` subcommands
-- **`sovereign run`**: Natural language task execution with auto mode detection and cron scheduling
-- **`sovereign status`**: Village overview showing all agents and scheduled jobs
-- **`sovereign kill`**: Agent termination and daemon control
-- **Dashboard**: Full Axum HTTP server with embedded frontend (no Node.js required)
-  - Terminal aesthetic: jet black, Geist Mono, green/cyan/amber accents
-  - Three-pane layout: agents/hands panel | live log stream | command bar
-  - REST API: `/api/status`, `/api/hands`, `/api/agents`, `/api/audit/recent`
-  - OpenAI-compatible: `/v1/chat/completions`, `/v1/models`
+Sovereign Kernel is a 10-crate Rust workspace containing 29 named subsystems. It is the Rust-native unification of OpenClaw (AI assistant), NemoClaw (sandbox), and the original Sovereign Kernel (OS daemon).
 
 ---
 
-## 🏘️ The Village — Agent Ecosystem
+## Crate Dependency Graph
 
-| Component | Location | Purpose |
-|-----------|----------|---------|
-| **Inter-Agent Bus** | `sk-kernel/src/bus.rs` | Persistent message routing — messages saved to target agent's SQLite session |
-| **Worker Summoning** | `sk-kernel/src/executor.rs` | The Witch dynamically summons sub-agents via `summon_skeleton` |
-| **NL Builder** | `sk-kernel/src/wizard.rs` | `analyze_task_intent()` — The Architect forges permanent Village blueprints |
-| **Resurrector** | `sk-kernel/src/supervisor.rs` | Periodic checkpointing + crash recovery from last saved state |
-| **Checkpoint Store** | `sk-memory/src/checkpoint.rs` | SQLite checkpoint table for agent state persistence |
-| **Host Tools** | `sk-tools/src/host/` | Desktop control, system config, app installer, full file access |
-| **Safety Gate** | `sk-kernel/src/approval.rs` | 3-tier risk classification: Low/Medium/High/Critical with approval gates |
-| **Shared Memory** | `sk-memory/src/shared.rs` | Global `global_knowledge` table accessible by agents with `SharedMemory` capability |
-| **Capability Gate** | `sk-types/src/capability.rs` | `Capability::SharedMemory` controls access to the global knowledge pool |
-
-```
-User: "sovereign run 'Research quantum computing trends'"
-    └── NL Builder analyzes task intent
-        └── Spawns researcher agent (Sandbox Mode)
-            ├── web_search("quantum computing trends 2026")
-            ├── web_fetch(url)
-            └── Returns structured summary
-                └── [Resurrector checkpoints every 30s]
+```text
+                     sk-cli
+                    /  |   \
+                   /   |    \
+            sk-kernel  |  sk-hands
+             / |  \    |    |
+            /  |   \   |    |
+     sk-engine |  sk-channels
+        |   \  |     |
+        |    \ |     |
+     sk-mcp  sk-tools
+        |      |
+        |      |
+     sk-memory |
+        |  \   |
+        |   \  |
+     sk-soul   |
+        \      |
+         \     |
+         sk-types
 ```
 
 ---
 
-## 🛡️ Security Model
+## Crate Details
 
-| Layer | Mechanism |
-|-------|-----------|
-| **Capability Gates** | Tool access controlled by `sk-types::Capability` — declared in agent manifest |
-| **Sandbox Policy** | `ExecPolicy` allowlist restricts shell and file operations in Sandbox mode |
-| **Path Sanitization** | All file operations validated against workspace root; traversal attacks blocked |
-| **Taint Tracking** | Network-fetched data tagged as tainted; cannot be directly executed |
-| **Approval Gate** | Risky tool calls paused for human approval before execution |
-| **Merkle Audit Trail** | Every action SHA-256 chained in SQLite; tampering is cryptographically detectable |
-| **Hardened Core** (v0.1.0) | Zero-warning Clippy state, 100% test coverage, and strict MSRV 1.75.0 compliance |
+### sk-types
+
+Shared types, capability gates, taint tracking, and error definitions used across all crates.
+
+### sk-soul — Soul Files
+
+Agent identity system. Parses `SOUL.md`, `AGENTS.md`, and `TOOLS.md` to construct agent personalities, workspace prompts, and bootstrap files.
+
+### sk-memory — The Archive + The Scribe
+
+| Subsystem | Role |
+|---|---|
+| **The Archive** | SQLite + BM25 vector memory substrate. Persistent storage for agent knowledge across sessions. |
+| **The Scribe** | Session transcripts, write locks, transcript repair. Manages session state lifecycle. |
+
+### sk-engine — The Oracle + The Healer + The Village + The Witch + The Treasury + The Chronicler + The Sentinel
+
+| Subsystem | Role |
+|---|---|
+| **The Oracle** | 50+ LLM provider catalog. Manages auth profiles, OAuth flows, model discovery, and API calls. |
+| **The Healer** | Context compaction. Summarizes and prunes old conversation turns to stay within token budgets. |
+| **The Village** | Multi-agent ecosystem. Inter-Agent Bus for direct messaging, shared Village Library memory. |
+| **The Witch** | Dynamic subagent spawning. Creates sandboxed worker agents for parallel task execution. |
+| **The Treasury** | Global USD budget cap. Tracks cost per agent, enforces limits, kills agents on overspend. |
+| **The Chronicler** | Usage analytics. Records token usage, cost, and latency per agent, channel, and model. |
+| **The Sentinel** | Retry policy. Exponential backoff for failed LLM calls and channel delivery attempts. |
+
+### sk-mcp — The Diplomat + The Alchemist
+
+| Subsystem | Role |
+|---|---|
+| **The Diplomat** | Cross-instance agent-to-agent protocol. Allows SK instances on different machines to collaborate. |
+| **The Alchemist** | Plugin SDK. Third-party Hands as WASM modules or dynamic Rust libraries (.so/.dll). |
+
+### sk-kernel — The Kernel + The Warden + The Gatekeeper + The Resurrector + The Raven + The Cartographer + The Beacon + The Ledger
+
+| Subsystem | Role |
+|---|---|
+| **The Kernel** | WebSocket control plane, HTTP API server, config system (TOML/JSON, hot-reload), daemon lifecycle (systemd/launchd). |
+| **The Warden** | Security sandbox: Landlock LSM filesystem isolation, seccomp-bpf syscall filtering, network egress proxy with policy YAML. |
+| **The Gatekeeper** | Exec approval manager. Intercepts dangerous commands and network requests, surfaces them in The Watchtower for approve/deny. |
+| **The Resurrector** | Crash recovery. Auto-restarts panicked or crashed agents from their last SQLite checkpoint. |
+| **The Raven** | Notification system. Push notifications, email alerts, Gmail Pub/Sub triggers, inbound webhooks. |
+| **The Cartographer** | Remote access. Native Tailscale Serve/Funnel and SSH tunnel support for exposing The Watchtower. |
+| **The Beacon** | Presence system. Tracks agent online/offline/busy state and broadcasts to connected clients. |
+| **The Ledger** | Merkle audit trail. Tamper-evident cryptographic chain of every agent action. |
+
+### sk-tools — The Forge + The Voice + Tool Execution
+
+| Subsystem | Role |
+|---|---|
+| **The Forge** | CDP-based Chrome/Chromium browser automation. Screenshots, navigation, form filling, downloads. |
+| **The Voice** | Always-on speech. cpal audio capture + Whisper STT + ElevenLabs TTS integration. |
+| Shell execution | Bash/PowerShell with full PTY support, process registry, background jobs. |
+| File operations | Read, write, edit, glob — path-sandboxed, atomic writes. |
+| Media pipeline | Image/audio/video processing, transcription, size caps. |
+| Device tools | Camera snap/clip, screen record, location.get (when hardware available). |
+| Code execution | Docker/native sandbox with timeout and output capture. |
+
+### sk-channels — The Bridge + The Herald
+
+| Subsystem | Role |
+|---|---|
+| **The Bridge** | 30+ channel adapters: Telegram, Discord, WhatsApp, Slack, Signal, iMessage, Matrix, IRC, Twitch, Teams, Google Chat, Nostr, WebChat, Zalo, Feishu, Line, Mattermost, Synology, Nextcloud Talk, Tlon. |
+| **The Herald** | In-channel slash command parser: `/status`, `/new`, `/compact`, `/think`, `/verbose`, `/usage`, `/restart`, `/activation`, `/elevated`. |
+
+Bridge features: Channel Dock (routing), DM pairing, group routing, mention gating, allowlists, typing indicators, reactions, multi-agent channel routing.
+
+### sk-hands — Hands + The Bazaar
+
+| Subsystem | Role |
+|---|---|
+| **Hands** | Autonomous capability packages. 30+ bundled: browser, researcher, web-search, clip, collector, lead, predictor, email, twitter, otto, mysql-reporter, peka, etc. |
+| **The Bazaar** | Community marketplace. Publish, discover, install, version, and rate community Hands. |
+
+### sk-cli — The Watchtower + The Builder + The Canvas
+
+| Subsystem | Role |
+|---|---|
+| **The Watchtower** | Terminal web dashboard at `localhost:8080`. Live logs, approval queue, agent management, WebChat, usage analytics. Embedded in the binary. |
+| **The Builder** | `sovereign onboard` — interactive TUI setup wizard. Provider detection, key validation, first-run config. |
+| **The Canvas** | A2UI agent-driven visual workspace. Served via The Watchtower WebSocket. |
+| CLI surface | `sovereign init/chat/run/status/kill/dashboard/hands/audit/doctor/tunnel/usage` |
 
 ---
 
-## ⚡ Execution Flow
+## Data Flow
 
-```
-User / Channel Input
-       ↓
-   ChannelBridge (sk-channels)
-       ↓
-   SovereignBridge.send_message()
-       ↓
-   SovereignKernel.run_agent()
-       ↓
-   sk-engine: Agent Loop
-   ┌──────────────┐
-   │ 1. Build prompt (soul + memory + tools)
-   │ 2. Call LLM driver → stream response
-   │ 3. Parse tool calls
-   │ 4. Check capability gate
-   │ 5. [Sandbox] → ExecPolicy check
-   │ 6. Execute tool via sk-tools
-   │ 7. Append result to conversation
-   │ 8. Log to Merkle audit trail
-   │ 9. Repeat until done
-   └──────────────┘
-       ↓
-   Response → User / Channel
-```
-
----
-
-## 🗂️ Directory Structure
-
-```
-sovereign-kernel/
-├── Cargo.toml              # Workspace manifest
-├── README.md
-├── ARCHITECTURE.md
-├── SECURITY.md
-├── USAGE.md
-├── VISION.md
-├── soul/
-│   └── SOUL.md             # Agent identity definition
-├── docs/
-│   └── PROJECT_PLAN.md     # Full 26-week roadmap
-├── config.toml             # Default kernel config
-├── config.unrestricted.toml
-└── crates/
-    ├── sk-types/
-    ├── sk-engine/
-    ├── sk-kernel/
-    ├── sk-soul/
-    ├── sk-memory/
-    ├── sk-mcp/
-    ├── sk-tools/
-    │   └── skills/         # 52 bundled expert skills
-    ├── sk-hands/
-    │   └── bundled/        # 10 bundled autonomous hands
-    ├── sk-channels/
-    └── sk-cli/
-        └── static/         # Embedded dashboard frontend
+```text
+User sends message on Telegram
+    → The Bridge (sk-channels) receives via Bot API
+    → The Herald checks for slash commands
+    → The Kernel (sk-kernel) routes to session
+    → The Scribe (sk-memory) loads session transcript
+    → The Oracle (sk-engine) selects LLM provider
+    → The Sentinel retries on failure
+    → The Healer compacts if context too long
+    → Agent loop executes with tools (sk-tools)
+    → The Gatekeeper checks for dangerous commands
+    → The Forge runs browser automation if needed
+    → The Ledger records every action
+    → The Treasury checks budget
+    → The Chronicler logs usage
+    → Response flows back through The Bridge
+    → User receives reply on Telegram
 ```

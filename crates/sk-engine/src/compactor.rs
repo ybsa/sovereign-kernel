@@ -386,9 +386,10 @@ fn build_conversation_text(messages: &[Message], config: &CompactionConfig) -> S
                             content, is_error, ..
                         } => {
                             let status = if *is_error { "ERROR" } else { "OK" };
+                            let content_str = content.text_content();
                             // Strip base64 blobs and injection markers before compaction
                             let cleaned =
-                                crate::runtime::session_repair::strip_tool_result_details(content);
+                                crate::runtime::session_repair::strip_tool_result_details(&content_str);
                             let preview = if cleaned.len() > 2000 {
                                 format!("{}...", &cleaned[..2000])
                             } else {

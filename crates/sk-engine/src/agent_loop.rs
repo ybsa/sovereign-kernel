@@ -290,7 +290,7 @@ pub async fn run_agent_loop(
                             content: sk_types::message::MessageContent::Blocks(vec![
                                 sk_types::message::ContentBlock::ToolResult {
                                     tool_use_id: tool_call.id.clone(),
-                                    content: "System Error: Infinite loop detected. You are calling the same tool with the same arguments repeatedly. Please try a completely different approach.".to_string(),
+                                    content: sk_types::MessageContent::Text("System Error: Infinite loop detected. You are calling the same tool with the same arguments repeatedly. Please try a completely different approach.".to_string()),
                                     is_error: true,
                                 }
                             ]),
@@ -328,7 +328,7 @@ pub async fn run_agent_loop(
                         content: sk_types::message::MessageContent::Blocks(vec![
                             sk_types::message::ContentBlock::ToolResult {
                                 tool_use_id: tool_call.id.clone(),
-                                content,
+                                content: sk_types::MessageContent::Text(content),
                                 is_error: tool_result.is_error,
                             },
                         ]),

@@ -15,6 +15,8 @@ pub enum TaskComplexity {
     ToolExecution,
     /// Complex reasoning, coding, or long context — needs CloudReasoning.
     DeepReasoning,
+    /// Absolute highest intelligence for scientific or architectural breakthroughs — CloudFrontier.
+    FrontierReasoning,
 }
 
 /// Router to select the best model for a given task.
@@ -51,11 +53,13 @@ impl ModelRouter {
             return TaskComplexity::ToolExecution; // Maps to CloudFast, Local might OOM or be too slow
         }
 
-        // Keyword heuristics for complex tasks
+        // Check keyword for frontier reasoning
         if let Some(last_msg) = messages.last() {
             let lower = last_msg.content.text_content().to_lowercase();
+            if lower.contains("architect") || lower.contains("scientific") {
+                return TaskComplexity::FrontierReasoning;
+            }
             if lower.contains("code")
-                || lower.contains("architect")
                 || lower.contains("debug")
                 || lower.contains("analyze")
             {
@@ -73,6 +77,7 @@ impl ModelRouter {
             TaskComplexity::SimpleChat => ModelTier::LocalLight,
             TaskComplexity::ToolExecution => ModelTier::CloudFast,
             TaskComplexity::DeepReasoning => ModelTier::CloudReasoning,
+            TaskComplexity::FrontierReasoning => ModelTier::CloudFrontier,
         };
 
         let mut candidates: Vec<ModelCapability> = self

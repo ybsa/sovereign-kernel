@@ -96,6 +96,7 @@ dotenvy = "0.15"
 hmac = "0.12"
 base64 = "0.22"
 hex = "0.4"
+fs-err = "3"
 
 # Inter-crate
 sk-types = { path = "crates/sk-types" }

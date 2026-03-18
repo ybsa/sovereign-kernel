@@ -147,7 +147,7 @@ impl LlmDriver for OpenAIDriver {
                                 content,
                                 ..
                             } => {
-                                text_parts.push(content.clone());
+                                text_parts.push(content.text_content());
                                 _tool_call_id = Some(tool_use_id.clone());
                             }
                             _ => {}

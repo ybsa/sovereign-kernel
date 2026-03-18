@@ -18,12 +18,14 @@ mod bridge;
 mod chat;
 mod daemon;
 mod dashboard;
+mod doctor;
 mod hands;
 mod init;
 mod middleware;
 mod openai_compat;
 mod run;
 mod status;
+mod treasury;
 
 #[derive(Parser)]
 #[command(name = "sovereign", version, about = "Sovereign Kernel — Agentic OS")]
@@ -107,6 +109,10 @@ enum Commands {
         /// Agent ID or name
         id: Option<String>,
     },
+    /// Run system diagnostics and health checks
+    Doctor,
+    /// Manage budgets and track LLM costs
+    Treasury(treasury::TreasuryArgs),
 }
 
 #[tokio::main]
@@ -207,6 +213,12 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::Agents { action, id } => agents::run(config, &action, id).await?,
+        Commands::Doctor => doctor::run(&config).await?,
+        Commands::Treasury(args) => {
+            let api_url = config.api_listen.clone();
+            let api_key = std::env::var("SOVEREIGN_API_KEY").ok();
+            treasury::run(args, &format!("http://{}", api_url), api_key.as_deref()).await?;
+        }
     }
 
     Ok(())

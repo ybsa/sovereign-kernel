@@ -1,44 +1,45 @@
-# 🛰️ Sovereign Kernel Vision
+# Vision — Sovereign Kernel
 
-## The Mission
-To build a **Virtual AI Operating System** that runs on top of any host OS, providing a secure, autonomous, and powerful layer for AI agents to perform complex, human-like tasks while maintaining absolute user control and privacy.
+## The Dream
 
-## Why Sovereign Kernel?
+One binary. One command. Every channel. Every model. Total security.
 
-The current AI landscape is dominated by two extremes:
-1.  **Chatbots**: Useful for text but isolated from the system.
-2.  **Unsecured Scripts**: Powerful but dangerous, with no sandboxing or audit trails.
+Sovereign Kernel is the answer to a simple question: **What if your AI assistant was an operating system?**
 
-Sovereign Kernel provides the **missing middle layer**. It is the "brain" and "nervous system" that allows agents to interact with the world safely.
+Not a chatbot. Not a wrapper. Not a framework. An actual operating system — one that treats AI agents as first-class citizens the way Linux treats processes. Where agents have identities (Soul Files), memory (The Archive), tools (Hands), communication (The Bridge), security policies (The Warden), crash recovery (The Resurrector), and a budget (The Treasury).
 
-## For Who?
+## Why Rust?
 
-Sovereign Kernel is built for:
-*   **Developers & Hackers**: Build custom local agents that automate your workflows without exposing your API keys via third-party web apps.
-*   **Privacy-Conscious Power Users**: Run AI on your own hardware. Your data stays on your machine, always.
-*   **Enterprise Teams (Coming Soon)**: Unrestricted automation power bound by strict, cryptographically-verifiable security policies and audits.
+OpenClaw proved the concept in Node.js. NemoClaw proved the security model. Sovereign Kernel proves the language.
 
-## Core Principles
+- **Memory safety** — no segfaults, no use-after-free, no data races. Critical for a system that runs 24/7 with untrusted agent input.
+- **Single binary** — `cargo build --release` produces one executable. No npm, no Python, no runtime. Drop it on any Linux/macOS/Windows machine and run `sovereign onboard`.
+- **Performance** — agents that process faster burn fewer tokens. Rust's zero-cost abstractions mean The Oracle can manage 50+ LLM providers with microsecond dispatch.
+- **Cross-platform** — the same binary runs on your laptop, your server, your Raspberry Pi.
 
-### 1. Absolute Sovereignty
-The user is the final authority. Agents operate with **Deny-by-Default** capabilities. Every sensitive action requires explicit approval unless the user chooses to trust the agent in "Unrestricted Mode."
+## Terminal-First
 
-### 2. Radical Transparency
-Every thought, every tool call, and every system interaction is logged in a cryptographically signed **Merkle Audit Trail**. You never have to wonder what your agent did or why.
+No apps. No Electron. No browser dependency.
 
-### 3. Native Sandboxing
-Agents don't just run on your computer; they run in a **Dual-Metered WASM Sandbox** or isolated **Docker Containers**. We protect your host system from shell bleeds, path traversals, and resource exhaustion.
+Sovereign Kernel runs from your terminal — like `git`, like `docker`, like `claude`. The Watchtower (web dashboard) is embedded in the binary and served at `localhost:8080`, but the CLI is always the primary interface.
 
-### 4. Zero Data Exfiltration
-Privacy is not a feature; it's the foundation. Sovereign Kernel has **Zero Telemetry**. Your data, your keys, and your agent's memory stay local.
+This is deliberate. Terminal tools:
+- Work over SSH
+- Work in containers
+- Work on headless servers
+- Work on every OS
+- Compose with other tools
 
-## The 2026 Roadmap
+## The 29 Subsystems
 
--   **Phase 1-15 (Complete)**: Core infrastructure, industrial tools, audit trails, and multi-agent coordination.
--   **Phase 16-20 (Complete)**: Production Hardening, Channel Robustness, Docker Sandboxing, Global Audit, and The Healer (Token Optimization).
--   **Phase 21-24 (Complete)**: **The Village Evolution.** Split Summoner/Architect roles, NL Builder, Resurrector, and the creation of **PEKA (The Terminal Master)**.
--   **Phase 25+**: Self-Assembling Orchestration, Distributed Networks, and UI Ecosystem.
+Every subsystem has a name, a purpose, and a home crate. The dark-fantasy naming isn't just flavor — it's a mnemonic system. When someone says "The Warden rejected it," everyone instantly knows it's a security sandbox issue.
 
----
+## The Future
 
-> "Build an open-source AI agent operating system that can do anything a human can do on a computer, with user-controlled risk levels."
+Sovereign Kernel is not the end. It's the foundation for:
+
+- **Federated agent villages** — The Diplomat enables SK instances to collaborate across machines and networks.
+- **Community ecosystem** — The Bazaar lets anyone publish and share Hands, creating a pip/npm for AI capabilities.
+- **Plugin extensibility** — The Alchemist opens SK to WASM and dynamic library plugins, letting the community extend it without forking.
+
+The goal: **make personal AI assistants as ubiquitous and reliable as web servers.**

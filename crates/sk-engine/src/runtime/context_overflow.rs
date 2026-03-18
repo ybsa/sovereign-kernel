@@ -95,20 +95,21 @@ pub fn recover_from_overflow(
     }
 
     // Stage 3: Truncate all historical tool results to 2K chars
-    let tool_truncation_limit = 2000;
+    let tool_truncation_limit: usize = 2000;
     let mut truncated = 0;
     for msg in messages.iter_mut() {
         if let MessageContent::Blocks(blocks) = &mut msg.content {
             for block in blocks.iter_mut() {
                 if let ContentBlock::ToolResult { content, .. } = block {
-                    if content.len() > tool_truncation_limit {
+                    let text = content.text_content();
+                    if text.len() > tool_truncation_limit {
                         let keep = tool_truncation_limit.saturating_sub(80);
-                        *content = format!(
+                        *content = MessageContent::Text(format!(
                             "{}\n\n[OVERFLOW RECOVERY: truncated from {} to {} chars]",
-                            &content[..keep],
-                            content.len(),
+                            &text[..keep],
+                            text.len(),
                             keep
-                        );
+                        ));
                         truncated += 1;
                     }
                 }
@@ -202,7 +203,7 @@ mod tests {
                 role: Role::User,
                 content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                     tool_use_id: "t1".to_string(),
-                    content: big_result.clone(),
+                    content: MessageContent::Text(big_result.clone()),
                     is_error: false,
                 }]),
             },
@@ -210,7 +211,7 @@ mod tests {
                 role: Role::User,
                 content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                     tool_use_id: "t2".to_string(),
-                    content: big_result,
+                    content: MessageContent::Text(big_result),
                     is_error: false,
                 }]),
             },

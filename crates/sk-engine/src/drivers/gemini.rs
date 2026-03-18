@@ -185,7 +185,7 @@ impl LlmDriver for GeminiDriver {
                                 let mut obj = serde_json::Map::new();
                                 obj.insert(
                                     "result".to_string(),
-                                    serde_json::Value::String(content.clone()),
+                                    serde_json::Value::String(content.text_content()),
                                 );
                                 parts.push(GeminiPart::FunctionResponse {
                                     function_response: GeminiFunctionResponseData {

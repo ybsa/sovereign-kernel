@@ -13,7 +13,7 @@ use tracing::{info, warn};
 /// The Sovereign Kernel — top-level king.
 pub struct SovereignKernel {
     /// Global configuration.
-    pub config: KernelConfig,
+    pub config: Arc<tokio::sync::RwLock<KernelConfig>>,
     /// Soul identity.
     pub soul: SoulIdentity,
     /// Memory substrate.
@@ -34,6 +34,8 @@ pub struct SovereignKernel {
     pub bus: Arc<crate::bus::InterAgentBus>,
     /// Global agent registry.
     pub agents: Arc<crate::registry::AgentRegistry>,
+    /// Global event bus for kernel-wide notifications.
+    pub event_bus: Arc<crate::event_bus::EventBus>,
     /// Scheduled background job king.
     pub cron: Arc<crate::cron::CronScheduler>,
     /// Process supervisor.
@@ -188,6 +190,7 @@ impl SovereignKernel {
         ));
 
         let bus = Arc::new(crate::bus::InterAgentBus::new(memory.clone()));
+        let event_bus = Arc::new(crate::event_bus::EventBus::new(1024));
 
         let cron = Arc::new(crate::cron::CronScheduler::new(&config.data_dir, 100));
         if let Err(e) = cron.load() {
@@ -197,7 +200,22 @@ impl SovereignKernel {
         let supervisor = Arc::new(crate::supervisor::Supervisor::new());
         let agents = Arc::new(crate::registry::AgentRegistry::new());
         let sandbox_pool = Arc::new(sk_engine::runtime::docker_sandbox::ContainerPool::new());
-        let metering = Arc::new(crate::metering::MeteringEngine::new());
+        
+        let mut metering = crate::metering::MeteringEngine::new();
+        metering.set_persist_path(config.data_dir.join("metering.json"));
+        metering.load().await.ok(); // Ignore errors if file doesn't exist yet
+        let metering = Arc::new(metering);
+
+        // Periodically save metering status
+        let m_save = metering.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+                if let Err(e) = m_save.save().await {
+                    tracing::error!("Failed to save metering state: {}", e);
+                }
+            }
+        });
 
         // Initialize Hands Registry
         let mut hand_registry = sk_hands::registry::HandRegistry::new();
@@ -211,7 +229,7 @@ impl SovereignKernel {
         let hands = Arc::new(tokio::sync::RwLock::new(hand_registry));
 
         Ok(Self {
-            config,
+            config: Arc::new(tokio::sync::RwLock::new(config)),
             soul,
             memory,
             mcp,
@@ -222,6 +240,7 @@ impl SovereignKernel {
             skills,
             bus,
             agents,
+            event_bus,
             cron,
             supervisor,
             delivery_handler: tokio::sync::RwLock::new(None),
@@ -275,6 +294,7 @@ impl SovereignKernel {
         // 1. Create and store cancellation token
         let token = CancellationToken::new();
         self.active_loops.insert(aid, token.clone());
+        self.event_bus.publish(crate::event_bus::KernelEvent::AgentStarted { agent_id: aid.to_string() });
 
         // 2. Wrap the loop in a select! to handle cancellation
         let result = tokio::select! {
@@ -289,6 +309,7 @@ impl SovereignKernel {
 
         // 3. Remove token after completion
         self.active_loops.remove(&aid);
+        self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { agent_id: aid.to_string() });
 
         let result = result?;
 
@@ -304,6 +325,7 @@ impl SovereignKernel {
     pub fn stop_agent(&self, id: &AgentId) -> bool {
         if let Some((_, token)) = self.active_loops.remove(id) {
             token.cancel();
+            self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { agent_id: id.to_string() });
             true
         } else {
             false
@@ -327,6 +349,7 @@ impl SovereignKernel {
         };
 
         // 2. Restore session
+        let config = self.config.read().await;
         let mut session = match self
             .memory
             .sessions
@@ -387,6 +410,7 @@ impl SovereignKernel {
     /// Start background services, including the cron job executor.
     pub async fn start_background_services(self: &Arc<Self>) {
         let kernel = self.clone();
+        let data_dir = self.config.read().await.data_dir.clone();
         tokio::spawn(async move {
             tracing::info!("Starting background cron scheduler...");
             loop {
@@ -412,6 +436,13 @@ impl SovereignKernel {
 
                 let hb_config = crate::heartbeat::HeartbeatConfig::default();
                 let statuses = crate::heartbeat::check_agents(&hb_info, &hb_config);
+
+                // Publish presence info to event bus (The Beacon)
+                let active_agents: Vec<String> = statuses.iter()
+                    .filter(|s| !s.unresponsive)
+                    .map(|s| s.agent_id.to_string())
+                    .collect();
+                kernel.event_bus.publish(crate::event_bus::KernelEvent::Presence { active_agents });
 
                 for status in statuses {
                     if status.unresponsive {
@@ -529,9 +560,101 @@ impl SovereignKernel {
         });
     }
 
+    /// Apply hot-reload actions from a reload plan.
+    pub async fn apply_hot_actions(&self, actions: &[crate::config_reload::HotAction]) -> SovereignResult<()> {
+        for action in actions {
+            use crate::config_reload::HotAction::*;
+            info!("Applying hot-reload action: {:?}", action);
+            match action {
+                ReloadSkills => {
+                    let config = self.config.read().await;
+                    let mut skills_path = std::env::current_dir()
+                        .unwrap_or_default()
+                        .join("crates")
+                        .join("sk-tools")
+                        .join("skills");
+            
+                    if !skills_path.exists() {
+                        if let Ok(exe) = std::env::current_exe() {
+                            if let Some(parent) = exe.parent() {
+                                skills_path = parent.join("skills");
+                            }
+                        }
+                    }
+                    let new_registry = sk_tools::skills::SkillRegistry::load_from_dir(skills_path);
+                    let mut lock = self.skills.write().await;
+                    *lock = new_registry;
+                    info!("Skills registry hot-reloaded.");
+                }
+                UpdateCronConfig => {
+                    // CronScheduler config updates handled on next invocation
+                    let config = self.config.read().await;
+                    info!("Cron configuration updated (max_jobs={}).", config.max_cron_jobs);
+                }
+                UpdateApprovalPolicy => {
+                    // Safety gate policy updates handled on next invocation
+                    info!("Approval policy hot-reload noted (takes effect on next check).");
+                }
+                ReloadMcpServers => {
+                    let config = self.config.read().await;
+                    let mut mcp = self.mcp.write().await;
+                    // TODO: Implement smart diffing for MCP servers instead of full reconnect
+                    // for now we just reconnect all
+                    let mut mcp_servers_map = std::collections::HashMap::new();
+                    for server in &config.mcp_servers {
+                        let entry = sk_types::config::McpServerEntry {
+                            transport: match &server.transport {
+                                sk_types::config::McpTransportEntry::Stdio { .. } => "stdio".to_string(),
+                                sk_types::config::McpTransportEntry::Sse { .. } => "sse".to_string(),
+                            },
+                            command: match &server.transport {
+                                sk_types::config::McpTransportEntry::Stdio { command, .. } => {
+                                    Some(command.clone())
+                                }
+                                _ => None,
+                            },
+                            args: match &server.transport {
+                                sk_types::config::McpTransportEntry::Stdio { args, .. } => args.clone(),
+                                _ => Vec::new(),
+                            },
+                            env: match &server.env {
+                                sk_types::config::McpEnv::List(nodes) => nodes
+                                    .iter()
+                                    .map(|k| (k.clone(), std::env::var(k).unwrap_or_default()))
+                                    .collect(),
+                                sk_types::config::McpEnv::Map(map) => map
+                                    .iter()
+                                    .map(|(k, v)| {
+                                        let val = if let Some(env_name) = v.strip_prefix('$') {
+                                            std::env::var(env_name).unwrap_or_default()
+                                        } else {
+                                            v.clone()
+                                        };
+                                        (k.clone(), val)
+                                    })
+                                    .collect(),
+                            },
+                            url: match &server.transport {
+                                sk_types::config::McpTransportEntry::Sse { url, .. } => Some(url.clone()),
+                                _ => None,
+                            },
+                        };
+                        mcp_servers_map.insert(server.name.clone(), entry);
+                    }
+                    mcp.connect_all(&mcp_servers_map).await?;
+                    info!("MCP servers hot-reloaded.");
+                }
+                _ => {
+                    warn!("Hot-reload action {:?} is partially implemented or a no-op currently.", action);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Start the API bridge server if enabled in configuration.
     pub async fn start_api_server(self: Arc<Self>) -> SovereignResult<()> {
-        let addr = self.config.api_listen.clone();
+        let addr = self.config.read().await.api_listen.clone();
         crate::api::start_server(self, &addr).await
     }
 
@@ -551,100 +674,134 @@ async fn init_llm_driver(
     String,
 )> {
     let dm = &config.default_model;
-    let api_key = std::env::var(&dm.api_key_env).unwrap_or_default();
+    
+    // 1. Initialize primary driver
+    let primary_api_key = std::env::var(&dm.api_key_env).unwrap_or_default();
+    let (primary_driver, primary_model) = create_driver(
+        &dm.provider,
+        &dm.model,
+        &primary_api_key,
+        dm.base_url.as_deref(),
+    )?;
 
-    // 1. If we have a base_url, we can usually default to OpenAICompatDriver
-    if let Some(base_url) = &dm.base_url {
-        info!(provider = %dm.provider, model = %dm.model, url = %base_url, "Using custom LLM provider (OpenAI-compatible)");
-        let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = Arc::new(
-            sk_engine::drivers::openai::OpenAIDriver::new(api_key, base_url.clone()),
-        );
-        return Ok((driver, dm.model.clone()));
+    // 2. Initialize fallbacks
+    let mut entries = vec![(primary_model.clone(), primary_driver)];
+    
+    for fallback in &config.fallback_providers {
+        let fb_api_key = if !fallback.api_key_env.is_empty() {
+            std::env::var(&fallback.api_key_env).unwrap_or_default()
+        } else {
+            String::new()
+        };
+        
+        if let Ok((driver, model)) = create_driver(
+            &fallback.provider,
+            &fallback.model,
+            &fb_api_key,
+            fallback.base_url.as_deref(),
+        ) {
+            entries.push((model, driver));
+        }
     }
 
-    // 2. Known provider logic
+    info!(providers = entries.len(), "Sentinel initialized with failover chain");
+    let sentinel: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = Arc::new(
+        sk_engine::sentinel::SentinelDriver::new(entries)
+    );
+
+    Ok((sentinel, primary_model))
+}
+
+/// Create a concrete LLM driver from provider details.
+fn create_driver(
+    provider: &str,
+    model: &str,
+    api_key: &str,
+    base_url: Option<&str>,
+) -> SovereignResult<(
+    Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
+    String,
+)> {
+    if let Some(url) = base_url {
+        let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = Arc::new(
+            sk_engine::drivers::openai::OpenAIDriver::new(api_key.to_string(), url.to_string()),
+        );
+        return Ok((driver, model.to_string()));
+    }
+
     let (driver, model_name): (
         Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
         String,
-    ) = match dm.provider.to_lowercase().as_str() {
+    ) = match provider.to_lowercase().as_str() {
         "anthropic" => (
             Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
-                api_key.clone(),
+                api_key.to_string(),
                 "https://api.anthropic.com".to_string(),
-            )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
-            dm.model.clone(),
+            )),
+            model.to_string(),
         ),
         "openai" => (
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key.clone(),
+                api_key.to_string(),
                 "https://api.openai.com/v1".to_string(),
-            )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
-            dm.model.clone(),
+            )),
+            model.to_string(),
         ),
         "gemini" => (
             Arc::new(sk_engine::drivers::gemini::GeminiDriver::new(
-                api_key.clone(),
+                api_key.to_string(),
                 "https://generativelanguage.googleapis.com".to_string(),
-            )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
-            dm.model.clone(),
+            )),
+            model.to_string(),
         ),
         "groq" => (
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key.clone(),
+                api_key.to_string(),
                 "https://api.groq.com/openai/v1".to_string(),
-            )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
-            dm.model.clone(),
+            )),
+            model.to_string(),
         ),
         "deepseek" => (
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key.clone(),
+                api_key.to_string(),
                 "https://api.deepseek.com".to_string(),
-            )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
-            dm.model.clone(),
+            )),
+            model.to_string(),
         ),
         "xai" | "grok" => (
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key.clone(),
+                api_key.to_string(),
                 "https://api.x.ai/v1".to_string(),
-            )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
-            dm.model.clone(),
+            )),
+            model.to_string(),
         ),
         "openrouter" => (
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key.clone(),
+                api_key.to_string(),
                 "https://openrouter.ai/api/v1".to_string(),
-            )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
-            dm.model.clone(),
+            )),
+            model.to_string(),
         ),
         "mistral" => (
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                api_key.clone(),
+                api_key.to_string(),
                 "https://api.mistral.ai/v1".to_string(),
-            )) as Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
-            dm.model.clone(),
+            )),
+            model.to_string(),
+        ),
+        /// Ollama default
+        "ollama" => (
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key.to_string(),
+                "http://localhost:11434/v1".to_string(),
+            )),
+            model.to_string(),
         ),
         _ => {
-            // Last resort
-            if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
-                let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> =
-                    Arc::new(sk_engine::drivers::anthropic::AnthropicDriver::new(
-                        key,
-                        "https://api.anthropic.com".to_string(),
-                    ));
-                (driver, "claude-3-5-sonnet-20241022".to_string())
-            } else if let Ok(key) = std::env::var("OPENAI_API_KEY") {
-                let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> =
-                    Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
-                        key,
-                        "https://api.openai.com/v1".to_string(),
-                    ));
-                (driver, "gpt-4o".to_string())
-            } else {
-                return Err(SovereignError::Config(format!(
-                    "Unknown LLM provider '{}' and no fallback API keys found",
-                    dm.provider
-                )));
-            }
+            return Err(SovereignError::Config(format!(
+                "Unknown LLM provider '{}'",
+                provider
+            )));
         }
     };
 

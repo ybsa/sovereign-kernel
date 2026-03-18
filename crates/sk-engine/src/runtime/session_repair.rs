@@ -370,7 +370,7 @@ fn insert_synthetic_results(messages: &mut Vec<Message>) -> usize {
             .or_default()
             .push(ContentBlock::ToolResult {
                 tool_use_id,
-                content: "[Tool execution was interrupted or lost]".to_string(),
+                content: sk_types::MessageContent::Text("[Tool execution was interrupted or lost]".to_string()),
                 is_error: true,
             });
     }
@@ -702,7 +702,7 @@ mod tests {
                 role: Role::User,
                 content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                     tool_use_id: "orphan-id".to_string(),
-                    content: "some result".to_string(),
+                    content: sk_types::MessageContent::Text("some result".to_string()),
                     is_error: false,
                 }]),
             },
@@ -762,7 +762,7 @@ mod tests {
                 role: Role::User,
                 content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                     tool_use_id: "tu-1".to_string(),
-                    content: "Results found".to_string(),
+                    content: sk_types::MessageContent::Text("Results found".to_string()),
                     is_error: false,
                 }]),
             },
@@ -793,7 +793,7 @@ mod tests {
                 role: Role::User,
                 content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                     tool_use_id: "tu-reorder".to_string(),
-                    content: "Search results".to_string(),
+                    content: sk_types::MessageContent::Text("Search results".to_string()),
                     is_error: false,
                 }]),
             },

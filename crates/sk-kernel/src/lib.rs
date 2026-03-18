@@ -12,6 +12,7 @@ pub mod bus;
 pub mod capabilities;
 pub mod config;
 pub mod config_reload;
+pub mod control_plane;
 pub mod cron;
 pub mod error;
 pub mod event_bus;

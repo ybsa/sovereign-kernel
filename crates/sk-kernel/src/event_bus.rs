@@ -11,6 +11,7 @@ pub enum KernelEvent {
     MemoryStored { agent_id: String, memory_id: String },
     McpServerConnected { server_name: String },
     McpServerDisconnected { server_name: String },
+    Presence { active_agents: Vec<String> },
     Error { message: String },
 }
 

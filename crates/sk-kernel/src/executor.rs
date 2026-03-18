@@ -110,6 +110,13 @@ pub fn create_agent_config(
     let aid = agent_id;
     let k = kernel.clone();
 
+    let cfg_snap = kernel.config.blocking_read();
+    let max_iter = cfg_snap.max_iterations_per_task;
+    let max_tok = cfg_snap.max_tokens_per_task;
+    let step_dump = cfg_snap.step_dump_enabled;
+    let forensics = cfg_snap.effective_workspaces_dir();
+    drop(cfg_snap);
+
     AgentLoopConfig {
         driver,
         system_prompt,
@@ -117,10 +124,10 @@ pub fn create_agent_config(
         model: model_name.clone(),
         max_tokens: 4096,
         temperature: 0.7,
-        max_iterations_per_task: kernel.config.max_iterations_per_task,
-        max_tokens_per_task: kernel.config.max_tokens_per_task,
-        step_dump_enabled: kernel.config.step_dump_enabled,
-        forensics_root: kernel.config.effective_workspaces_dir(),
+        max_iterations_per_task: max_iter,
+        max_tokens_per_task: max_tok,
+        step_dump_enabled: step_dump,
+        forensics_root: forensics,
         stream_handler: None,
         on_usage: {
             let kernel = kernel.clone();
@@ -135,7 +142,7 @@ pub fn create_agent_config(
                 kernel.metering.record_cost(aid, cost);
 
                 // Enforce global budget
-                kernel.config.check_budget(kernel.metering.total_cost())?;
+                kernel.config.blocking_read().check_budget(kernel.metering.total_cost())?;
 
                 Ok(())
             }))
@@ -147,8 +154,13 @@ pub fn create_agent_config(
             let browser = b.clone();
             let aid = aid;
             let agent_id_str = aid.to_string();
-            let config = kernel.config.clone();
-            let default_mode = config.execution_mode;
+            let config_snap = kernel.config.blocking_read();
+            let default_mode = config_snap.execution_mode;
+            let approval_list = config_snap.approval_whitelist.clone();
+            let workspaces_dir = config_snap.effective_workspaces_dir();
+            let exec_policy = config_snap.exec_policy.clone();
+            let docker_cfg = config_snap.docker.clone();
+            drop(config_snap);
             let force_sandbox = kernel
                 .memory
                 .structured
@@ -169,7 +181,7 @@ pub fn create_agent_config(
             };
 
             // 1. Check Whitelist
-            let is_whitelisted = config.approval_whitelist.iter().any(|w| {
+            let is_whitelisted = approval_list.iter().any(|w| {
                 tool_call.name == *w
                     || (tool_call.name == "shell_exec"
                         && tool_call
@@ -695,7 +707,7 @@ pub fn create_agent_config(
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::file_ops::handle_read_file(
-                            &config.effective_workspaces_dir(),
+                            &workspaces_dir,
                             path,
                         )
                         .map(|out| healer_result(&tool_id, out, false))
@@ -714,7 +726,7 @@ pub fn create_agent_config(
                             .and_then(|v| v.as_bool())
                             .unwrap_or(false);
                         sk_tools::file_ops::handle_write_file(
-                            &config.effective_workspaces_dir(),
+                            &workspaces_dir,
                             path,
                             content,
                             append,
@@ -730,7 +742,7 @@ pub fn create_agent_config(
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
                         sk_tools::file_ops::handle_list_dir(
-                            &config.effective_workspaces_dir(),
+                            &workspaces_dir,
                             path,
                         )
                         .map(|out| healer_result(&tool_id, out, false))
@@ -744,7 +756,7 @@ pub fn create_agent_config(
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::file_ops::handle_delete_file(
-                            &config.effective_workspaces_dir(),
+                            &workspaces_dir,
                             path,
                         )
                         .map(|out| healer_result(&tool_id, out, false))
@@ -762,7 +774,7 @@ pub fn create_agent_config(
                             .and_then(|v| v.as_str())
                             .unwrap_or("");
                         sk_tools::file_ops::handle_move_file(
-                            &config.effective_workspaces_dir(),
+                            &workspaces_dir,
                             source,
                             dest,
                         )
@@ -781,7 +793,7 @@ pub fn create_agent_config(
                             .and_then(|v| v.as_str())
                             .unwrap_or("");
                         sk_tools::file_ops::handle_copy_file(
-                            &config.effective_workspaces_dir(),
+                            &workspaces_dir,
                             source,
                             dest,
                         )
@@ -805,8 +817,8 @@ pub fn create_agent_config(
                         if use_sandbox {
                             tokio::task::block_in_place(|| {
                                 tokio::runtime::Handle::current().block_on(async {
-                                    let sandbox_config = &config.docker;
-                                    let workspace = config.effective_workspaces_dir();
+                                    let sandbox_config = &docker_cfg;
+                                    let workspace = workspaces_dir.clone();
                                     let config_hash =
                                         sk_engine::runtime::docker_sandbox::config_hash(
                                             sandbox_config,
@@ -876,7 +888,7 @@ pub fn create_agent_config(
                             tokio::task::block_in_place(|| {
                                 tokio::runtime::Handle::current()
                                     .block_on(sk_tools::shell::handle_shell_exec(
-                                        &config.exec_policy,
+                                        &exec_policy,
                                         command,
                                         working_dir,
                                         timeout_secs,
@@ -902,8 +914,8 @@ pub fn create_agent_config(
                         if use_sandbox {
                             tokio::task::block_in_place(|| {
                                 tokio::runtime::Handle::current().block_on(async {
-                                    let sandbox_config = &config.docker;
-                                    let workspace = config.effective_workspaces_dir();
+                                    let sandbox_config = &docker_cfg;
+                                    let workspace = workspaces_dir.clone();
 
                                     // 1. Create a script file in the workspace subfolder
                                     let file_id = uuid::Uuid::new_v4().to_string();
@@ -1014,7 +1026,7 @@ pub fn create_agent_config(
                             tokio::task::block_in_place(|| {
                                 tokio::runtime::Handle::current()
                                     .block_on(sk_tools::code_exec::handle_code_exec(
-                                        &config.exec_policy,
+                                        &exec_policy,
                                         language,
                                         code,
                                     ))
@@ -1074,7 +1086,7 @@ pub fn create_agent_config(
 
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(async {
-                                let workspace = config.effective_workspaces_dir();
+                                let workspace = workspaces_dir.clone();
                                 match sk_engine::runtime::ottos_outpost::execute_ottos_outpost(req, &workspace).await {
                                     Ok(res) => {
                                         let mut response = String::new();
@@ -1232,7 +1244,7 @@ pub fn create_agent_config(
                             // 1. Prepare Cargo workspace
                             let file_id = uuid::Uuid::new_v4().to_string();
                             let temp_rel_dir = format!(".sk_temp/compile_rust_{}_{}", skill_name, file_id);
-                            let workspace = config.effective_workspaces_dir();
+                            let workspace = workspaces_dir.clone();
                             let temp_abs_dir = workspace.join(&temp_rel_dir);
                             if let Err(e) = std::fs::create_dir_all(&temp_abs_dir) {
                                 return Err(sk_types::SovereignError::ToolExecutionError(format!("Failed to create temp dir: {}", e)));
@@ -1261,7 +1273,7 @@ edition = "2021"
                             }
 
                             // 4. Run `cargo build --release` in Docker sandbox using rust image
-                            let mut build_config = config.docker.clone();
+                            let mut build_config = docker_cfg.clone();
                             build_config.image = "rust:1.80-slim".to_string();
 
                             let config_hash = sk_engine::runtime::docker_sandbox::config_hash(&build_config);
@@ -1486,7 +1498,11 @@ system_prompt = "You are a specialized worker focused on: {}. Your goal is to as
 "#, hand_id, intent.name, intent.task, intent.capabilities, intent.name, intent.name, intent.task);
 
                                 // 3. Save to custom hands dir (~/.sovereign/hands/)
-                                let hands_dir = kernel_clone.config.data_dir.join("hands");
+                                let hands_dir = kernel_clone
+                                    .config
+                                    .blocking_read()
+                                    .data_dir
+                                    .join("hands");
                                 if !hands_dir.exists() {
                                     let _ = std::fs::create_dir_all(&hands_dir);
                                 }

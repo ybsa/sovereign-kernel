@@ -67,7 +67,7 @@ pub enum ContentBlock {
         /// The tool_use ID this result corresponds to.
         tool_use_id: String,
         /// The result content.
-        content: String,
+        content: MessageContent,
         /// Whether the tool execution errored.
         is_error: bool,
     },
@@ -127,7 +127,7 @@ impl MessageContent {
                 .iter()
                 .map(|b| match b {
                     ContentBlock::Text { text } => text.len(),
-                    ContentBlock::ToolResult { content, .. } => content.len(),
+                    ContentBlock::ToolResult { content, .. } => content.text_length(),
                     ContentBlock::Thinking { thinking } => thinking.len(),
                     ContentBlock::ToolUse { .. }
                     | ContentBlock::Image { .. }

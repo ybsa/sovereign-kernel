@@ -54,11 +54,26 @@ enum ApiContentBlock {
         name: String,
         input: serde_json::Value,
     },
+    #[serde(rename = "image")]
+    Image {
+        source: ApiImageSource,
+    },
     #[serde(rename = "tool_result")]
     ToolResult {
         tool_use_id: String,
-        content: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        content: Option<Vec<ApiContentBlock>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        is_error: Option<bool>,
     },
+}
+
+#[derive(Debug, Serialize)]
+pub struct ApiImageSource {
+    #[serde(rename = "type")]
+    pub source_type: String,
+    pub media_type: String,
+    pub data: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -138,6 +153,15 @@ impl LlmDriver for AnthropicDriver {
                             sk_types::message::ContentBlock::Text { text } => {
                                 blocks.push(ApiContentBlock::Text { text: text.clone() });
                             }
+                            sk_types::message::ContentBlock::Image { media_type, data } => {
+                                blocks.push(ApiContentBlock::Image {
+                                    source: ApiImageSource {
+                                        source_type: "base64".to_string(),
+                                        media_type: media_type.clone(),
+                                        data: data.clone(),
+                                    },
+                                });
+                            }
                             sk_types::message::ContentBlock::ToolUse { id, name, input } => {
                                 blocks.push(ApiContentBlock::ToolUse {
                                     id: id.clone(),
@@ -148,14 +172,55 @@ impl LlmDriver for AnthropicDriver {
                             sk_types::message::ContentBlock::ToolResult {
                                 tool_use_id,
                                 content,
-                                ..
+                                is_error,
                             } => {
+                                let result_blocks = match content {
+                                    sk_types::MessageContent::Text(t) => {
+                                        if t.is_empty() {
+                                            None
+                                        } else {
+                                            Some(vec![ApiContentBlock::Text { text: t.clone() }])
+                                        }
+                                    }
+                                    sk_types::MessageContent::Blocks(bs) => {
+                                        let mut mapped = Vec::new();
+                                        for b in bs {
+                                            match b {
+                                                sk_types::ContentBlock::Text { text } => {
+                                                    mapped.push(ApiContentBlock::Text {
+                                                        text: text.clone(),
+                                                    });
+                                                }
+                                                sk_types::ContentBlock::Image {
+                                                    media_type,
+                                                    data,
+                                                } => {
+                                                    mapped.push(ApiContentBlock::Image {
+                                                        source: ApiImageSource {
+                                                            source_type: "base64".to_string(),
+                                                            media_type: media_type.clone(),
+                                                            data: data.clone(),
+                                                        },
+                                                    });
+                                                }
+                                                _ => {}
+                                            }
+                                        }
+                                        if mapped.is_empty() {
+                                            None
+                                        } else {
+                                            Some(mapped)
+                                        }
+                                    }
+                                };
                                 blocks.push(ApiContentBlock::ToolResult {
                                     tool_use_id: tool_use_id.clone(),
-                                    content: content.clone(),
+                                    content: result_blocks,
+                                    is_error: if *is_error { Some(true) } else { None },
                                 });
                             }
-                            _ => {}
+                            sk_types::message::ContentBlock::Unknown
+                            | sk_types::message::ContentBlock::Thinking { .. } => {}
                         }
                     }
                 }
@@ -203,6 +268,7 @@ impl LlmDriver for AnthropicDriver {
                 .post(&url)
                 .header("x-api-key", &self.api_key)
                 .header("anthropic-version", "2023-06-01")
+                .header("anthropic-beta", "computer-use-2024-10-22,prompt-caching-2024-07-31")
                 .json(&api_request)
                 .send()
                 .await

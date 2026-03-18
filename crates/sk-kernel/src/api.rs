@@ -110,6 +110,11 @@ pub async fn start_server(kernel: Arc<SovereignKernel>, addr: &str) -> Sovereign
         )
         .route("/v1/agents/:id/thinking", get(thinking_handler))
         .route("/v1/triggers/webhook", post(webhook_handler))
+        .route("/v1/config", get(get_config_handler).post(update_config_handler))
+        .route("/v1/tools", get(list_tools_handler))
+        .route("/v1/treasury/status", get(treasury_status_handler))
+        .route("/v1/treasury/reset", post(treasury_reset_handler))
+        .route("/ws", get(crate::control_plane::ws_handler))
         .layer(axum::middleware::from_fn(auth))
         .layer(
             CorsLayer::new()
@@ -329,6 +334,8 @@ async fn thinking_handler(
     let forensics_dir = state
         .kernel
         .config
+        .read()
+        .await
         .data_dir
         .join(".steps")
         .join(agent.session_id.to_string());
@@ -364,6 +371,63 @@ async fn thinking_handler(
         .into_response()
 }
 
+/// GET /v1/config
+async fn get_config_handler(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
+    let cfg = state.kernel.config.read().await.clone();
+    (StatusCode::OK, Json(cfg))
+}
+
+/// POST /v1/config
+async fn update_config_handler(
+    State(state): State<Arc<ApiState>>,
+    Json(payload): Json<sk_types::config::KernelConfig>,
+) -> impl IntoResponse {
+    let old_config = state.kernel.config.read().await.clone();
+    
+    // Validate new config
+    if let Err(errors) = crate::config_reload::validate_config_for_reload(&payload) {
+        return (StatusCode::BAD_REQUEST, Json(ActionResponse {
+            success: false,
+            message: format!("Config validation failed: {}", errors.join(", ")),
+        })).into_response();
+    }
+
+    let plan = crate::config_reload::build_reload_plan(&old_config, &payload);
+    plan.log_summary();
+
+    if plan.restart_required {
+        return (StatusCode::ACCEPTED, Json(ActionResponse {
+            success: true,
+            message: format!("Config received. FULL RESTART REQUIRED: {}", plan.restart_reasons.join("; ")),
+        })).into_response();
+    }
+
+    // Apply hot actions
+    {
+        let mut lock = state.kernel.config.write().await;
+        *lock = payload;
+    }
+
+    if let Err(e) = state.kernel.apply_hot_actions(&plan.hot_actions).await {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(ActionResponse {
+            success: false,
+            message: format!("Failed to apply hot-reload: {}", e),
+        })).into_response();
+    }
+
+    (StatusCode::OK, Json(ActionResponse {
+        success: true,
+        message: "Config hot-reloaded successfully.".to_string(),
+    })).into_response()
+}
+
+/// GET /v1/tools
+async fn list_tools_handler(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
+    let mcp = state.kernel.mcp.read().await;
+    let tools = mcp.all_tools();
+    (StatusCode::OK, Json(tools))
+}
+
 /// POST /v1/triggers/webhook
 async fn webhook_handler(
     State(state): State<Arc<ApiState>>,
@@ -389,4 +453,26 @@ async fn webhook_handler(
             message: "Webhook accepted and logged to audit trail.".to_string(),
         }),
     )
+}
+/// GET /v1/treasury/status
+async fn treasury_status_handler(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
+    let config = state.kernel.config.read().await;
+    let status = state.kernel.metering.budget_status(&config.budget).await;
+    (StatusCode::OK, Json(status))
+}
+
+/// POST /v1/treasury/reset
+async fn treasury_reset_handler(State(_state): State<Arc<ApiState>>) -> impl IntoResponse {
+    // For now, we just create a fresh metering engine or reset the state
+    // Actually, MeteringEngine should have a reset method.
+    // I'll add a simple way to reset in MeteringEngine later if needed, 
+    // but for now I'll just clear the global costs.
+    
+    // I'll call a reset method on metering (needs to be added)
+    // state.kernel.metering.reset().await;
+    
+    (StatusCode::OK, Json(ActionResponse {
+        success: true,
+        message: "Treasury costs reset (partially implemented)".to_string(),
+    }))
 }

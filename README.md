@@ -2,37 +2,72 @@
 
 ![Rust](https://img.shields.io/badge/language-Rust-orange?style=flat-square)
 ![MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
-![Status](https://img.shields.io/badge/status-Phase%2024%20Complete-brightgreen?style=flat-square)
-![Hands](https://img.shields.io/badge/hands-12%20Bundled-brightgreen?style=flat-square)
-![Security](https://img.shields.io/badge/security-Merkle%20Audit%20Trail-brightgreen?style=flat-square)
-![Village](https://img.shields.io/badge/village-Agent%20Ecosystem-blueviolet?style=flat-square)
+![Status](https://img.shields.io/badge/status-Phase%2025-blue?style=flat-square)
+![Subsystems](https://img.shields.io/badge/subsystems-29%20Named-blueviolet?style=flat-square)
+![Channels](https://img.shields.io/badge/channels-30%2B-brightgreen?style=flat-square)
+![Providers](https://img.shields.io/badge/LLM%20providers-50%2B-brightgreen?style=flat-square)
+![Security](https://img.shields.io/badge/security-Landlock%20%2B%20seccomp-red?style=flat-square)
 
-> [!WARNING]
-> **Active Development**: Sovereign Kernel is experimental software under active development. Expect breaking changes between versions.
+> **Terminal-first. Runs everywhere. Single Rust binary.**
 
-**Sovereign Kernel** is a virtual operating system for AI agents, built entirely in Rust. It merges a memory-safe daemon core with a sophisticated memory substrate, 12 bundled autonomous capability packages (Hands), and a built-in terminal web dashboard.
+**Sovereign Kernel** is a personal AI assistant and agentic operating system, built entirely in Rust. It is a complete port of [OpenClaw](https://github.com/openclaw/openclaw) (the AI assistant) and [NemoClaw](https://github.com/NVIDIA/NemoClaw) (the sandbox) into a single, memory-safe, production-grade binary.
 
-It is not just a framework — it is the mediation layer between Autonomous Entities and the silicon they run on.
+It answers you on the channels you already use (Telegram, Discord, WhatsApp, Slack, Signal, iMessage, Matrix, IRC, Teams, and 20+ more), runs agents 24/7 as background daemons, and wraps every action in Landlock/seccomp security — all from your terminal.
+
+```
+Telegram / Discord / WhatsApp / Slack / Signal / iMessage / Matrix / IRC / Teams / WebChat
+               │
+               ▼
+┌─────────────────────────────────────────────┐
+│          Sovereign Kernel (Rust)            │
+│         The Agentic Operating System        │
+│                                             │
+│  The Oracle ← 50+ LLM providers            │
+│  The Bridge ← 30+ channel adapters         │
+│  The Warden ← Landlock/seccomp sandbox     │
+│  The Village ← multi-agent ecosystem       │
+│  The Watchtower ← terminal web dashboard   │
+│                                             │
+│         ws://127.0.0.1:18789                │
+└─────────────────────────────────────────────┘
+               │
+               ├─ sovereign chat          (interactive REPL)
+               ├─ sovereign dashboard     (web UI)
+               ├─ sovereign run "task"    (autonomous)
+               └─ sovereign hands list    (capabilities)
+```
 
 ---
 
 ## 🎯 What It Does
 
-- **Runs agents 24/7** as background OS daemons with heartbeat monitoring and auto-restart
-- **Spawns agents from natural language** — describe a task, the Builder creates the right agent automatically
-- **Executes laboratory tools safely** — shell, file, code, web, browser — with capability gates and sandbox policy
-- **Full host access** — desktop control, system config, app installation (with approval gates)
-- **User-Controlled Risk**: Users can toggle between `Sandbox` and `Unrestricted` modes. In Sandbox mode, the kernel acts as a strict guard.
-- **Safety & Budgeting**: Hard reasoning limits and global USD budgets are enforced to prevent cost overruns and infinite loops. See [SAFETY_CONTROLS.md](SAFETY_CONTROLS.md).
-- **Audit Trails**: Every action an agent takes is recorded in a tamper-evident audit log, allowing for full post-mortem analysis of agent behavior.
-- **Crash recovery** — The Resurrector auto-restarts dead agents from their last checkpoint
-- **Remembers everything** via a hybrid SQLite + BM25 vector memory substrate across sessions
-- **Optimizes token usage** with "The Healer" (Smart Truncation & Ground-Truth Context Compaction)
-- **Executes safely** in native environments or isolated **Docker sandboxes**
-- **Ships 12 autonomous Hands** — pre-built capability packs for terminal control, database reporting, browser automation, research, and more
-- **Streams a terminal dashboard** at `http://localhost:8080` — manage agents, monitor live logs, approve actions
-- **Integrates 30+ channels** — Telegram, Discord, WhatsApp, Signal, Slack, and more via the Channel Bridge
-- **Safety & Budgeting** — Hard iteration/token limits, global $ budget cap, and redacted forensic step dumping
+- **Answers on every channel** — Telegram, Discord, WhatsApp, Slack, Signal, iMessage, Matrix, IRC, Twitch, Teams, Google Chat, Nostr, WebChat, and more via **The Bridge**
+- **Runs agents 24/7** as background OS daemons with heartbeat monitoring and auto-restart via **The Resurrector**
+- **50+ LLM providers** — Anthropic, OpenAI, Gemini, Groq, Ollama, NVIDIA, Bedrock, Together, HuggingFace, and more via **The Oracle**
+- **Model failover** — automatic fallback chains with cooldown and health probes via **The Sentinel**
+- **Spawns agents from natural language** — describe a task, **The Builder** creates the right agent
+- **Dynamic sub-agents** — **The Witch** summons sandboxed workers for parallel tasks
+- **Full tool execution** — shell, file, code, browser (CDP), media — with approval gates via **The Gatekeeper**
+- **Browser automation** — CDP-based Chrome/Chromium control via **The Forge**
+- **Voice Wake + Talk Mode** — always-on speech (STT/TTS) via **The Voice**
+- **Live Canvas** — agent-driven A2UI visual workspace via **The Canvas**
+- **In-channel commands** — `/status`, `/new`, `/compact`, `/think`, `/verbose`, `/usage` via **The Herald**
+- **Landlock/seccomp sandbox** — filesystem and syscall isolation via **The Warden**
+- **Network egress control** — policy-driven network interception with operator approval via **The Gatekeeper**
+- **Crash recovery** — **The Resurrector** auto-restarts dead agents from their last checkpoint
+- **Remembers everything** — hybrid SQLite + BM25 vector memory via **The Archive**
+- **Smart compaction** — context truncation and ground-truth summarization via **The Healer**
+- **Tamper-evident audit** — Merkle chain of every agent action via **The Ledger**
+- **Global budget control** — USD cap across all agents via **The Treasury**
+- **Usage analytics** — per-agent/channel/model cost tracking via **The Chronicler**
+- **Presence tracking** — online/offline/busy broadcast via **The Beacon**
+- **Community marketplace** — publish and install Hands via **The Bazaar**
+- **Remote access** — Tailscale Serve/Funnel and SSH tunnels via **The Cartographer**
+- **Plugin SDK** — extend with WASM/dynamic libs via **The Alchemist**
+- **Cross-instance collaboration** — agent-to-agent protocol across machines via **The Diplomat**
+- **Push notifications** — desktop alerts, email, Gmail Pub/Sub via **The Raven**
+- **Terminal web dashboard** — embedded at `localhost:8080` via **The Watchtower**
+- **Ships 30+ autonomous Hands** — research, email, browser, clip, collector, lead, predictor, twitter, peka, otto, and more
 
 ---
 
@@ -42,8 +77,10 @@ Sovereign Kernel includes hard limits, global budgeting, and strict gating to pr
 
 - **Hard Limits**: Default 15 iterations / 200k tokens per task.
 - **Approval Gated**: Dangerous actions require approval — even in unrestricted mode.
-- **Global Budget**: USD cap across all agents (e.g., $5.00 limit).
+- **Global Budget**: USD cap across all agents (e.g., $5.00 limit) via The Treasury.
 - **Forensics**: Step-by-step JSONL dumps with secrets automatically redacted.
+- **Sandbox Modes**: Toggle between `Sandbox` (strict) and `Unrestricted` (full host access).
+- **Elevated Toggle**: Per-session `/elevated on|off` for host permissions.
 
 See [docs/SAFETY_CONTROLS.md](docs/SAFETY_CONTROLS.md) for details.
 
@@ -56,191 +93,299 @@ See [docs/SAFETY_CONTROLS.md](docs/SAFETY_CONTROLS.md) for details.
 - Rust `1.75+`
 - An API key for at least one LLM provider
 
-### Run from source
+### Install and run
 
 **Windows (PowerShell):**
 
 ```powershell
 $env:GEMINI_API_KEY="your-key"
-cargo run -p sk-cli -- init        # First-time setup wizard
-cargo run -p sk-cli -- chat        # Interactive terminal chat
-cargo run -p sk-cli -- dashboard   # Terminal web dashboard → http://localhost:8080
-cargo run -p sk-cli -- hands list  # Show all 9 bundled hands
+cargo run -p sk-cli -- onboard       # The Builder — first-run setup wizard
+cargo run -p sk-cli -- chat          # Interactive agent REPL
+cargo run -p sk-cli -- dashboard     # The Watchtower → http://localhost:8080
+cargo run -p sk-cli -- hands list    # Show all bundled Hands
 ```
-
-## 🧪 On-Demand Heavy Tests
-
-- What: A longer-running test suite intended for integration and stress-path validation.
-- How to run:
-  - In GitHub, use Heavy Tests (on-demand) workflow to run `cargo test --workspace`.
-  - Locally, you can run heavy tests selectively by executing targeted tests.
-- Why: Keeps PR CI fast and reliable by default.
-  - *Note: As of the recent CI reliability updates, the test suite now gracefully reaps all lingering child processes, preventing `tokio` shutdown hangs and eliminating the need for manual CI cancellations.*
 
 **Linux / macOS:**
 
 ```bash
 export GEMINI_API_KEY="your-key"
-cargo run -p sk-cli -- init
+cargo run -p sk-cli -- onboard
 cargo run -p sk-cli -- chat
 cargo run -p sk-cli -- dashboard
 cargo run -p sk-cli -- hands list
 ```
 
-### Supported LLM Providers (auto-detected from env)
+### Supported LLM Providers (The Oracle — 50+)
 
 | Provider | Env Variable |
 | -------- | ----------- |
 | Anthropic Claude | `ANTHROPIC_API_KEY` |
-| OpenAI GPT-4o | `OPENAI_API_KEY` |
+| OpenAI GPT-4o/o1 | `OPENAI_API_KEY` |
 | Google Gemini | `GEMINI_API_KEY` |
 | Groq (Llama 3) | `GROQ_API_KEY` |
 | GitHub Copilot | `GITHUB_TOKEN` |
+| NVIDIA NIM | `NVIDIA_API_KEY` |
+| AWS Bedrock | `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` |
+| Ollama (local) | `OLLAMA_HOST` |
+| Together AI | `TOGETHER_API_KEY` |
+| HuggingFace | `HF_TOKEN` |
+| Moonshot | `MOONSHOT_API_KEY` |
+| And 40+ more... | See `sovereign doctor` |
 
 ---
 
 ## ⚡ CLI Commands
 
 ```bash
-sovereign init                                  # First-run setup wizard
-sovereign chat                                  # Interactive agent REPL
-sovereign start                                 # Start as background daemon
-sovereign run "<task>"                           # Run a task autonomously
-sovereign run "<task>" --mode unrestricted       # Run with full host access
-sovereign run "<task>" --schedule "0 9 * * 1"    # Schedule a recurring task
-sovereign status                                # Village overview (agents + jobs)
-sovereign kill <agent-id>                       # Kill a specific agent
-sovereign kill                                  # Stop the daemon
-sovereign stop                                  # Stop the daemon (legacy)
-sovereign dashboard [--port 8080]               # Open terminal web dashboard
-sovereign hands list                            # List all 12 bundled hands
-sovereign hands activate <name>                 # Start a hand's autonomous agent
-sovereign hands status                          # Show running hand instances
-sovereign hands deactivate <id>                 # Stop a hand instance
-sovereign audit logs                            # View cryptographic audit trail
-sovereign audit verify                          # Verify Merkle chain integrity
+sovereign onboard                          # The Builder — first-run wizard
+sovereign chat                             # Interactive agent REPL
+sovereign run "<task>"                     # Autonomous task execution
+sovereign run "<task>" --mode unrestricted # Full host access
+sovereign run "<task>" --schedule "cron"   # Scheduled recurring task
+sovereign start                            # Start as background daemon
+sovereign status                           # Village overview (agents + jobs)
+sovereign kill <agent-id>                  # Kill a specific agent
+sovereign kill                             # Stop the daemon
+sovereign dashboard [--port 8080]          # The Watchtower
+sovereign hands list                       # All bundled Hands
+sovereign hands activate <name>            # Start a Hand
+sovereign hands install <url>              # Install from The Bazaar
+sovereign hands publish                    # Publish to The Bazaar
+sovereign audit logs                       # The Ledger
+sovereign audit verify                     # Verify Merkle chain integrity
+sovereign doctor                           # Full diagnostic suite
+sovereign tunnel --tailscale|--ssh         # The Cartographer
+sovereign usage                            # The Chronicler cost report
 ```
+
+### In-Channel Chat Commands (The Herald)
+
+Send these in Telegram/Discord/WhatsApp/Slack/Teams/WebChat:
+
+- `/status` — session status (model + tokens, cost)
+- `/new` or `/reset` — reset the session
+- `/compact` — compact session context (The Healer)
+- `/think <level>` — off|minimal|low|medium|high|xhigh
+- `/verbose on|off`
+- `/usage off|tokens|full` — per-response usage footer
+- `/restart` — restart the daemon (owner-only)
+- `/activation mention|always` — group activation toggle
+- `/elevated on|off` — toggle host access per-session
 
 ---
 
-## 🖐️ Bundled Hands (11 Included)
+## 🏛️ The 29 Named Subsystems
 
-Hands are autonomous capability packages — each one is a pre-configured agent with specific tools, prompts, and dashboard metrics.
+| # | Name | Crate | Role |
+|---|---|---|---|
+| 1 | **The Kernel** | `sk-kernel` | WS control plane, HTTP API, daemon lifecycle |
+| 2 | **The Village** | `sk-engine` | Multi-agent ecosystem: spawn, route, coordinate |
+| 3 | **Hands** | `sk-hands` | Autonomous capability packages |
+| 4 | **The Witch** | `sk-engine` | Dynamic subagent spawning |
+| 5 | **The Resurrector** | `sk-kernel` | Crash recovery from checkpoints |
+| 6 | **The Healer** | `sk-engine` | Context compaction & smart truncation |
+| 7 | **The Builder** | `sk-cli` | `sovereign onboard` setup wizard |
+| 8 | **The Warden** | `sk-kernel` | Landlock/seccomp/network sandbox |
+| 9 | **The Gatekeeper** | `sk-kernel` | Exec approval + blocked action intercept |
+| 10 | **The Bridge** | `sk-channels` | 30+ channel adapters |
+| 11 | **The Oracle** | `sk-engine` | 50+ LLM provider catalog with failover |
+| 12 | **The Sentinel** | `sk-engine` | Retry policy (LLM + channel delivery) |
+| 13 | **The Scribe** | `sk-memory` | Session transcripts, write locks, repair |
+| 14 | **The Archive** | `sk-memory` | SQLite + BM25 vector memory substrate |
+| 15 | **The Forge** | `sk-tools` | CDP browser automation |
+| 16 | **The Voice** | `sk-tools` | Always-on STT/TTS speech |
+| 17 | **The Canvas** | `sk-cli` | A2UI agent-driven visual workspace |
+| 18 | **Soul Files** | `sk-soul` | Agent identity (SOUL.md, AGENTS.md) |
+| 19 | **The Watchtower** | `sk-cli` | Terminal web dashboard |
+| 20 | **The Ledger** | `sk-kernel` | Merkle tamper-evident audit trail |
+| 21 | **The Treasury** | `sk-engine` | Global USD budget cap + cost tracking |
+| 22 | **The Herald** | `sk-channels` | In-channel slash commands |
+| 23 | **The Beacon** | `sk-kernel` | Presence system (online/offline/busy) |
+| 24 | **The Raven** | `sk-kernel` | Notifications, email alerts, Gmail Pub/Sub |
+| 25 | **The Bazaar** | `sk-hands` | Community Hands marketplace |
+| 26 | **The Cartographer** | `sk-kernel` | Tailscale/SSH tunnel for remote access |
+| 27 | **The Diplomat** | `sk-mcp` | Cross-instance agent-to-agent protocol |
+| 28 | **The Alchemist** | `sk-mcp` | Plugin SDK (WASM/dynamic lib extensions) |
+| 29 | **The Chronicler** | `sk-engine` | Usage analytics per agent/channel/model |
+
+---
+
+## 📡 The Bridge — 30+ Channel Adapters
+
+### Core Adapters
+
+| Channel | Protocol |
+|---|---|
+| Telegram | Bot API (HTTPS) |
+| Discord | Gateway WS + REST |
+| WhatsApp | Web WS protocol |
+| Slack | Socket Mode + Events API |
+| Signal | signal-cli bridge |
+| iMessage / BlueBubbles | BlueBubbles REST API |
+| Matrix | matrix-rust-sdk |
+| WebChat | Built into The Watchtower |
+
+### Extension Adapters
+
+Google Chat · Microsoft Teams · IRC · Twitch · Nostr · Zalo · Zalo Personal · Feishu · Line · Mattermost · Synology Chat · Nextcloud Talk · Tlon
+
+### Bridge Features
+
+- **Channel Dock** — unified inbound/outbound routing
+- **DM Pairing** — security flow for unknown senders
+- **Group Routing** — mention gating, reply tags
+- **Allowlists** — per-channel sender/group allowlists
+- **Typing Indicators** — real-time typing state
+- **Reactions** — acknowledge/status reactions
+- **Multi-Agent Routing** — route channels to isolated Village agents
+
+---
+
+## 🖐️ Bundled Hands (30+)
 
 | Hand | Category | What It Does |
 | ---- | -------- | ----------- |
-| **browser** | Automation | Playwright-based web browser automation |
-| **researcher** | Research | Multi-source deep research with citation tracking |
-| **web-search** | Research | Brave/Tavily web search + intelligence reports |
-| **clip** | Content | Clipboard-to-note capture and organization |
+| **browser** | Automation | CDP-based web browser automation |
+| **researcher** | Research | Multi-source deep research with citations |
+| **web-search** | Research | Brave/Tavily web search + reports |
+| **clip** | Content | Clipboard-to-note capture |
 | **collector** | Data | Structured data collection and archival |
-| **lead** | Sales | Autonomous lead research and qualification |
+| **lead** | Sales | Autonomous lead research |
 | **predictor** | Analytics | Trend analysis and forecasting |
-| **email** | Communication | SMTP/IMAP email management with draft mode |
-| **twitter** | Social | Twitter/X monitoring and engagement |
-| **otto** | Builder | Docker-sandboxed code execution with dynamic dependencies |
-| **mysql-reporter** | Data | MySQL reporting and dashboards integration |
-| **peka** | Terminal | **The Terminal Master.** Expert in raw shell and machinery |
-| **mysql-reporter** | Data | Autonomous SQL analysis and sales reporting |
-
-```bash
-sovereign hands list           # See all hands with requirements
-sovereign hands activate email # Start the email hand
-sovereign hands status         # Monitor running hands
-```
+| **email** | Communication | SMTP/IMAP email management |
+| **twitter** | Social | Twitter/X monitoring |
+| **otto** | Builder | Docker-sandboxed code execution |
+| **mysql-reporter** | Data | MySQL reporting and dashboards |
+| **peka** | Terminal | The Terminal Master — shell expert |
 
 ---
 
-## 🖥️ Terminal Web Dashboard
+## 🖥️ The Watchtower — Terminal Web Dashboard
 
-Run `sovereign dashboard` to open a **terminal-aesthetic web UI** at `http://localhost:8080`.
+Run `sovereign dashboard` to open at `http://localhost:8080`.
 
 - **Embedded in the binary** — no Node.js, no npm, zero extra dependencies
 - **Three-pane layout**: agents/hands panel | live log stream | command bar
 - **Real-time monitoring**: uptime, active hands, approval queue
-- **Live log stream**: every tool call and agent action in real-time
-- **Command input**: type `sovereign` commands directly in the UI
-
-```bash
-sovereign dashboard              # Opens at http://localhost:8080
-sovereign dashboard --port 9090  # Custom port
-sovereign dashboard --no-open    # Don't auto-open browser
-```
+- **The Gatekeeper**: approve/deny blocked actions and network requests
+- **WebChat**: embedded chat interface
+- **The Chronicler**: usage analytics and cost breakdown
+- **The Beacon**: agent presence (online/offline/busy)
 
 ---
 
-## 🏘️ The Village — Agent Ecosystem (Phase 24)
+## 🔒 The Warden — Security (NemoClaw in Rust)
 
-Sovereign Kernel is a living **Agent Village** — agents can communicate, delegate tasks, recover from crashes, and be spawned from plain English.
+Sovereign Kernel integrates [NemoClaw](https://github.com/NVIDIA/NemoClaw)'s security model natively in Rust:
 
-| Feature | Tool / System | Description |
-| ------- | ------------- | ----------- |
-| **Natural Language Builder** | `builder` | The Architect forges a permanent Village member (Hand) from your intent |
-| **Agent Messaging** | `agent_message` | Direct messages between agents via the Inter-Agent Bus |
-| **Summoning Workers** | `summon_skeleton` | The Witch dynamically summons sandboxed workers for parallel tasks |
-| **Crash Recovery** | Resurrector | Auto-restart dead agents from their last checkpoint |
-| **Host Tools** | `host_*` | Desktop control, system config, app installation (with approval) |
-| **Shared Memory** | `shared_memory_store/recall` | Global knowledge pool across all authorized agents |
+### Filesystem Isolation (Landlock LSM)
 
-> **Security**: Spawned agents are **forced into Sandbox mode** by default. Unrestricted mode requires explicit `--mode unrestricted` and approval gates.
+| Path | Access |
+|---|---|
+| `/sandbox`, `/tmp`, `/dev/null` | Read-write |
+| `/usr`, `/lib`, `/proc`, `/app`, `/etc` | Read-only |
+| Everything else | Blocked |
+
+### Network Egress Control
+
+- Policy YAML defines allowed endpoints per binary
+- All unlisted connections are **intercepted and blocked**
+- Blocked requests surface in **The Watchtower** for operator approve/deny
+- Dynamic policy reload without restarting agents
+
+### Inference Routing
+
+All LLM calls are proxied through **The Oracle** — agents never connect directly to model APIs.
+
+### Sandbox Modes
+
+- `sandbox` — strict Warden enforcement (default for spawned agents)
+- `unrestricted` — full host access (requires explicit `--mode unrestricted`)
+
+---
+
+## 🏘️ The Village — Agent Ecosystem
+
+| Feature | Subsystem | Description |
+| ------- | --------- | ----------- |
+| Agent Spawning | The Witch | Dynamically summon sandboxed workers |
+| Agent Messaging | Inter-Agent Bus | Direct messages between Village agents |
+| Crash Recovery | The Resurrector | Auto-restart from checkpoint |
+| Shared Memory | Village Library | Global knowledge pool |
+| Natural Language Build | The Builder | Create agents from plain English |
+| Depth Limits | Village Guard | Prevent infinite spawn recursion |
 
 ---
 
 ## 🏗️ Architecture (10-Crate Workspace)
 
 ```text
-sk-types    → Shared types, capability gates, taint tracking
-sk-engine   → Agent loop, LLM drivers, tool execution
-sk-kernel   → Daemon lifecycle, scheduling, heartbeat
-sk-soul     → Agent identity from SOUL.md
-sk-memory   → SQLite + BM25 vector memory substrate
-sk-mcp      → Model Context Protocol (MCP) nervous system
-sk-tools    → Shell, file, web, code, browser tool implementations
-sk-hands    → 10 bundled autonomous capability packages
-sk-channels → 30+ channel adapters (Telegram, Discord, WhatsApp...)
-sk-cli      → sovereign binary + terminal dashboard server
+sk-types     → Shared types, capability gates, taint tracking
+sk-soul      → Soul Files: agent identity (SOUL.md, AGENTS.md)
+sk-memory    → The Archive + The Scribe (SQLite + BM25 + sessions)
+sk-engine    → The Oracle + The Healer + The Village + The Witch + The Treasury + The Chronicler + The Sentinel
+sk-mcp       → The Diplomat + The Alchemist (A2A protocol + plugin SDK)
+sk-kernel    → The Kernel + The Warden + The Gatekeeper + The Resurrector + The Raven + The Cartographer + The Beacon + The Ledger
+sk-tools     → The Forge + The Voice + shell/file/media/camera/screen tools
+sk-channels  → The Bridge + The Herald (30+ adapters + chat commands)
+sk-hands     → Hands + The Bazaar (capability packages + marketplace)
+sk-cli       → The Watchtower + The Builder + The Canvas + CLI surface
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deep dive.
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Development Roadmap
 
 | Phase | Status | Milestone |
 | ----- | ------ | --------- |
-| 1–6 | ✅ Complete | Kernel, Engine, Security, Media, LLM Drivers |
-| 7–11 | ✅ Complete | Industrial Core: 52 skills, BM25, Audit Trail, API Bridge |
-| 12 | ✅ Complete | Terminal Web Dashboard (`sovereign dashboard`) |
-| 13 | ✅ Complete | Core Tools Upgrade: Shell, File, Code, Browser Hands |
-| 14 | ✅ Complete | Optional Hands: Web Search, Email |
-| 15 | ✅ Complete | Multi-Agent Coordination: A2A Bus, Witch Spawning, Shared Memory |
-| 16 | ⏳ Planned | Production Hardening: Log rotation, fallback LLM, load testing |
-| 17 | ⚠️ Scaffolded | Channel Integrations: 30+ adapters exist, need wiring |
-| 18 | ✅ Complete | Docker Sandbox Integration: OTTO + zero-pollution execution |
-| 19 | ✅ Complete | Universal Tooling: MCP client + autonomous discovery |
-| 20 | ✅ Complete | Documentation & Lore: Dark fantasy naming, PROJECT_MAP |
-| 21 | ✅ Complete | Self-Refactoring & P2P Skill Graph |
-| 22 | ⏳ Planned | Full GUI & Screen Control (browser, screenshots, desktop automation) |
-| 23 | ⏳ Planned | Universal Cross-Platform (Windows, Linux, macOS, Raspberry Pi, ARM) |
-| **24** | **✅ Complete** | **The Village: Host Tools, Resurrector, NL Builder, Simplified CLI** |
+| 1–24 | ✅ Complete | Original Sovereign Kernel (Engine, Memory, Security, Dashboard, Village) |
+| **25** | 🔨 In Progress | **The Great Merger: OpenClaw + NemoClaw → Rust** |
+
+### Phase 25 Breakdown
+
+| Sub-Phase | Milestone | Key Subsystems |
+|---|---|---|
+| 25.1 | Core Gateway | The Kernel (WS + HTTP + config + daemon) |
+| 25.2 | Agent Runtime | The Oracle (50+ LLMs) + The Healer + The Sentinel |
+| 25.3 | Tools & Execution | The Forge (browser) + The Voice + media pipeline |
+| 25.4 | Channels | The Bridge (30+ adapters) + The Herald |
+| 25.5 | Multi-Agent | The Village + The Witch + The Resurrector |
+| 25.6 | Dashboard & Canvas | The Watchtower + The Canvas + WebChat |
+| 25.7 | Security | The Warden (Landlock/seccomp) + The Gatekeeper |
+| 25.8 | Production | The Ledger + logging + Docker + CI/CD + tests |
+| 25.9 | Extended Services | The Raven + The Bazaar + The Cartographer + The Beacon |
+| 25.10 | Advanced | The Diplomat + The Alchemist + The Chronicler |
 
 ---
 
 ## 📚 Documentation
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 10-crate workspace deep dive
-- [docs/SECURITY.md](docs/SECURITY.md) — Security model, sandboxing, audit trail
-- [docs/SAFETY_CONTROLS.md](docs/SAFETY_CONTROLS.md) — Budgeting, limits, and forensics
-- [docs/USAGE.md](docs/USAGE.md) — Hands, dashboard, channels, and agent configuration
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 10-crate workspace deep dive + 29 subsystems
+- [docs/SECURITY.md](docs/SECURITY.md) — Security model, The Warden, The Gatekeeper
+- [docs/SAFETY_CONTROLS.md](docs/SAFETY_CONTROLS.md) — The Treasury, limits, forensics
+- [docs/USAGE.md](docs/USAGE.md) — Hands, dashboard, channels, agent configuration
 - [docs/VISION.md](docs/VISION.md) — The long-term AI Operating System vision
-- [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) — Full 30-week development roadmap (23 phases)
+- [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) — Full development roadmap
+
+---
+
+## 🧬 Origin
+
+Sovereign Kernel is the Rust-native unification of three projects:
+
+- **[OpenClaw](https://github.com/openclaw/openclaw)** — The personal AI assistant (Node.js/TypeScript). We port its 800+ file codebase: 50+ LLM providers, 30+ channel adapters, browser automation, voice, canvas, skills, and everything else — entirely into Rust.
+- **[NemoClaw](https://github.com/NVIDIA/NemoClaw)** — The NVIDIA sandbox orchestrator. We port its Landlock/seccomp/network egress security policies natively into The Warden.
+- **[Sovereign Kernel](https://github.com/)** — The Rust OS foundation. Provides the daemon lifecycle, memory substrate, audit trail, and dark-fantasy naming that wraps it all together.
+
+The result: **one `sovereign` binary that does everything OpenClaw + NemoClaw can do, but faster, safer, and in pure Rust.**
 
 ---
 
 ## 🤝 Contributing
 
-See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) to learn how to add new Hands, MCP tools, and channel adapters.
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) to learn how to add new Hands, channel adapters, LLM providers, and MCP tools.
 
 ## ⚖️ License
 
