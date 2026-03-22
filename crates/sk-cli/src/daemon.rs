@@ -9,10 +9,13 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
     println!("⚡ Starting Sovereign...");
 
     // Initialize kernel
-    let kernel = Arc::new(SovereignKernel::init(config).await?);
+    let kernel = Arc::new(SovereignKernel::init(config.clone()).await?);
 
     // Start background background job scheduler
     kernel.start_background_services().await;
+
+    // Resurrect crashed agents
+    kernel.resurrect_all_active_agents().await;
 
     // Start the API Bridge server
     let k_server = kernel.clone();
@@ -34,39 +37,114 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
 
     let mut bridged = false;
 
-    // Start Telegram Channel if valid token
-    if let Ok(token) = std::env::var("TELEGRAM_BOT_TOKEN") {
-        if !token.is_empty() {
-            println!("⚡ Connecting to Telegram...");
-            let tg_adapter = sk_channels::telegram::TelegramAdapter::new(token)
-                .await
-                .map_err(|e| anyhow::anyhow!("Telegram init failed: {e}"))?;
-            manager
-                .start_adapter(Arc::new(tg_adapter))
-                .await
-                .map_err(|e| anyhow::anyhow!("Telegram adapter start failed: {e}"))?;
-            bridged = true;
+    // Start Telegram Channel if configured
+    if let Some(tg_cfg) = &config.channels.telegram {
+        if let Ok(token) = std::env::var(&tg_cfg.bot_token_env) {
+            if !token.is_empty() {
+                println!("⚡ Connecting to Telegram...");
+                let tg_adapter = sk_channels::telegram::TelegramAdapter::new(token)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Telegram init failed: {e}"))?;
+                manager
+                    .start_adapter(Arc::new(tg_adapter))
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Telegram adapter start failed: {e}"))?;
+                bridged = true;
+            }
+        }
+    } else {
+        // Fallback for missing config (from raw env) if Telegram wasn't explicitly configured in config but the token exists
+        // Wait, since we are moving to configs, we might not need this. But let's keep it clean
+        if let Ok(token) = std::env::var("TELEGRAM_BOT_TOKEN") {
+             if !token.is_empty() {
+                println!("⚡ Connecting to Telegram (legacy env)...");
+                let tg_adapter = sk_channels::telegram::TelegramAdapter::new(token)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Telegram init failed: {e}"))?;
+                manager
+                    .start_adapter(Arc::new(tg_adapter))
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Telegram adapter start failed: {e}"))?;
+                bridged = true;
+            }
         }
     }
 
-    // Start Discord Channel if valid token
-    if let Ok(token) = std::env::var("DISCORD_BOT_TOKEN") {
-        if !token.is_empty() {
-            println!("⚡ Connecting to Discord...");
-            let guild_ids: Vec<u64> = std::env::var("DISCORD_GUILD_IDS")
-                .unwrap_or_default()
-                .split(',')
-                .filter_map(|s| s.trim().parse().ok())
-                .collect();
-            // MESSAGE_CONTENT + GUILD_MESSAGES intents
-            let intents = 33280u64;
-            let discord_adapter =
-                sk_channels::discord::DiscordAdapter::new(token, guild_ids, intents);
-            manager
-                .start_adapter(Arc::new(discord_adapter))
-                .await
-                .map_err(|e| anyhow::anyhow!("Discord adapter start failed: {e}"))?;
-            bridged = true;
+    // Start Discord Channel if configured
+    if let Some(discord_cfg) = &config.channels.discord {
+        if let Ok(token) = std::env::var(&discord_cfg.bot_token_env) {
+            if !token.is_empty() {
+                println!("⚡ Connecting to Discord...");
+                let discord_adapter =
+                    sk_channels::discord::DiscordAdapter::new(token, discord_cfg.allowed_guilds.clone(), discord_cfg.intents);
+                manager
+                    .start_adapter(Arc::new(discord_adapter))
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Discord adapter start failed: {e}"))?;
+                bridged = true;
+            }
+        }
+    } else {
+        if let Ok(token) = std::env::var("DISCORD_BOT_TOKEN") {
+            if !token.is_empty() {
+                println!("⚡ Connecting to Discord (legacy env)...");
+                let guild_ids: Vec<u64> = std::env::var("DISCORD_GUILD_IDS")
+                    .unwrap_or_default()
+                    .split(',')
+                    .filter_map(|s| s.trim().parse().ok())
+                    .collect();
+                let intents = 33280u64;
+                let discord_adapter =
+                    sk_channels::discord::DiscordAdapter::new(token, guild_ids, intents);
+                manager
+                    .start_adapter(Arc::new(discord_adapter))
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Discord adapter start failed: {e}"))?;
+                bridged = true;
+            }
+        }
+    }
+
+    // Start WhatsApp Channel if configured
+    if let Some(wa_cfg) = &config.channels.whatsapp {
+        if let Ok(access_token) = std::env::var(&wa_cfg.access_token_env) {
+            let verify_token = std::env::var(&wa_cfg.verify_token_env).unwrap_or_default();
+            if !access_token.is_empty() && !wa_cfg.phone_number_id.is_empty() {
+                println!("⚡ Connecting to WhatsApp (Webhook Port: {})...", wa_cfg.webhook_port);
+                let wa_adapter = sk_channels::whatsapp::WhatsAppAdapter::new(
+                    access_token,
+                    verify_token,
+                    wa_cfg.phone_number_id.clone(),
+                    wa_cfg.webhook_port,
+                    wa_cfg.allowed_users.clone(),
+                );
+                manager
+                    .start_adapter(Arc::new(wa_adapter))
+                    .await
+                    .map_err(|e| anyhow::anyhow!("WhatsApp adapter start failed: {e}"))?;
+                bridged = true;
+            }
+        }
+    }
+
+    // Start Slack Channel if configured
+    if let Some(slack_cfg) = &config.channels.slack {
+        if let Ok(bot_token) = std::env::var(&slack_cfg.bot_token_env) {
+            if let Ok(app_token) = std::env::var(&slack_cfg.app_token_env) {
+                if !bot_token.is_empty() && !app_token.is_empty() {
+                    println!("⚡ Connecting to Slack (Socket Mode)...");
+                    let slack_adapter = sk_channels::slack::SlackAdapter::new(
+                        app_token,
+                        bot_token,
+                        slack_cfg.allowed_channels.clone(),
+                    );
+                    manager
+                        .start_adapter(Arc::new(slack_adapter))
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Slack adapter start failed: {e}"))?;
+                    bridged = true;
+                }
+            }
         }
     }
 
@@ -78,11 +156,7 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
 
     // Start the Live Canvas dashboard (following Sovereign Kernel's run_daemon pattern)
     let dashboard_state = Arc::new(crate::dashboard::AppState {
-        hand_registry: {
-            let mut reg = sk_hands::registry::HandRegistry::new();
-            reg.load_bundled();
-            std::sync::Mutex::new(reg)
-        },
+        kernel: kernel.clone(),
         started_at: std::time::Instant::now(),
         telegram_connected: bridged,
     });
@@ -135,7 +209,7 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
     println!("⚡ Sovereign Kernel started (PID: {}).", std::process::id());
 
     // Config hot-reload watcher (from Sovereign Kernel's server.rs)
-    let k_reload = kernel.clone();
+    let _k_reload = kernel.clone();
     tokio::spawn(async move {
         let env_path = std::path::PathBuf::from(".env");
         let mut last_modified = std::fs::metadata(&env_path).and_then(|m| m.modified()).ok();

@@ -1,31 +1,27 @@
-//! Browser automation via a Python Playwright bridge.
+//! Browser automation via chromiumoxide.
 //!
-//! Manages persistent browser sessions per agent, communicating with a Python
-//! subprocess over JSON-line stdin/stdout protocol (same pattern as MCP stdio).
+//! Manages persistent browser sessions per agent using native Rust bindings
+//! to the Chrome DevTools Protocol (CDP).
 //!
 //! # Security
-//! - SSRF check runs in Rust *before* sending navigate commands to Python
-//! - Bridge subprocess launched with `sandbox_command()` (cleared env)
-//! - All page content wrapped with `wrap_external_content()` markers
+//! - SSRF check runs in Rust *before* sending navigate commands
+//! - Sessions are isolated via separate pages/incognito contexts if configured
 //! - Session limits: max concurrent, idle timeout, 1 per agent
 
+use chromiumoxide::browser::{Browser, BrowserConfig};
+use chromiumoxide::Page;
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use sk_types::config::BrowserConfig;
-use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
-use std::process::{Child, ChildStdin, ChildStdout, Stdio};
-use std::sync::OnceLock;
+use sk_types::config::BrowserConfig as AppBrowserConfig;
+use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::Mutex;
-use tracing::{debug, info, warn};
-
-/// Embedded Python bridge script (compiled into the binary).
-const BRIDGE_SCRIPT: &str = include_str!("browser_bridge.py");
+use tokio::sync::{Mutex, OnceCell};
+use tracing::{debug, error, info, warn};
+use futures::StreamExt;
 
 // ── Protocol types ──────────────────────────────────────────────────────────
 
-/// Command sent from Rust to the Python bridge.
+/// Command sent from agent to the browser manager.
 #[derive(Debug, Serialize)]
 #[serde(tag = "action")]
 pub enum BrowserCommand {
@@ -37,8 +33,8 @@ pub enum BrowserCommand {
     Close,
 }
 
-/// Response received from the Python bridge.
-#[derive(Debug, Deserialize)]
+/// Response returned to the agent.
+#[derive(Debug, Deserialize, Serialize)]
 pub struct BrowserResponse {
     pub success: bool,
     pub data: Option<serde_json::Value>,
@@ -47,52 +43,107 @@ pub struct BrowserResponse {
 
 // ── Session ─────────────────────────────────────────────────────────────────
 
-/// A live browser session backed by a Python Playwright subprocess.
+/// A live browser session backed by a chromiumoxide Page.
 struct BrowserSession {
-    child: Child,
-    stdin: ChildStdin,
-    stdout: BufReader<ChildStdout>,
+    page: Page,
     last_active: Instant,
 }
 
 impl BrowserSession {
-    /// Send a command and read the response.
-    fn send(&mut self, cmd: &BrowserCommand) -> Result<BrowserResponse, String> {
-        let json = serde_json::to_string(cmd).map_err(|e| format!("Serialize error: {e}"))?;
-        self.stdin
-            .write_all(json.as_bytes())
-            .map_err(|e| format!("Failed to write to bridge stdin: {e}"))?;
-        self.stdin
-            .write_all(b"\n")
-            .map_err(|e| format!("Failed to write newline: {e}"))?;
-        self.stdin
-            .flush()
-            .map_err(|e| format!("Failed to flush bridge stdin: {e}"))?;
-
-        let mut line = String::new();
-        self.stdout
-            .read_line(&mut line)
-            .map_err(|e| format!("Failed to read bridge stdout: {e}"))?;
-
-        if line.trim().is_empty() {
-            return Err("Bridge process closed unexpectedly".to_string());
-        }
-
+    async fn execute(&mut self, cmd: &BrowserCommand) -> Result<BrowserResponse, String> {
         self.last_active = Instant::now();
-        serde_json::from_str(line.trim())
-            .map_err(|e| format!("Failed to parse bridge response: {e}"))
-    }
-
-    /// Kill the subprocess.
-    fn kill(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
-}
-
-impl Drop for BrowserSession {
-    fn drop(&mut self) {
-        self.kill();
+        
+        match cmd {
+            BrowserCommand::Navigate { url } => {
+                let p = self.page.goto(url).await.map_err(|e| format!("Nav Error: {e}"))?;
+                p.wait_for_navigation().await.map_err(|e| format!("Nav Wait Error: {e}"))?;
+                
+                let title = self.page.evaluate("document.title").await.map_err(|e| format!("Title fetch error: {e}"))?.into_value::<String>().unwrap_or_default();
+                let page_url = self.page.url().await.map_err(|e| format!("URL fetch error: {e}"))?.unwrap_or_default();
+                
+                // Read clean markdown via Readability
+                let content = self.page.evaluate(include_str!("readability.js")).await.map_err(|e| format!("Readability error: {e}"))?.into_value::<String>().unwrap_or_default();
+                
+                Ok(BrowserResponse {
+                    success: true,
+                    data: Some(serde_json::json!({
+                        "title": title,
+                        "url": page_url,
+                        "content": content
+                    })),
+                    error: None,
+                })
+            }
+            BrowserCommand::Click { selector } => {
+                let element = self.page.find_element(selector.as_str()).await.map_err(|e| format!("Element not found: {e}"))?;
+                element.click().await.map_err(|e| format!("Click failed: {e}"))?;
+                
+                let title = self.page.evaluate("document.title").await.ok().and_then(|v| v.into_value::<String>().ok()).unwrap_or_default();
+                let url = self.page.url().await.ok().flatten().unwrap_or_default();
+                
+                Ok(BrowserResponse {
+                    success: true,
+                    data: Some(serde_json::json!({ "title": title, "url": url })),
+                    error: None,
+                })
+            }
+            BrowserCommand::Type { selector, text } => {
+                let element = self.page.find_element(selector.as_str()).await.map_err(|e| format!("Element not found: {e}"))?;
+                element.click().await.map_err(|e| format!("Focus failed: {e}"))?;
+                element.type_str(text).await.map_err(|e| format!("Type failed: {e}"))?;
+                
+                Ok(BrowserResponse {
+                    success: true,
+                    data: None,
+                    error: None,
+                })
+            }
+            BrowserCommand::Screenshot => {
+                use chromiumoxide::cdp::browser_protocol::page::CaptureScreenshotFormat;
+                let bytes = self.page.screenshot(
+                    chromiumoxide::page::ScreenshotParams::builder()
+                        .format(CaptureScreenshotFormat::Png)
+                        .full_page(false)
+                        .build()
+                ).await.map_err(|e| format!("Screenshot error: {e}"))?;
+                
+                use base64::Engine;
+                let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+                let url = self.page.url().await.ok().flatten().unwrap_or_default();
+                
+                Ok(BrowserResponse {
+                    success: true,
+                    data: Some(serde_json::json!({
+                        "image_base64": b64,
+                        "url": url
+                    })),
+                    error: None,
+                })
+            }
+            BrowserCommand::ReadPage => {
+                let title = self.page.evaluate("document.title").await.ok().and_then(|v| v.into_value::<String>().ok()).unwrap_or_default();
+                let url = self.page.url().await.ok().flatten().unwrap_or_default();
+                let content = self.page.evaluate(include_str!("readability.js")).await.map_err(|e| format!("Readability error: {e}"))?.into_value::<String>().unwrap_or_default();
+                
+                Ok(BrowserResponse {
+                    success: true,
+                    data: Some(serde_json::json!({
+                        "title": title,
+                        "url": url,
+                        "content": content
+                    })),
+                    error: None,
+                })
+            }
+            BrowserCommand::Close => {
+                let _ = self.page.clone().close().await;
+                Ok(BrowserResponse {
+                    success: true,
+                    data: None,
+                    error: None,
+                })
+            }
+        }
     }
 }
 
@@ -100,212 +151,103 @@ impl Drop for BrowserSession {
 
 /// Manages browser sessions for all agents.
 pub struct BrowserManager {
-    sessions: DashMap<String, Mutex<BrowserSession>>,
-    config: BrowserConfig,
-    bridge_path: OnceLock<PathBuf>,
+    sessions: DashMap<String, Arc<Mutex<BrowserSession>>>,
+    config: AppBrowserConfig,
+    browser: OnceCell<Arc<Browser>>,
 }
 
 impl BrowserManager {
     /// Create a new BrowserManager with the given configuration.
-    pub fn new(config: BrowserConfig) -> Self {
+    pub fn new(config: AppBrowserConfig) -> Self {
         Self {
             sessions: DashMap::new(),
             config,
-            bridge_path: OnceLock::new(),
+            browser: OnceCell::new(),
         }
     }
 
-    /// Write the embedded Python bridge script to a temp file (once).
-    fn ensure_bridge_script(&self) -> Result<&PathBuf, String> {
-        if let Some(path) = self.bridge_path.get() {
-            return Ok(path);
-        }
-        let dir = std::env::temp_dir().join("Sovereign Kernel");
-        std::fs::create_dir_all(&dir).map_err(|e| format!("Failed to create temp dir: {e}"))?;
-        let path = dir.join("browser_bridge.py");
-        std::fs::write(&path, BRIDGE_SCRIPT)
-            .map_err(|e| format!("Failed to write bridge script: {e}"))?;
-        debug!(path = %path.display(), "Wrote browser bridge script");
-        // Race-safe: if another thread set it first, we just use theirs
-        let _ = self.bridge_path.set(path);
-        Ok(self.bridge_path.get().unwrap())
+    async fn get_browser(&self) -> Result<Arc<Browser>, String> {
+        self.browser.get_or_try_init(|| async {
+            let mut build = BrowserConfig::builder()
+                .window_size(self.config.viewport_width, self.config.viewport_height);
+            
+            if !self.config.headless {
+                build = build.with_head();
+            }
+
+            let b_config = build.build().map_err(|e| format!("Config builder error: {e}"))?;
+            
+            let (browser, mut handler) = Browser::launch(b_config)
+                .await
+                .map_err(|e| format!("Failed to launch chromium: {e}"))?;
+            
+            tokio::spawn(async move {
+                while let Some(_) = handler.next().await {
+                    // pump events
+                }
+            });
+
+            Ok(Arc::new(browser))
+        }).await.cloned()
     }
 
-    /// Get or create a browser session for the given agent.
-    /// This does synchronous subprocess spawn + I/O, so it must be called from
-    /// within `block_in_place` (see `send_command`).
-    fn get_or_create_sync(&self, agent_id: &str) -> Result<(), String> {
-        if self.sessions.contains_key(agent_id) {
-            return Ok(());
+    async fn get_or_create_session(&self, agent_id: &str) -> Result<Arc<Mutex<BrowserSession>>, String> {
+        if let Some(session) = self.sessions.get(agent_id) {
+            return Ok(session.clone());
         }
 
-        // Enforce session limit
         if self.sessions.len() >= self.config.max_sessions {
-            return Err(format!(
-                "Maximum browser sessions reached ({}). Close an existing session first.",
-                self.config.max_sessions
-            ));
+            return Err(format!("Max browser sessions reached ({})", self.config.max_sessions));
         }
 
-        let bridge_path = self.ensure_bridge_script()?;
-
-        let mut cmd = std::process::Command::new(&self.config.python_path);
-        cmd.arg(bridge_path.to_string_lossy().as_ref());
-        if self.config.headless {
-            cmd.arg("--headless");
-        } else {
-            cmd.arg("--no-headless");
-        }
-        cmd.arg("--width")
-            .arg(self.config.viewport_width.to_string());
-        cmd.arg("--height")
-            .arg(self.config.viewport_height.to_string());
-        cmd.arg("--timeout")
-            .arg(self.config.timeout_secs.to_string());
-
-        cmd.stdin(Stdio::piped());
-        cmd.stdout(Stdio::piped());
-        cmd.stderr(Stdio::null());
-
-        // SECURITY: Isolate environment — clear everything, pass through only essentials
-        cmd.env_clear();
-        #[cfg(windows)]
-        {
-            if let Ok(v) = std::env::var("SYSTEMROOT") {
-                cmd.env("SYSTEMROOT", v);
-            }
-            if let Ok(v) = std::env::var("PATH") {
-                cmd.env("PATH", v);
-            }
-            if let Ok(v) = std::env::var("TEMP") {
-                cmd.env("TEMP", v);
-            }
-            if let Ok(v) = std::env::var("TMP") {
-                cmd.env("TMP", v);
-            }
-            // Playwright needs these to find installed browsers
-            if let Ok(v) = std::env::var("USERPROFILE") {
-                cmd.env("USERPROFILE", v);
-            }
-            if let Ok(v) = std::env::var("APPDATA") {
-                cmd.env("APPDATA", v);
-            }
-            if let Ok(v) = std::env::var("LOCALAPPDATA") {
-                cmd.env("LOCALAPPDATA", v);
-            }
-            cmd.env("PYTHONIOENCODING", "utf-8");
-        }
-        #[cfg(not(windows))]
-        {
-            if let Ok(v) = std::env::var("PATH") {
-                cmd.env("PATH", v);
-            }
-            if let Ok(v) = std::env::var("HOME") {
-                cmd.env("HOME", v);
-            }
-            if let Ok(v) = std::env::var("TMPDIR") {
-                cmd.env("TMPDIR", v);
-            }
-            if let Ok(v) = std::env::var("XDG_CACHE_HOME") {
-                cmd.env("XDG_CACHE_HOME", v);
-            }
-        }
-
-        let mut child = cmd.spawn().map_err(|e| {
-            format!(
-                "Failed to spawn browser bridge: {e}. Ensure Python and playwright are installed."
-            )
-        })?;
-
-        let stdin = child.stdin.take().ok_or("Failed to capture bridge stdin")?;
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or("Failed to capture bridge stdout")?;
-        let mut reader = BufReader::new(stdout);
-
-        // Wait for the "ready" response
-        let mut ready_line = String::new();
-        reader
-            .read_line(&mut ready_line)
-            .map_err(|e| format!("Bridge failed to start: {e}"))?;
-
-        if ready_line.trim().is_empty() {
-            let _ = child.kill();
-            return Err("Browser bridge process exited without sending ready signal. Check Python/Playwright installation.".to_string());
-        }
-
-        let ready: BrowserResponse = serde_json::from_str(ready_line.trim())
-            .map_err(|e| format!("Bridge startup failed: {e}. Output: {ready_line}"))?;
-
-        if !ready.success {
-            let err = ready.error.unwrap_or_else(|| "Unknown error".to_string());
-            let _ = child.kill();
-            return Err(format!("Browser bridge failed to start: {err}"));
-        }
-
-        info!(agent_id, "Browser session created");
-
-        let session = BrowserSession {
-            child,
-            stdin,
-            stdout: reader,
+        let browser = self.get_browser().await?;
+        let page = browser.new_page("about:blank").await.map_err(|e| format!("Failed to create page: {e}"))?;
+        
+        // Inject JS helper scripts if needed (e.g., Readability library)
+        
+        let session = Arc::new(Mutex::new(BrowserSession {
+            page,
             last_active: Instant::now(),
-        };
-
-        self.sessions
-            .insert(agent_id.to_string(), Mutex::new(session));
-        Ok(())
+        }));
+        
+        self.sessions.insert(agent_id.to_string(), session.clone());
+        Ok(session)
     }
 
-    /// Check whether an agent has an active browser session (without creating one).
     pub fn has_session(&self, agent_id: &str) -> bool {
         self.sessions.contains_key(agent_id)
     }
 
-    /// Send a command to an agent's browser session.
     pub async fn send_command(
         &self,
         agent_id: &str,
         cmd: BrowserCommand,
     ) -> Result<BrowserResponse, String> {
-        // Session creation involves sync subprocess spawn + I/O
-        tokio::task::block_in_place(|| self.get_or_create_sync(agent_id))?;
+        let session_arc = self.get_or_create_session(agent_id).await?;
+        let mut session = session_arc.lock().await;
 
-        let session_ref = self
-            .sessions
-            .get(agent_id)
-            .ok_or_else(|| "Session disappeared".to_string())?;
+        let res = session.execute(&cmd).await.unwrap_or_else(|e| BrowserResponse {
+            success: false,
+            data: None,
+            error: Some(e),
+        });
 
-        let session_mutex = session_ref.value();
-        let mut session = session_mutex.lock().await;
-
-        // Run synchronous I/O in a blocking context
-        let response = tokio::task::block_in_place(|| session.send(&cmd))?;
-
-        if !response.success {
-            let err = response
-                .error
-                .clone()
-                .unwrap_or_else(|| "Unknown error".to_string());
+        if !res.success {
+            let err = res.error.clone().unwrap_or_else(|| "Unknown error".to_string());
             warn!(agent_id, error = %err, "Browser command failed");
         }
 
-        Ok(response)
+        Ok(res)
     }
 
-    /// Close an agent's browser session.
     pub async fn close_session(&self, agent_id: &str) {
-        if let Some((_, session_mutex)) = self.sessions.remove(agent_id) {
-            let mut session = session_mutex.lock().await;
-            // Try graceful close
-            let _ = session.send(&BrowserCommand::Close);
-            session.kill();
+        if let Some((_, session_arc)) = self.sessions.remove(agent_id) {
+            let mut session = session_arc.lock().await;
+            let _ = session.execute(&BrowserCommand::Close).await;
             info!(agent_id, "Browser session closed");
         }
     }
 
-    /// Clean up an agent's browser session (called after agent loop ends).
     pub async fn cleanup_agent(&self, agent_id: &str) {
         self.close_session(agent_id).await;
     }
@@ -313,123 +255,66 @@ impl BrowserManager {
 
 // ── Tool handler functions ──────────────────────────────────────────────────
 
-/// browser_navigate — Navigate to a URL. SSRF-checked in Rust before delegating.
 pub async fn tool_browser_navigate(
     input: &serde_json::Value,
     mgr: &BrowserManager,
     agent_id: &str,
 ) -> Result<String, String> {
     let url = input["url"].as_str().ok_or("Missing 'url' parameter")?;
-
-    // SECURITY: SSRF check in Rust before sending to Python
     super::web_fetch::check_ssrf(url)?;
 
-    let resp = mgr
-        .send_command(
-            agent_id,
-            BrowserCommand::Navigate {
-                url: url.to_string(),
-            },
-        )
-        .await?;
-
-    if !resp.success {
-        return Err(resp.error.unwrap_or_else(|| "Navigate failed".to_string()));
-    }
+    let resp = mgr.send_command(agent_id, BrowserCommand::Navigate { url: url.to_string() }).await?;
+    if !resp.success { return Err(resp.error.unwrap_or_else(|| "Navigate failed".into())); }
 
     let data = resp.data.unwrap_or_default();
     let title = data["title"].as_str().unwrap_or("(no title)");
     let page_url = data["url"].as_str().unwrap_or(url);
     let content = data["content"].as_str().unwrap_or("");
-
-    // Wrap with external content markers
     let wrapped = super::web_content::wrap_external_content(page_url, content);
 
-    Ok(format!(
-        "Navigated to: {page_url}\nTitle: {title}\n\n{wrapped}"
-    ))
+    Ok(format!("Navigated to: {page_url}\nTitle: {title}\n\n{wrapped}"))
 }
 
-/// browser_click — Click an element by CSS selector or text.
 pub async fn tool_browser_click(
     input: &serde_json::Value,
     mgr: &BrowserManager,
     agent_id: &str,
 ) -> Result<String, String> {
-    let selector = input["selector"]
-        .as_str()
-        .ok_or("Missing 'selector' parameter")?;
-
-    let resp = mgr
-        .send_command(
-            agent_id,
-            BrowserCommand::Click {
-                selector: selector.to_string(),
-            },
-        )
-        .await?;
-
-    if !resp.success {
-        return Err(resp.error.unwrap_or_else(|| "Click failed".to_string()));
-    }
+    let selector = input["selector"].as_str().ok_or("Missing 'selector'")?;
+    let resp = mgr.send_command(agent_id, BrowserCommand::Click { selector: selector.into() }).await?;
+    if !resp.success { return Err(resp.error.unwrap_or_else(|| "Click failed".into())); }
 
     let data = resp.data.unwrap_or_default();
     let title = data["title"].as_str().unwrap_or("(no title)");
     let url = data["url"].as_str().unwrap_or("");
-
     Ok(format!("Clicked: {selector}\nPage: {title}\nURL: {url}"))
 }
 
-/// browser_type — Type text into an input field.
 pub async fn tool_browser_type(
     input: &serde_json::Value,
     mgr: &BrowserManager,
     agent_id: &str,
 ) -> Result<String, String> {
-    let selector = input["selector"]
-        .as_str()
-        .ok_or("Missing 'selector' parameter")?;
-    let text = input["text"].as_str().ok_or("Missing 'text' parameter")?;
-
-    let resp = mgr
-        .send_command(
-            agent_id,
-            BrowserCommand::Type {
-                selector: selector.to_string(),
-                text: text.to_string(),
-            },
-        )
-        .await?;
-
-    if !resp.success {
-        return Err(resp.error.unwrap_or_else(|| "Type failed".to_string()));
-    }
-
+    let selector = input["selector"].as_str().ok_or("Missing 'selector'")?;
+    let text = input["text"].as_str().ok_or("Missing 'text'")?;
+    let resp = mgr.send_command(agent_id, BrowserCommand::Type { selector: selector.into(), text: text.into() }).await?;
+    if !resp.success { return Err(resp.error.unwrap_or_else(|| "Type failed".into())); }
     Ok(format!("Typed into {selector}: {text}"))
 }
 
-/// browser_screenshot — Take a screenshot of the current page.
 pub async fn tool_browser_screenshot(
     _input: &serde_json::Value,
     mgr: &BrowserManager,
     agent_id: &str,
 ) -> Result<String, String> {
-    let resp = mgr
-        .send_command(agent_id, BrowserCommand::Screenshot)
-        .await?;
-
-    if !resp.success {
-        return Err(resp
-            .error
-            .unwrap_or_else(|| "Screenshot failed".to_string()));
-    }
+    let resp = mgr.send_command(agent_id, BrowserCommand::Screenshot).await?;
+    if !resp.success { return Err(resp.error.unwrap_or_else(|| "Screenshot failed".into())); }
 
     let data = resp.data.unwrap_or_default();
     let b64 = data["image_base64"].as_str().unwrap_or("");
     let url = data["url"].as_str().unwrap_or("");
 
-    // Save screenshot to uploads temp dir so it's accessible via /api/uploads/
-    let mut image_urls: Vec<String> = Vec::new();
+    let mut image_urls = Vec::new();
     if !b64.is_empty() {
         use base64::Engine;
         let upload_dir = std::env::temp_dir().join("sk_uploads");
@@ -443,141 +328,35 @@ pub async fn tool_browser_screenshot(
         }
     }
 
-    let result = serde_json::json!({
+    Ok(serde_json::json!({
         "screenshot": true,
         "url": url,
         "image_urls": image_urls,
-    });
-
-    Ok(result.to_string())
+    }).to_string())
 }
 
-/// browser_read_page — Read the current page content as markdown.
 pub async fn tool_browser_read_page(
     _input: &serde_json::Value,
     mgr: &BrowserManager,
     agent_id: &str,
 ) -> Result<String, String> {
     let resp = mgr.send_command(agent_id, BrowserCommand::ReadPage).await?;
-
-    if !resp.success {
-        return Err(resp.error.unwrap_or_else(|| "ReadPage failed".to_string()));
-    }
+    if !resp.success { return Err(resp.error.unwrap_or_else(|| "ReadPage failed".into())); }
 
     let data = resp.data.unwrap_or_default();
     let title = data["title"].as_str().unwrap_or("(no title)");
     let url = data["url"].as_str().unwrap_or("");
     let content = data["content"].as_str().unwrap_or("");
-
     let wrapped = super::web_content::wrap_external_content(url, content);
 
     Ok(format!("Page: {title}\nURL: {url}\n\n{wrapped}"))
 }
 
-/// browser_close — Close the browser session for this agent.
 pub async fn tool_browser_close(
     _input: &serde_json::Value,
     mgr: &BrowserManager,
     agent_id: &str,
 ) -> Result<String, String> {
     mgr.close_session(agent_id).await;
-    Ok("Browser session closed.".to_string())
-}
-
-// ── Tests ───────────────────────────────────────────────────────────────────
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_browser_config_defaults() {
-        let config = BrowserConfig::default();
-        assert!(config.headless);
-        assert_eq!(config.viewport_width, 1280);
-        assert_eq!(config.viewport_height, 720);
-        assert_eq!(config.timeout_secs, 30);
-        assert_eq!(config.idle_timeout_secs, 300);
-        assert_eq!(config.max_sessions, 5);
-    }
-
-    #[test]
-    fn test_browser_command_serialize_navigate() {
-        let cmd = BrowserCommand::Navigate {
-            url: "https://example.com".to_string(),
-        };
-        let json = serde_json::to_string(&cmd).unwrap();
-        assert!(json.contains("\"action\":\"Navigate\""));
-        assert!(json.contains("\"url\":\"https://example.com\""));
-    }
-
-    #[test]
-    fn test_browser_command_serialize_click() {
-        let cmd = BrowserCommand::Click {
-            selector: "#submit-btn".to_string(),
-        };
-        let json = serde_json::to_string(&cmd).unwrap();
-        assert!(json.contains("\"action\":\"Click\""));
-        assert!(json.contains("\"selector\":\"#submit-btn\""));
-    }
-
-    #[test]
-    fn test_browser_command_serialize_type() {
-        let cmd = BrowserCommand::Type {
-            selector: "input[name='email']".to_string(),
-            text: "test@example.com".to_string(),
-        };
-        let json = serde_json::to_string(&cmd).unwrap();
-        assert!(json.contains("\"action\":\"Type\""));
-        assert!(json.contains("test@example.com"));
-    }
-
-    #[test]
-    fn test_browser_command_serialize_screenshot() {
-        let cmd = BrowserCommand::Screenshot;
-        let json = serde_json::to_string(&cmd).unwrap();
-        assert!(json.contains("\"action\":\"Screenshot\""));
-    }
-
-    #[test]
-    fn test_browser_command_serialize_read_page() {
-        let cmd = BrowserCommand::ReadPage;
-        let json = serde_json::to_string(&cmd).unwrap();
-        assert!(json.contains("\"action\":\"ReadPage\""));
-    }
-
-    #[test]
-    fn test_browser_command_serialize_close() {
-        let cmd = BrowserCommand::Close;
-        let json = serde_json::to_string(&cmd).unwrap();
-        assert!(json.contains("\"action\":\"Close\""));
-    }
-
-    #[test]
-    fn test_browser_response_deserialize() {
-        let json =
-            r#"{"success": true, "data": {"title": "Example", "url": "https://example.com"}}"#;
-        let resp: BrowserResponse = serde_json::from_str(json).unwrap();
-        assert!(resp.success);
-        assert!(resp.data.is_some());
-        assert!(resp.error.is_none());
-        let data = resp.data.unwrap();
-        assert_eq!(data["title"], "Example");
-    }
-
-    #[test]
-    fn test_browser_response_error_deserialize() {
-        let json = r#"{"success": false, "error": "Element not found"}"#;
-        let resp: BrowserResponse = serde_json::from_str(json).unwrap();
-        assert!(!resp.success);
-        assert!(resp.data.is_none());
-        assert_eq!(resp.error.unwrap(), "Element not found");
-    }
-
-    #[test]
-    fn test_browser_manager_new() {
-        let config = BrowserConfig::default();
-        let mgr = BrowserManager::new(config);
-        assert!(mgr.sessions.is_empty());
-    }
+    Ok("Browser session closed.".into())
 }

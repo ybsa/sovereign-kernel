@@ -182,7 +182,7 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> impl IntoRespons
         .unwrap_or_default()
         .as_secs();
 
-    let reg = state.hand_registry.lock().unwrap();
+    let reg = state.kernel.hands.read().await;
     let defs = reg.list_definitions();
 
     let mut models = vec![ModelObject {

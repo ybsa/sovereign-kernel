@@ -232,6 +232,7 @@ impl MemorySubstrate {
                  session_id TEXT NOT NULL,
                  agent_config TEXT NOT NULL DEFAULT '{}',
                  tool_state TEXT DEFAULT '{}',
+                 status TEXT NOT NULL DEFAULT 'active',
                  created_at TEXT NOT NULL DEFAULT (datetime('now'))
              );
              CREATE INDEX IF NOT EXISTS idx_checkpoints_agent ON checkpoints(agent_id);

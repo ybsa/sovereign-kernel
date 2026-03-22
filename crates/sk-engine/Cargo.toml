@@ -25,7 +25,9 @@ anyhow = { workspace = true }
 base64.workspace = true
 regex-lite = "0.1"
 zeroize = "1.8"
+futures = { workspace = true }
 hex = "0.4"
+chromiumoxide = { workspace = true }
 
 [dev-dependencies]
 tokio-test = { workspace = true }

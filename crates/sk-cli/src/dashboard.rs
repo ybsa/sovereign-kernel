@@ -16,7 +16,6 @@ use axum::response::IntoResponse;
 use axum::routing::get;
 use axum::Router;
 use serde::Serialize;
-use sk_hands::registry::HandRegistry;
 use std::sync::Arc;
 use std::time::Instant;
 use tower_http::cors::{Any, CorsLayer};
@@ -105,7 +104,7 @@ const DASHBOARD_HTML: &str = concat!(
 
 /// Shared state accessible by all dashboard API routes.
 pub struct AppState {
-    pub hand_registry: std::sync::Mutex<HandRegistry>,
+    pub kernel: Arc<sk_kernel::SovereignKernel>,
     pub started_at: Instant,
     pub telegram_connected: bool,
 }
@@ -219,7 +218,7 @@ async fn api_version() -> axum::Json<VersionInfo> {
 }
 
 async fn api_status(state: axum::extract::State<Arc<AppState>>) -> axum::Json<StatusResponse> {
-    let reg = state.hand_registry.lock().unwrap();
+    let reg = state.kernel.hands.read().await;
     let defs = reg.list_definitions();
     let instances = reg.list_instances();
 
@@ -233,17 +232,21 @@ async fn api_status(state: axum::extract::State<Arc<AppState>>) -> axum::Json<St
     })
 }
 
-async fn api_list_agents() -> axum::Json<Vec<AgentInfo>> {
-    axum::Json(vec![AgentInfo {
-        id: "default".into(),
-        name: "Sovereign Agent".into(),
-        status: "running".into(),
-        model: "claude-sonnet-4-20250514".into(),
-    }])
+async fn api_list_agents(state: axum::extract::State<Arc<AppState>>) -> axum::Json<Vec<AgentInfo>> {
+    let mut agents = Vec::new();
+    for entry in state.kernel.active_loops.iter() {
+        agents.push(AgentInfo {
+            id: entry.key().to_string(),
+            name: "Sovereign Agent".into(),
+            status: "running".into(),
+            model: state.kernel.model_name.clone(),
+        });
+    }
+    axum::Json(agents)
 }
 
 async fn api_list_hands(state: axum::extract::State<Arc<AppState>>) -> axum::Json<Vec<HandInfo>> {
-    let reg = state.hand_registry.lock().unwrap();
+    let reg = state.kernel.hands.read().await;
     let defs = reg.list_definitions();
     axum::Json(
         defs.iter()
@@ -262,7 +265,7 @@ async fn api_list_hands(state: axum::extract::State<Arc<AppState>>) -> axum::Jso
 async fn api_list_hand_instances(
     state: axum::extract::State<Arc<AppState>>,
 ) -> axum::Json<Vec<HandInstanceInfo>> {
-    let reg = state.hand_registry.lock().unwrap();
+    let reg = state.kernel.hands.read().await;
     let instances = reg.list_instances();
     axum::Json(
         instances
@@ -317,13 +320,19 @@ struct AuditEntry {
     details: String,
 }
 
-async fn api_audit() -> axum::Json<Vec<AuditEntry>> {
-    axum::Json(vec![AuditEntry {
-        timestamp: chrono::Utc::now().to_rfc3339(),
-        action: "daemon_start".into(),
-        agent: "system".into(),
-        details: "Sovereign Kernel daemon started".into(),
-    }])
+async fn api_audit(state: axum::extract::State<Arc<AppState>>) -> axum::Json<Vec<AuditEntry>> {
+    let mut results = Vec::new();
+    if let Ok(logs) = state.kernel.memory.audit.get_recent_logs(50) {
+        for log in logs {
+            results.push(AuditEntry {
+                timestamp: log.timestamp,
+                action: log.action_type,
+                agent: log.agent_id.to_string(),
+                details: format!("Mode: {} | Hash: {}", log.execution_mode, &log.hash[..std::cmp::min(8, log.hash.len())]),
+            });
+        }
+    }
+    axum::Json(results)
 }
 
 // ─── Router builder ──────────────────────────────────────────────────────────

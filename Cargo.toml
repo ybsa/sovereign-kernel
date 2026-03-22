@@ -97,6 +97,8 @@ hmac = "0.12"
 base64 = "0.22"
 hex = "0.4"
 fs-err = "3"
+colored = "2"
+chromiumoxide = { version = "0.6", features = ["tokio-runtime"] }
 
 # Inter-crate
 sk-types = { path = "crates/sk-types" }

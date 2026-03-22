@@ -15,6 +15,7 @@ use clap::{Parser, Subcommand};
 mod agents;
 mod audit;
 mod bridge;
+mod channels;
 mod chat;
 mod daemon;
 mod dashboard;
@@ -55,6 +56,7 @@ enum Commands {
     /// Start the kernel as a background daemon
     Start,
     /// Run a task autonomously
+    #[command(alias = "do")]
     Run {
         /// The task description (natural language)
         task: String,
@@ -109,6 +111,14 @@ enum Commands {
         /// Agent ID or name
         id: Option<String>,
     },
+    /// Manage channel bridges (list, info)
+    Channels {
+        /// Action: list, info
+        #[arg(default_value = "list")]
+        action: String,
+        /// Target channel (e.g., telegram, discord)
+        channel: Option<String>,
+    },
     /// Run system diagnostics and health checks
     Doctor,
     /// Manage budgets and track LLM costs
@@ -130,15 +140,19 @@ async fn main() -> anyhow::Result<()> {
             .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"))
     };
 
+    let mut _log_guard = None;
+
     if let Some(ref log_path) = cli.log_file {
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(log_path)
-            .unwrap_or_else(|e| panic!("Failed to open log file {}: {}", log_path, e));
+        let path = std::path::Path::new(log_path);
+        let dir = path.parent().unwrap_or(std::path::Path::new("."));
+        let prefix = path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("sovereign.log"));
+
+        let file_appender = tracing_appender::rolling::daily(dir, prefix);
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+        _log_guard = Some(guard); // Keep the worker guard alive
 
         let file_layer = tracing_subscriber::fmt::layer()
-            .with_writer(file)
+            .with_writer(non_blocking)
             .json() // Write as JSON to the log file for structure
             .with_ansi(false);
 
@@ -193,12 +207,9 @@ async fn main() -> anyhow::Result<()> {
         Commands::Hands { action, args } => hands::run(config, &action, &args).await?,
         Commands::Audit { action, args } => audit::run(config, &action, &args).await?,
         Commands::Dashboard { port, no_open } => {
+            let kernel = std::sync::Arc::new(sk_kernel::SovereignKernel::init(config).await?);
             let state = std::sync::Arc::new(dashboard::AppState {
-                hand_registry: std::sync::Mutex::new({
-                    let mut reg = sk_hands::registry::HandRegistry::new();
-                    reg.load_bundled();
-                    reg
-                }),
+                kernel,
                 started_at: std::time::Instant::now(),
                 telegram_connected: false,
             });
@@ -218,6 +229,9 @@ async fn main() -> anyhow::Result<()> {
             let api_url = config.api_listen.clone();
             let api_key = std::env::var("SOVEREIGN_API_KEY").ok();
             treasury::run(args, &format!("http://{}", api_url), api_key.as_deref()).await?;
+        }
+        Commands::Channels { action, channel } => {
+            channels::run(config, &action, channel.as_deref()).await?;
         }
     }
 

@@ -20,6 +20,7 @@ Sets up your LLM API key, execution mode, and agent identity.
 | `sovereign chat` | Interactive terminal REPL |
 | `sovereign start` | Start as background daemon |
 | `sovereign run "<task>"` | Run a task autonomously (NL Builder auto-detects mode) |
+| `sovereign do "<task>"` | Fast alias for `run` — just do it. |
 | `sovereign run "<task>" --schedule "..."` | Schedule a recurring cron task |
 | `sovereign status` | Village overview — agents, jobs, daemon status |
 | `sovereign kill <agent-id>` | Kill a specific agent |
@@ -137,7 +138,7 @@ sovereign --config config.unrestricted.toml chat
 | `web_fetch` | Fetch and extract text from URLs |
 | `web_search` | Search the web (requires BRAVE_API_KEY or TAVILY_API_KEY) |
 | `code_exec` | Run scripts natively or in Docker (supports `use_sandbox` flag). |
-| `browser_navigate` | Open URLs in Playwright browser |
+| `browser_navigate` | Open URLs via native Chromium automation |
 | `browser_click` / `browser_type` | Interact with web pages |
 | `browser_screenshot` | Capture screenshots |
 | `memory_store` / `memory_recall` | Persistent key-value memory |

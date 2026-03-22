@@ -8,3 +8,8 @@ Thumbs.db
 
 # IDEs
 .vscode/
+
+# Environment and Logs
+.env
+*.log
+logs/

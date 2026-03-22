@@ -853,7 +853,7 @@ mod tests {
             role: Role::User,
             content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                 tool_use_id: "tu-1".to_string(),
-                content: "Search results here".to_string(),
+                content: MessageContent::Text("Search results here".to_string()),
                 is_error: false,
             }]),
         };
@@ -1182,7 +1182,7 @@ mod tests {
                 role: Role::User,
                 content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                     tool_use_id: "tu-1".to_string(),
-                    content: "Results found".to_string(),
+                    content: MessageContent::Text("Results found".to_string()),
                     is_error: false,
                 }]),
             },
@@ -1322,7 +1322,7 @@ mod tests {
             role: Role::User,
             content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                 tool_use_id: "t1".to_string(),
-                content: tool_content,
+                content: MessageContent::Text(tool_content),
                 is_error: false,
             }]),
         }];
@@ -1341,7 +1341,7 @@ mod tests {
             role: Role::User,
             content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                 tool_use_id: "t2".to_string(),
-                content: large_result,
+                content: MessageContent::Text(large_result),
                 is_error: false,
             }]),
         }];
@@ -1364,7 +1364,7 @@ mod tests {
             role: Role::User,
             content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                 tool_use_id: "t3".to_string(),
-                content: short_result.to_string(),
+                content: MessageContent::Text(short_result.to_string()),
                 is_error: false,
             }]),
         }];

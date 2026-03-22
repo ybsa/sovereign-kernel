@@ -10,7 +10,6 @@
 
 use std::path::PathBuf;
 use sk_types::config::KernelConfig;
-use tracing::{info, warn, error};
 
 pub async fn run(config: &KernelConfig) -> anyhow::Result<()> {
     println!("═══════════════════════════════════════════════════════");
@@ -22,8 +21,8 @@ pub async fn run(config: &KernelConfig) -> anyhow::Result<()> {
     // 1. Check Directories
     print!("📁 Checking directories... ");
     let dirs = vec![
-        &config.data_dir,
-        &dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")).join("sovereign-kernel"),
+        config.data_dir.clone(),
+        dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")).join("sovereign-kernel"),
     ];
 
     for d in dirs {
@@ -61,7 +60,7 @@ pub async fn run(config: &KernelConfig) -> anyhow::Result<()> {
         ("GROQ_API_KEY", "Groq"),
     ];
     let mut keys_found = 0;
-    for (env, name) in keys {
+    for (env, _name) in keys {
         if std::env::var(env).is_ok() {
             keys_found += 1;
         }

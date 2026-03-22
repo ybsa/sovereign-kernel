@@ -2,7 +2,7 @@
 
 use clap::{Parser, Subcommand};
 use sk_types::SovereignResult;
-use colored::*;
+use colored::Colorize;
 
 /// Manage budgets and track LLM costs.
 #[derive(Parser, Debug)]
@@ -49,7 +49,7 @@ async fn show_status(api_url: &str, api_key: Option<&str>) -> SovereignResult<()
     println!("\n{}", "── THE TREASURY: BUDGET STATUS ──".bold().cyan());
     
     let total = status["current_spend"].as_f64().unwrap_or(0.0);
-    println!("Total Session Spend: ${:.4}", total.to_string().yellow());
+    println!("Total Session Spend: ${}", format!("{:.4}", total).yellow());
 
     print_window("Hourly", status["hourly_spend"].as_f64(), status["hourly_limit"].as_f64(), status["hourly_pct"].as_f64());
     print_window("Daily", status["daily_spend"].as_f64(), status["daily_limit"].as_f64(), status["daily_pct"].as_f64());
@@ -79,7 +79,7 @@ fn print_window(name: &str, spend: Option<f64>, limit: Option<f64>, pct: Option<
     }
 }
 
-async fn show_report(api_url: &str, api_key: Option<&str>) -> SovereignResult<()> {
+async fn show_report(_api_url: &str, _api_key: Option<&str>) -> SovereignResult<()> {
     // Similar to status but maybe lists agents if available
     println!("Detailed per-agent report coming soon...");
     Ok(())

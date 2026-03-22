@@ -854,7 +854,7 @@ mod tests {
                     is_error,
                     content,
                     ..
-                } => tool_use_id == "tu-orphan" && *is_error && content.contains("interrupted"),
+                } => tool_use_id == "tu-orphan" && *is_error && content.text_content().contains("interrupted"),
                 _ => false,
             }),
             _ => false,
@@ -881,7 +881,7 @@ mod tests {
                 role: Role::User,
                 content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                     tool_use_id: "tu-dup".to_string(),
-                    content: "First result".to_string(),
+                    content: MessageContent::Text("First result".to_string()),
                     is_error: false,
                 }]),
             },
@@ -889,7 +889,7 @@ mod tests {
                 role: Role::User,
                 content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                     tool_use_id: "tu-dup".to_string(),
-                    content: "Duplicate result".to_string(),
+                    content: MessageContent::Text("Duplicate result".to_string()),
                     is_error: false,
                 }]),
             },
@@ -978,7 +978,7 @@ mod tests {
                 role: Role::User,
                 content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                     tool_use_id: "orphan".to_string(),
-                    content: "lost".to_string(),
+                    content: MessageContent::Text("lost".to_string()),
                     is_error: false,
                 }]),
             },
@@ -1057,7 +1057,7 @@ mod tests {
                 role: Role::User,
                 content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                     tool_use_id: "tu-a".to_string(),
-                    content: "search result".to_string(),
+                    content: MessageContent::Text("search result".to_string()),
                     is_error: false,
                 }]),
             },
@@ -1066,7 +1066,7 @@ mod tests {
                 role: Role::User,
                 content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
                     tool_use_id: "tu-ghost".to_string(),
-                    content: "ghost result".to_string(),
+                    content: MessageContent::Text("ghost result".to_string()),
                     is_error: false,
                 }]),
             },
@@ -1114,12 +1114,12 @@ mod tests {
                 content: MessageContent::Blocks(vec![
                     ContentBlock::ToolResult {
                         tool_use_id: "orphan-1".to_string(),
-                        content: "lost 1".to_string(),
+                        content: MessageContent::Text("lost 1".to_string()),
                         is_error: false,
                     },
                     ContentBlock::ToolResult {
                         tool_use_id: "orphan-2".to_string(),
-                        content: "lost 2".to_string(),
+                        content: MessageContent::Text("lost 2".to_string()),
                         is_error: false,
                     },
                 ]),

@@ -288,7 +288,7 @@ impl SovereignKernel {
         agent_config.checkpoint_handler = Some(Box::new(move |_sess| {
             k.memory
                 .checkpoint
-                .save(&aid, &sid.0, &config_value, &serde_json::Value::Null)
+                .save(&aid, &sid.0, &config_value, &serde_json::Value::Null, "active")
         }));
 
         // 1. Create and store cancellation token
@@ -310,6 +310,10 @@ impl SovereignKernel {
         // 3. Remove token after completion
         self.active_loops.remove(&aid);
         self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { agent_id: aid.to_string() });
+
+        // Save terminal checkpoint status
+        let terminal_status = if result.is_ok() { "completed" } else { "error" };
+        let _ = self.memory.checkpoint.save(&session.agent_id, &session.id.0, &serde_json::Value::Null, &serde_json::Value::Null, terminal_status);
 
         let result = result?;
 
@@ -349,7 +353,7 @@ impl SovereignKernel {
         };
 
         // 2. Restore session
-        let config = self.config.read().await;
+        let _config = self.config.read().await;
         let mut session = match self
             .memory
             .sessions
@@ -389,28 +393,47 @@ impl SovereignKernel {
         agent_config.checkpoint_handler = Some(Box::new(move |_sess| {
             k.memory
                 .checkpoint
-                .save(&aid, &sid.0, &config_value, &serde_json::Value::Null)
+                .save(&aid, &sid.0, &config_value, &serde_json::Value::Null, "active")
         }));
 
         // Trigger loop continuation
-        let _ = sk_engine::agent_loop::run_agent_loop(
+        let result = sk_engine::agent_loop::run_agent_loop(
             agent_config,
             &mut session,
             "System: Please continue where you left off.",
         )
-        .await?;
+        .await;
+
+        let terminal_status = if result.is_ok() { "completed" } else { "error" };
+        let _ = self.memory.checkpoint.save(&agent_id, &session.id.0, &serde_json::Value::Null, &serde_json::Value::Null, terminal_status);
 
         // Save session after resurrection
         let _ = self.memory.sessions.save(&session);
+
+        let _ = result?;
 
         info!(agent_id = %agent_id, "Resurrector: Agent successfully resurrected");
         Ok(())
     }
 
+    /// Resurrect all agents that have active checkpoints (i.e. crashed).
+    pub async fn resurrect_all_active_agents(self: &Arc<Self>) {
+        if let Ok(active_agents) = self.memory.checkpoint.list_active_agents() {
+            for agent_id in active_agents {
+                let k = self.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = k.resurrect_agent(agent_id).await {
+                        tracing::error!(agent_id = %agent_id, "Failed to resurrect agent: {}", e);
+                    }
+                });
+            }
+        }
+    }
+
     /// Start background services, including the cron job executor.
     pub async fn start_background_services(self: &Arc<Self>) {
         let kernel = self.clone();
-        let data_dir = self.config.read().await.data_dir.clone();
+        let _data_dir = self.config.read().await.data_dir.clone();
         tokio::spawn(async move {
             tracing::info!("Starting background cron scheduler...");
             loop {
@@ -567,7 +590,7 @@ impl SovereignKernel {
             info!("Applying hot-reload action: {:?}", action);
             match action {
                 ReloadSkills => {
-                    let config = self.config.read().await;
+                    let _config = self.config.read().await;
                     let mut skills_path = std::env::current_dir()
                         .unwrap_or_default()
                         .join("crates")
@@ -704,6 +727,30 @@ async fn init_llm_driver(
         }
     }
 
+    // 3. Auto-detect additional fallbacks if none were explicitly configured
+    if entries.len() == 1 {
+        let auto_fallbacks = [
+            ("anthropic", "claude-3-5-sonnet-20241022", "ANTHROPIC_API_KEY"),
+            ("openai", "gpt-4o", "OPENAI_API_KEY"),
+            ("gemini", "gemini-1.5-pro", "GEMINI_API_KEY"),
+            ("groq", "llama-3.3-70b-versatile", "GROQ_API_KEY"),
+        ];
+
+        for (provider, model, env_var) in auto_fallbacks {
+            // Skip the primary provider to avoid duplicates
+            if provider == dm.provider.to_lowercase() {
+                continue;
+            }
+            if let Ok(api_key) = std::env::var(env_var) {
+                if !api_key.is_empty() {
+                    if let Ok((driver, model_name)) = create_driver(provider, model, &api_key, None) {
+                        entries.push((model_name, driver));
+                    }
+                }
+            }
+        }
+    }
+
     info!(providers = entries.len(), "Sentinel initialized with failover chain");
     let sentinel: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = Arc::new(
         sk_engine::sentinel::SentinelDriver::new(entries)
@@ -789,7 +836,7 @@ fn create_driver(
             )),
             model.to_string(),
         ),
-        /// Ollama default
+        // Ollama default
         "ollama" => (
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
                 api_key.to_string(),

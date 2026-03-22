@@ -12,6 +12,7 @@ pub struct Checkpoint {
     pub session_id: Uuid,
     pub agent_config: serde_json::Value,
     pub tool_state: serde_json::Value,
+    pub status: String,
     pub created_at: String,
 }
 
@@ -31,6 +32,7 @@ impl CheckpointStore {
         session_id: &Uuid,
         agent_config: &serde_json::Value,
         tool_state: &serde_json::Value,
+        status: &str,
     ) -> SovereignResult<()> {
         let conn = self
             .conn
@@ -45,13 +47,14 @@ impl CheckpointStore {
         })?;
 
         conn.execute(
-            "INSERT INTO checkpoints (agent_id, session_id, agent_config, tool_state, created_at)
-             VALUES (?, ?, ?, ?, datetime('now'))",
+            "INSERT INTO checkpoints (agent_id, session_id, agent_config, tool_state, status, created_at)
+             VALUES (?, ?, ?, ?, ?, datetime('now'))",
             params![
                 agent_id.to_string(),
                 session_id.to_string(),
                 config_json,
-                tool_state_json
+                tool_state_json,
+                status.to_string()
             ],
         )
         .map_err(|e| SovereignError::Memory(format!("Failed to save checkpoint: {e}")))?;
@@ -68,7 +71,7 @@ impl CheckpointStore {
 
         let mut stmt = conn
             .prepare(
-                "SELECT id, agent_id, session_id, agent_config, tool_state, created_at
+                "SELECT id, agent_id, session_id, agent_config, tool_state, status, created_at
              FROM checkpoints
              WHERE agent_id = ?
              ORDER BY created_at DESC
@@ -99,7 +102,7 @@ impl CheckpointStore {
 
         let mut stmt = conn
             .prepare(
-                "SELECT id, agent_id, session_id, agent_config, tool_state, created_at
+                "SELECT id, agent_id, session_id, agent_config, tool_state, status, created_at
              FROM checkpoints
              WHERE agent_id = ?
              ORDER BY created_at DESC",
@@ -112,6 +115,35 @@ impl CheckpointStore {
 
         rows.collect::<Result<Result<Vec<_>, _>, _>>()
             .map_err(|e| SovereignError::Memory(format!("Iterator error: {e}")))?
+    }
+
+    /// List all agents that have an active checkpoint (e.g. they crashed while running).
+    pub fn list_active_agents(&self) -> SovereignResult<Vec<AgentId>> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
+
+        let mut stmt = conn
+            .prepare("SELECT DISTINCT agent_id FROM checkpoints WHERE status = 'active'")
+            .map_err(|e| SovereignError::Memory(format!("Failed to prepare query: {e}")))?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                let agent_id_str: String = row.get(0)?;
+                Ok(agent_id_str)
+            })
+            .map_err(|e| SovereignError::Memory(format!("Query failed: {e}")))?;
+
+        let mut agents = Vec::new();
+        for row in rows {
+            if let Ok(id_str) = row {
+                if let Ok(id) = id_str.parse() {
+                    agents.push(id);
+                }
+            }
+        }
+        Ok(agents)
     }
 
     /// Delete all but the N most recent checkpoints for an agent.
@@ -163,8 +195,11 @@ impl CheckpointStore {
                 .map_err(|e| SovereignError::Internal(e.to_string()))?,
             tool_state: serde_json::from_str(&tool_state_json)
                 .map_err(|e| SovereignError::Internal(e.to_string()))?,
-            created_at: row
+            status: row
                 .get(5)
+                .map_err(|e| SovereignError::Memory(e.to_string()))?,
+            created_at: row
+                .get(6)
                 .map_err(|e| SovereignError::Memory(e.to_string()))?,
         })
     }

@@ -180,6 +180,21 @@ pub fn create_agent_config(
                 sk_types::config::ExecutionMode::Unrestricted => "Unrestricted",
             };
 
+            // 0. Enforce ExecutionMode::Sandbox Restrictions
+            if mode == sk_types::config::ExecutionMode::Sandbox {
+                let risk = crate::approval::ApprovalManager::classify_risk(&tool_call.name, Some(&tool_call.input));
+                let is_host_read = tool_call.name == "host_read_file" || tool_call.name == "host_list_dir";
+                let is_host_mutate = tool_call.name.starts_with("host_") && !is_host_read;
+                let is_raw_shell = tool_call.name == "shell_exec" && !tool_call.input.get("use_sandbox").and_then(|v| v.as_bool()).unwrap_or(false);
+                let is_dangerous = risk == sk_types::approval::RiskLevel::Critical || risk == sk_types::approval::RiskLevel::High;
+
+                if is_host_mutate || is_raw_shell || is_dangerous {
+                    return Err(sk_types::SovereignError::CapabilityDenied(
+                        format!("Tool '{}' is blocked by Sandbox mode. Switch to Unrestricted mode.", tool_call.name)
+                    ));
+                }
+            }
+
             // 1. Check Whitelist
             let is_whitelisted = approval_list.iter().any(|w| {
                 tool_call.name == *w

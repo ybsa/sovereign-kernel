@@ -9,8 +9,7 @@ use fs_err;
 use serde::{Deserialize, Serialize};
 use sk_types::AgentId;
 use std::collections::HashMap;
-use std::path::Path;
-use tracing::{error, info};
+use tracing::info;
 
 /// The metering engine tracks usage cost and enforces quota limits.
 pub struct MeteringEngine {
@@ -47,16 +46,21 @@ impl Default for MeteringState {
     }
 }
 
-impl MeteringEngine {
-    /// Create a new metering engine.
-    pub fn new() -> Self {
+impl Default for MeteringEngine {
+    fn default() -> Self {
         Self {
             costs: dashmap::DashMap::new(),
             state: tokio::sync::RwLock::new(MeteringState::default()),
             persist_path: None,
         }
     }
+}
 
+impl MeteringEngine {
+    /// Create a new metering engine.
+    pub fn new() -> Self {
+        Self::default()
+    }
     /// Set the persistence path for the metering state.
     pub fn set_persist_path(&mut self, path: std::path::PathBuf) {
         self.persist_path = Some(path);
@@ -67,7 +71,7 @@ impl MeteringEngine {
         if let Some(ref path) = self.persist_path {
             if path.exists() {
                 let data = fs_err::read_to_string(path)
-                    .map_err(|e| sk_types::SovereignError::Io(e.to_string()))?;
+                    .map_err(|e| sk_types::SovereignError::Io(e.into()))?;
                 let state: MeteringState = serde_json::from_str(&data)
                     .map_err(|e| sk_types::SovereignError::Internal(e.to_string()))?;
                 let mut lock = self.state.write().await;
@@ -95,22 +99,22 @@ impl MeteringEngine {
                 .map_err(|e| sk_types::SovereignError::Internal(e.to_string()))?;
             if let Some(parent) = path.parent() {
                 fs_err::create_dir_all(parent)
-                    .map_err(|e| sk_types::SovereignError::Io(e.to_string()))?;
+                    .map_err(|e| sk_types::SovereignError::Io(e.into()))?;
             }
             fs_err::write(path, data)
-                .map_err(|e| sk_types::SovereignError::Io(e.to_string()))?;
+                .map_err(|e| sk_types::SovereignError::Io(e.into()))?;
         }
         Ok(())
     }
 
     /// Record usage cost for an agent.
-    pub async fn record_cost(&self, agent_id: AgentId, cost_usd: f64) {
+    pub fn record_cost(&self, agent_id: AgentId, cost_usd: f64) {
         // 1. Update per-agent cost
         let mut entry = self.costs.entry(agent_id).or_insert(0.0);
         *entry += cost_usd;
 
         // 2. Update global windowed costs
-        let mut state = self.state.write().await;
+        let mut state = self.state.blocking_write();
         let now = Utc::now();
 
         // Check for window resets
@@ -154,8 +158,8 @@ impl MeteringEngine {
     }
 
     /// Get total cost across all agents.
-    pub async fn total_cost(&self) -> f64 {
-        self.state.read().await.total_cost
+    pub fn total_cost(&self) -> f64 {
+        self.state.blocking_read().total_cost
     }
 
     /// Get a budget status snapshot.

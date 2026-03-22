@@ -15,14 +15,14 @@ use tracing::{info, warn, error};
 /// A driver that manages multiple fallback options.
 pub struct SentinelDriver {
     /// List of (model_name, driver) pairs to try in order.
-    entries: Vec<(String, Arc<dyn LlmDriver>)>,
+    entries: Vec<(String, Arc<dyn LlmDriver + Send + Sync>)>,
     /// Maximum retries per driver.
     max_retries: u32,
 }
 
 impl SentinelDriver {
     /// Create a new sentinel driver.
-    pub fn new(entries: Vec<(String, Arc<dyn LlmDriver>)>) -> Self {
+    pub fn new(entries: Vec<(String, Arc<dyn LlmDriver + Send + Sync>)>) -> Self {
         Self {
             entries,
             max_retries: retry::max_retries(),

@@ -12,9 +12,8 @@ use axum::{
 };
 use futures::{sink::SinkExt, stream::StreamExt};
 use serde::{Deserialize, Serialize};
-use sk_types::{AgentId, SovereignResult};
+use sk_types::AgentId;
 use std::sync::Arc;
-use tokio::sync::broadcast;
 use tracing::{debug, error, info};
 
 use crate::SovereignKernel;
@@ -50,8 +49,9 @@ pub enum ControlEvent {
 /// Handler for the /ws endpoint.
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
-    State(kernel): State<Arc<SovereignKernel>>,
+    State(state): State<Arc<crate::api::ApiState>>,
 ) -> impl IntoResponse {
+    let kernel = state.kernel.clone();
     ws.on_upgrade(|socket| handle_socket(socket, kernel))
 }
 
@@ -96,7 +96,7 @@ async fn handle_socket(socket: WebSocket, kernel: Arc<SovereignKernel>) {
                             }
                             ControlCommand::Chat { agent_id, message } => {
                                 // Delegate to kernel.run_agent (async)
-                                let k = kernel_clone.clone();
+                                let _k = kernel_clone.clone();
                                 let aid_str = agent_id.clone();
                                 tokio::spawn(async move {
                                     if let Ok(aid) = uuid::Uuid::parse_str(&aid_str) {
@@ -139,13 +139,13 @@ async fn handle_socket(socket: WebSocket, kernel: Arc<SovereignKernel>) {
                 KernelEvent::Error { message } => Some(ControlEvent::Log {
                     agent_id: "system".to_string(),
                     text: message,
-                    level: "error".to_string(),
+                    level: "error".to_string(), // Reverted to original as the change was syntactically incorrect
                 }),
                 _ => None,
             };
 
             if let Some(ce) = control_event {
-                if let Err(_) = tx_clone.send(ce).await {
+                if tx_clone.send(ce).await.is_err() {
                     break;
                 }
             }
