@@ -6,7 +6,7 @@ license.workspace = true
 description = "Channel Bridge Layer — pluggable messaging integrations for sk"
 
 [dependencies]
-sk-types = { path = "../sk-types" }
+sk-types = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -21,7 +21,7 @@ uuid = { workspace = true }
 tokio-tungstenite = { workspace = true }
 url = { workspace = true }
 zeroize = { workspace = true }
-axum = { workspace = true }
+axum = { workspace = true, features = ["ws"] }
 hmac = { workspace = true }
 sha2 = { workspace = true }
 base64 = { workspace = true }

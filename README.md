@@ -2,7 +2,7 @@
 
 ![Rust](https://img.shields.io/badge/language-Rust-orange?style=flat-square)
 ![MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
-![Status](https://img.shields.io/badge/status-Phase%2025-blue?style=flat-square)
+![Status](https://img.shields.io/badge/status-v1.0.0--stable-brightgreen?style=flat-square)
 ![Subsystems](https://img.shields.io/badge/subsystems-29%20Named-blueviolet?style=flat-square)
 ![Channels](https://img.shields.io/badge/channels-30%2B-brightgreen?style=flat-square)
 ![Providers](https://img.shields.io/badge/LLM%20providers-50%2B-brightgreen?style=flat-square)
@@ -341,22 +341,22 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a deep dive.
 | Phase | Status | Milestone |
 | ----- | ------ | --------- |
 | 1–24 | ✅ Complete | Original Sovereign Kernel (Engine, Memory, Security, Dashboard, Village) |
-| **25** | 🔨 In Progress | **The Great Merger: OpenClaw + NemoClaw → Rust** |
+| **25** | ✅ Complete | **The Great Merger: OpenClaw + NemoClaw → Rust** |
 
 ### Phase 25 Breakdown
 
-| Sub-Phase | Milestone | Key Subsystems |
+| Sub-Phase | Milestone | Status |
 |---|---|---|
-| 25.1 | Core Gateway | The Kernel (WS + HTTP + config + daemon) |
-| 25.2 | Agent Runtime | The Oracle (50+ LLMs) + The Healer + The Sentinel |
-| 25.3 | Tools & Execution | The Forge (browser) + The Voice + media pipeline |
-| 25.4 | Channels | The Bridge (30+ adapters) + The Herald |
-| 25.5 | Multi-Agent | The Village + The Witch + The Resurrector |
-| 25.6 | Dashboard & Canvas | The Watchtower + The Canvas + WebChat |
-| 25.7 | Security | The Warden (Landlock/seccomp) + The Gatekeeper |
-| 25.8 | Production | The Ledger + logging + Docker + CI/CD + tests |
-| 25.9 | Extended Services | The Raven + The Bazaar + The Cartographer + The Beacon |
-| 25.10 | Advanced | The Diplomat + The Alchemist + The Chronicler |
+| 25.1 | Core Gateway | ✅ Done |
+| 25.2 | Agent Runtime | ✅ Done |
+| 25.3 | Tools & Execution | ✅ Done |
+| 25.4 | Channels | ✅ Done |
+| 25.5 | Multi-Agent | ✅ Done |
+| 25.6 | Dashboard & Canvas | ✅ Done |
+| 25.7 | Security | ✅ Done |
+| 25.8 | Production | ✅ Done |
+| 25.9 | Extended Services | ✅ Done |
+| 25.10 | Advanced | ✅ Done |
 
 ---
 

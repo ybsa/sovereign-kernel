@@ -84,24 +84,22 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
                 bridged = true;
             }
         }
-    } else {
-        if let Ok(token) = std::env::var("DISCORD_BOT_TOKEN") {
-            if !token.is_empty() {
-                println!("⚡ Connecting to Discord (legacy env)...");
-                let guild_ids: Vec<u64> = std::env::var("DISCORD_GUILD_IDS")
-                    .unwrap_or_default()
-                    .split(',')
-                    .filter_map(|s| s.trim().parse().ok())
-                    .collect();
-                let intents = 33280u64;
-                let discord_adapter =
-                    sk_channels::discord::DiscordAdapter::new(token, guild_ids, intents);
-                manager
-                    .start_adapter(Arc::new(discord_adapter))
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Discord adapter start failed: {e}"))?;
-                bridged = true;
-            }
+    } else if let Ok(token) = std::env::var("DISCORD_BOT_TOKEN") {
+        if !token.is_empty() {
+            println!("⚡ Connecting to Discord (legacy env)...");
+            let guild_ids: Vec<u64> = std::env::var("DISCORD_GUILD_IDS")
+                .unwrap_or_default()
+                .split(',')
+                .filter_map(|s| s.trim().parse().ok())
+                .collect();
+            let intents = 33280u64;
+            let discord_adapter =
+                sk_channels::discord::DiscordAdapter::new(token, guild_ids, intents);
+            manager
+                .start_adapter(Arc::new(discord_adapter))
+                .await
+                .map_err(|e| anyhow::anyhow!("Discord adapter start failed: {e}"))?;
+            bridged = true;
         }
     }
 
@@ -146,6 +144,57 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
                 }
             }
         }
+    }
+
+    // Start Signal Channel if configured
+    if let Some(signal_cfg) = &config.channels.signal {
+        if !signal_cfg.api_url.is_empty() && !signal_cfg.phone_number.is_empty() {
+            println!("⚡ Connecting to Signal (Rest API: {})...", signal_cfg.api_url);
+            let signal_adapter = sk_channels::adapters::signal::SignalAdapter::new(
+                signal_cfg.api_url.clone(),
+                signal_cfg.phone_number.clone(),
+                signal_cfg.allowed_users.clone(),
+            );
+            manager
+                .start_adapter(Arc::new(signal_adapter))
+                .await
+                .map_err(|e| anyhow::anyhow!("Signal adapter start failed: {e}"))?;
+            bridged = true;
+        }
+    }
+
+    // Start Matrix Channel if configured
+    if let Some(matrix_cfg) = &config.channels.matrix {
+        if let Ok(access_token) = std::env::var(&matrix_cfg.access_token_env) {
+            if !access_token.is_empty() && !matrix_cfg.user_id.is_empty() {
+                println!("⚡ Connecting to Matrix (Server: {})...", matrix_cfg.homeserver_url);
+                let matrix_adapter = sk_channels::adapters::matrix::MatrixAdapter::new(
+                    matrix_cfg.homeserver_url.clone(),
+                    matrix_cfg.user_id.clone(),
+                    access_token,
+                    matrix_cfg.allowed_rooms.clone(),
+                );
+                manager
+                    .start_adapter(Arc::new(matrix_adapter))
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Matrix adapter start failed: {e}"))?;
+                bridged = true;
+            }
+        }
+    }
+
+    // Start WebChat Channel if configured
+    if let Some(wc_cfg) = &config.channels.webchat {
+        println!("⚡ Starting WebChat WebSocket server on port {}...", wc_cfg.port);
+        let wc_adapter = sk_channels::adapters::webchat::WebChatAdapter::new(
+            wc_cfg.port,
+            wc_cfg.default_agent.clone(),
+        );
+        manager
+            .start_adapter(Arc::new(wc_adapter))
+            .await
+            .map_err(|e| anyhow::anyhow!("WebChat adapter start failed: {e}"))?;
+        bridged = true;
     }
 
     if !bridged {

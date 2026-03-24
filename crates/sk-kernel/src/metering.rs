@@ -71,7 +71,7 @@ impl MeteringEngine {
         if let Some(ref path) = self.persist_path {
             if path.exists() {
                 let data = fs_err::read_to_string(path)
-                    .map_err(|e| sk_types::SovereignError::Io(e.into()))?;
+                    .map_err(sk_types::SovereignError::Io)?;
                 let state: MeteringState = serde_json::from_str(&data)
                     .map_err(|e| sk_types::SovereignError::Internal(e.to_string()))?;
                 let mut lock = self.state.write().await;
@@ -99,10 +99,10 @@ impl MeteringEngine {
                 .map_err(|e| sk_types::SovereignError::Internal(e.to_string()))?;
             if let Some(parent) = path.parent() {
                 fs_err::create_dir_all(parent)
-                    .map_err(|e| sk_types::SovereignError::Io(e.into()))?;
+                    .map_err(sk_types::SovereignError::Io)?;
             }
             fs_err::write(path, data)
-                .map_err(|e| sk_types::SovereignError::Io(e.into()))?;
+                .map_err(sk_types::SovereignError::Io)?;
         }
         Ok(())
     }

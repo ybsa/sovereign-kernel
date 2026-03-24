@@ -15,6 +15,7 @@ pub mod shared_memory;
 pub mod shell;
 pub mod skills;
 pub mod village_forge;
+pub mod voice_tools;
 pub mod web_fetch;
 pub mod web_search;
 

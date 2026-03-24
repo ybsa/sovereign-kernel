@@ -136,11 +136,9 @@ impl CheckpointStore {
             .map_err(|e| SovereignError::Memory(format!("Query failed: {e}")))?;
 
         let mut agents = Vec::new();
-        for row in rows {
-            if let Ok(id_str) = row {
-                if let Ok(id) = id_str.parse() {
-                    agents.push(id);
-                }
+        for id_str in rows.flatten() {
+            if let Ok(id) = id_str.parse() {
+                agents.push(id);
             }
         }
         Ok(agents)

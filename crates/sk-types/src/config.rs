@@ -1592,6 +1592,8 @@ pub struct ChannelsConfig {
     pub webhook: Option<WebhookConfig>,
     /// LinkedIn messaging configuration (None = disabled).
     pub linkedin: Option<LinkedInConfig>,
+    /// WebChat (WebSocket) configuration (None = disabled).
+    pub webchat: Option<WebChatConfig>,
 }
 
 /// Telegram channel adapter configuration.
@@ -2078,6 +2080,35 @@ impl Default for XmppConfig {
             server: String::new(),
             port: 5222,
             rooms: vec![],
+            default_agent: None,
+            overrides: ChannelOverrides::default(),
+        }
+    }
+}
+
+/// WebChat (WebSocket) channel adapter configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct WebChatConfig {
+    /// Port to listen for WebSocket connections.
+    pub port: u16,
+    /// List of allowed origins for CORS (empty = allow all).
+    pub allowed_origins: Vec<String>,
+    /// Env var name holding the auth token for the widget.
+    pub auth_token_env: String,
+    /// Default agent name to route messages to.
+    pub default_agent: Option<String>,
+    /// Per-channel behavior overrides.
+    #[serde(default)]
+    pub overrides: ChannelOverrides,
+}
+
+impl Default for WebChatConfig {
+    fn default() -> Self {
+        Self {
+            port: 8081,
+            allowed_origins: vec![],
+            auth_token_env: "WEBCHAT_AUTH_TOKEN".to_string(),
             default_agent: None,
             overrides: ChannelOverrides::default(),
         }

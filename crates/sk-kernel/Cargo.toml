@@ -32,7 +32,7 @@ dirs = "5.0"
 fs-err = { workspace = true }
 axum = { workspace = true, features = ["json", "ws"] }
 tower-http = { version = "0.6.8", features = ["cors", "trace"] }
-sk-tools = { version = "0.1.0", path = "../sk-tools" }
+sk-tools = { workspace = true }
 sk-hands = { workspace = true }
 
 [dev-dependencies]

@@ -6,7 +6,7 @@ license.workspace = true
 description = "Hands system — curated autonomous capability packages for sk"
 
 [dependencies]
-sk-types = { path = "../sk-types" }
+sk-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }

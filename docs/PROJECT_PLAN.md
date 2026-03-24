@@ -190,7 +190,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 7: EXECUTION MODES (Weeks 1-2)
+## PHASE 7: EXECUTION MODES (Weeks 1-2) ✅ COMPLETED
 
 **Goal: Let users choose Sandbox or Unrestricted mode**
 
@@ -221,7 +221,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 8: SANDBOX ENFORCEMENT (Weeks 3-4)
+## PHASE 8: SANDBOX ENFORCEMENT (Weeks 3-4) ✅ COMPLETED
 
 **Goal: Block dangerous actions in Sandbox mode**
 
@@ -254,7 +254,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 9: APPROVAL GATES (Weeks 5-6)
+## PHASE 9: APPROVAL GATES (Weeks 5-6) ✅ COMPLETED
 
 **Goal: Ask human permission for risky actions**
 
@@ -281,7 +281,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 10: AUDIT TRAIL (Weeks 7-8)
+## PHASE 10: AUDIT TRAIL (Weeks 7-8) ✅ COMPLETED
 
 **Goal: Log every action with Merkle chain**
 
@@ -308,7 +308,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 11: API BRIDGE (Weeks 9-10)
+## PHASE 11: API BRIDGE (Weeks 9-10) ✅ COMPLETED
 
 **Goal: REST/WebSocket API so external apps can talk to kernel**
 
@@ -337,7 +337,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 12: WEB DASHBOARD (Weeks 11-13)
+## PHASE 12: WEB DASHBOARD (Weeks 11-13) ✅ COMPLETED
 
 **Goal: Beautiful UI to manage agents**
 
@@ -511,7 +511,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 17: CHAT INTEGRATIONS (Weeks 23-24)
+## PHASE 17: CHAT INTEGRATIONS (Weeks 23-24) ✅ COMPLETED
 
 ### 17.1: Telegram Bot
 **Features:**
@@ -557,7 +557,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 19: UNIVERSAL TOOLING & MCP (Next Milestone)
+## PHASE 19: UNIVERSAL TOOLING & MCP (Next Milestone) ✅ COMPLETED
 
 **Goal: Expand the Laboratory infinitely by connecting to standard Model Context Protocol servers.**
 
@@ -591,7 +591,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 21: ULTRA-SOVEREIGN CAPABILITIES (The Horizon)
+## PHASE 21: ULTRA-SOVEREIGN CAPABILITIES (The Horizon) ✅ COMPLETED
 
 **Goal: Achieve total autonomy where the agent continuously improves and collaborates.**
 
@@ -605,7 +605,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 22: FULL GUI & SCREEN CONTROL (The Eyes & Hands)
+## PHASE 22: FULL GUI & SCREEN CONTROL (The Eyes & Hands) ✅ COMPLETED
 
 **Goal: Give the agent full human-like access to the graphical desktop — see the screen, click, type, scroll, and interact with ANY application, not just the terminal.**
 
@@ -644,7 +644,7 @@ User sees results (Web UI / Chat / CLI)
 
 ---
 
-## PHASE 23: UNIVERSAL CROSS-PLATFORM SUPPORT (Every Device)
+## PHASE 23: UNIVERSAL CROSS-PLATFORM SUPPORT (Every Device) ✅ COMPLETED
 
 **Goal: Sovereign Kernel runs on EVERY device — from Raspberry Pi to enterprise servers. One binary, any platform.**
 
@@ -1027,10 +1027,24 @@ sovereign run "Create agent that monitors CPU and alerts if >90%"
 - Added `mode_hint` to `summon_skeleton` (safe/full_access/scheduled).
 - Implemented `builder` tool for creating agents from natural language descriptions.
 
-## 24.5: Lore Expansion & PEKA ✅
-- Formalized the Village Lore in `SOUL.md` and `PROJECT_MAP.md`.
-- Created **PEKA (The Terminal Master)** — a permanent Hand dedicated to shell and system iron.
-- Expanded the bundled Hands library to 12 specialized experts.
+---
+
+# PHASE 25: THE GREAT MERGER (OpenClaw + NemoClaw + Sovereign Kernel) ✅ COMPLETED
+> **Status**: v1.0.0 Stable Release.
+
+## 25.1: Rust Port of OpenClaw Core ✅
+- Ported 50+ LLM providers to `sk-engine/The Oracle`.
+- Ported 30+ channel adapters to `sk-channels/The Bridge`.
+- Ported 30+ autonomous Hands to `sk-hands`.
+
+## 25.2: Rust Port of NemoClaw Security ✅
+- Ported Landlock/seccomp/network egress to `sk-kernel/The Warden`.
+- Implemented `ApprovalManager` for human-in-the-loop gating.
+
+## 25.3: Voice & AI UI Integration ✅
+- Implemented `sk-tools/The Voice` with OpenAI STT/TTS.
+- Integrated `sk-cli/The Watchtower` with real-time logs and approval queue.
+- Verified Merkle audit trail integrity in `sk-kernel/The Ledger`.
 
 ---
 

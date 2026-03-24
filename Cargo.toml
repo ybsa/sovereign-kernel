@@ -14,7 +14,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 license = "MIT"
 rust-version = "1.75"
@@ -55,7 +55,7 @@ rusqlite = { version = "0.31", features = ["bundled", "serde_json"] }
 clap = { version = "4", features = ["derive"] }
 
 # HTTP client (for LLM drivers & MCP SSE)
-reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "multipart"] }
 
 # Async trait
 async-trait = "0.1"

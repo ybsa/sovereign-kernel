@@ -55,7 +55,7 @@ async fn show_status(api_url: &str, api_key: Option<&str>) -> SovereignResult<()
     print_window("Daily", status["daily_spend"].as_f64(), status["daily_limit"].as_f64(), status["daily_pct"].as_f64());
     print_window("Monthly", status["monthly_spend"].as_f64(), status["monthly_limit"].as_f64(), status["monthly_pct"].as_f64());
 
-    println!("");
+    println!();
     Ok(())
 }
 

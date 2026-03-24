@@ -16,7 +16,7 @@ use sk_types::config::BrowserConfig as AppBrowserConfig;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::{Mutex, OnceCell};
-use tracing::{debug, error, info, warn};
+use tracing::{info, warn};
 use futures::StreamExt;
 
 // ── Protocol types ──────────────────────────────────────────────────────────
@@ -182,7 +182,7 @@ impl BrowserManager {
                 .map_err(|e| format!("Failed to launch chromium: {e}"))?;
             
             tokio::spawn(async move {
-                while let Some(_) = handler.next().await {
+                while handler.next().await.is_some() {
                     // pump events
                 }
             });

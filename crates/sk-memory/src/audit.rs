@@ -211,3 +211,60 @@ impl AuditStore {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn setup_store() -> AuditStore {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE audit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_id TEXT NOT NULL,
+                execution_mode TEXT NOT NULL,
+                action_type TEXT NOT NULL,
+                action_data TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                hash TEXT NOT NULL,
+                previous_hash TEXT NOT NULL
+            )",
+            [],
+        )
+        .unwrap();
+        AuditStore::new(Arc::new(Mutex::new(conn)))
+    }
+
+    #[test]
+    fn test_audit_chain_integrity() {
+        let store = setup_store();
+        let agent_id = AgentId::new();
+
+        // 1. Append valid log
+        store
+            .append_log(&agent_id, "Sandbox", "tool_call", &json!({"tool": "ls"}))
+            .unwrap();
+
+        // 2. Verify chain
+        store.verify_chain().expect("Chain should be valid");
+    }
+
+    #[test]
+    fn test_audit_genesis() {
+        let store = setup_store();
+        let agent_id = AgentId::new();
+
+        store
+            .append_log(&agent_id, "Sandbox", "init", &json!({}))
+            .unwrap();
+
+        let logs = store.get_recent_logs(1).unwrap();
+        assert_eq!(logs.len(), 1);
+        assert_eq!(
+            logs[0].previous_hash,
+            "0000000000000000000000000000000000000000000000000000000000000000"
+        );
+        store.verify_chain().unwrap();
+    }
+}

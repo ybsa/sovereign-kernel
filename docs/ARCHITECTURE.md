@@ -86,7 +86,7 @@ Agent identity system. Parses `SOUL.md`, `AGENTS.md`, and `TOOLS.md` to construc
 | Subsystem | Role |
 |---|---|
 | **The Forge** | CDP-based Chrome/Chromium browser automation. Screenshots, navigation, form filling, downloads. |
-| **The Voice** | Always-on speech. cpal audio capture + Whisper STT + ElevenLabs TTS integration. |
+| **The Voice** | Always-on speech. OpenAI Whisper STT + OpenAI TTS-1 integration. |
 | Shell execution | Bash/PowerShell with full PTY support, process registry, background jobs. |
 | File operations | Read, write, edit, glob — path-sandboxed, atomic writes. |
 | Media pipeline | Image/audio/video processing, transcription, size caps. |
@@ -138,5 +138,6 @@ User sends message on Telegram
     → The Treasury checks budget
     → The Chronicler logs usage
     → Response flows back through The Bridge
-    → User receives reply on Telegram
+    → The Voice synthesizes audio if in Voice Mode
+    → User receives reply on Telegram / WebChat
 ```

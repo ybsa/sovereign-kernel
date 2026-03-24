@@ -36,3 +36,4 @@ pub mod webhook;
 pub mod whatsapp;
 pub mod xmpp;
 pub mod zulip;
+pub mod webchat;

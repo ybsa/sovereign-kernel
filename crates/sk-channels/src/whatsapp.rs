@@ -82,6 +82,7 @@ struct WhatsAppEntry {
 }
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 struct WhatsAppChange {
     value: Option<WhatsAppValue>,
     field: Option<String>,
@@ -105,6 +106,7 @@ struct WhatsAppProfile {
 }
 
 #[derive(Deserialize, Debug)]
+#[allow(dead_code)]
 struct WhatsAppMessage {
     from: String,
     id: String,

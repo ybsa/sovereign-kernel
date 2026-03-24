@@ -18,8 +18,8 @@ sk-memory = { workspace = true }
 sk-soul = { workspace = true }
 sk-mcp = { workspace = true }
 sk-tools = { workspace = true }
-sk-channels = { path = "../sk-channels" }
-sk-hands = { path = "../sk-hands" }
+sk-channels = { workspace = true }
+sk-hands = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }

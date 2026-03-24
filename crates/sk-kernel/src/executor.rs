@@ -33,6 +33,8 @@ pub fn create_agent_config(
         sk_tools::scheduler::schedule_create_tool(),
         sk_tools::scheduler::schedule_list_tool(),
         sk_tools::scheduler::schedule_delete_tool(),
+        sk_tools::voice_tools::text_to_speech_tool(),
+        sk_tools::voice_tools::speech_to_text_tool(),
     ];
     tools.extend(sk_tools::browser_tools::browser_tools());
     tools.extend(sk_tools::host::host_tools());
@@ -1225,6 +1227,44 @@ pub fn create_agent_config(
                             ))
                         })
                     })
+                }
+                "text_to_speech" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let text = args.get("text").and_then(|v| v.as_str()).unwrap_or("");
+                        let voice = args.get("voice").and_then(|v| v.as_str());
+                        let output_path = args.get("output_path").and_then(|v| v.as_str());
+
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current()
+                                .block_on(sk_tools::voice_tools::handle_text_to_speech(
+                                    text,
+                                    voice,
+                                    output_path,
+                                ))
+                                .map(|out| healer_result(&tool_id, out, false))
+                                .map_err(sk_types::SovereignError::ToolExecutionError)
+                        })
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
+                }
+                "speech_to_text" => {
+                    if let Some(args) = tool_call.input.as_object() {
+                        let file_path = args.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
+
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current()
+                                .block_on(sk_tools::voice_tools::handle_speech_to_text(file_path))
+                                .map(|out| healer_result(&tool_id, out, false))
+                                .map_err(sk_types::SovereignError::ToolExecutionError)
+                        })
+                    } else {
+                        Err(sk_types::SovereignError::ToolExecutionError(
+                            "Invalid arguments".into(),
+                        ))
+                    }
                 }
                 "compile_rust_skill" => {
                     if let Some(args) = tool_call.input.as_object() {

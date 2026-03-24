@@ -27,7 +27,7 @@ Sets up your LLM API key, execution mode, and agent identity.
 | `sovereign kill` | Stop the daemon |
 | `sovereign stop` | Stop the daemon (legacy) |
 | `sovereign dashboard` | Open terminal web dashboard |
-| `sovereign hands list` | List all 12 bundled hands |
+| `sovereign hands list` | List all 30+ bundled hands |
 | `sovereign audit logs` | View cryptographic audit trail |
 
 ---
@@ -85,7 +85,7 @@ The agent will use the `schedule_create` tool. The daemon will monitor the time 
 Hands are autonomous capability agents you can activate:
 
 ```bash
-sovereign hands list                  # Show all 12 hands with requirements
+sovereign hands list                  # Show all 30+ hands with requirements
 sovereign hands activate browser      # Start the browser automation hand
 sovereign hands activate web-search   # Start the web research hand
 sovereign hands activate email        # Start the email management hand
@@ -146,6 +146,8 @@ sovereign --config config.unrestricted.toml chat
 | `schedule_create` / `schedule_list` | Manage cron-based tasks |
 | `get_skill` / `list_skills` | Access 52 expert skill prompts |
 | `agent_message` | Send a direct message to another active agent |
+| `text_to_speech` | Convert text to speech audio (MP3) via OpenAI |
+| `speech_to_text` | Transcribe audio files to text via OpenAI Whisper |
 | `summon_skeleton` | The Witch dynamically summons sandboxed workers for parallel tasks |
 | `check_skeleton` | Check the status of a worker summoned by the Witch |
 | `shared_memory_store` | Store facts in global shared memory |

@@ -3278,7 +3278,7 @@ dependencies = [
 
 [[package]]
 name = "sk-channels"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "axum",
@@ -3306,7 +3306,7 @@ dependencies = [
 
 [[package]]
 name = "sk-cli"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3344,7 +3344,7 @@ dependencies = [
 
 [[package]]
 name = "sk-engine"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3373,7 +3373,7 @@ dependencies = [
 
 [[package]]
 name = "sk-hands"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "dashmap",
@@ -3390,7 +3390,7 @@ dependencies = [
 
 [[package]]
 name = "sk-kernel"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "axum",
  "chrono",
@@ -3425,7 +3425,7 @@ dependencies = [
 
 [[package]]
 name = "sk-mcp"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "reqwest 0.12.28",
@@ -3440,7 +3440,7 @@ dependencies = [
 
 [[package]]
 name = "sk-memory"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -3457,7 +3457,7 @@ dependencies = [
 
 [[package]]
 name = "sk-soul"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "chrono",
  "serde",
@@ -3468,7 +3468,7 @@ dependencies = [
 
 [[package]]
 name = "sk-tools"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "regex-lite",
  "reqwest 0.12.28",
@@ -3485,7 +3485,7 @@ dependencies = [
 
 [[package]]
 name = "sk-types"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "async-trait",
  "chrono",
