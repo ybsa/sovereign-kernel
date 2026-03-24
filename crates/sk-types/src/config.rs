@@ -241,11 +241,11 @@ impl Default for PerplexitySearchConfig {
 }
 
 fn default_max_iterations() -> u32 {
-    15
+    u32::MAX
 }
 
 fn default_max_tokens() -> u32 {
-    200_000
+    u32::MAX
 }
 
 /// Web fetch configuration.

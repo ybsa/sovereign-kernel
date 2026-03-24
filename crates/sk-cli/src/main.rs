@@ -51,7 +51,17 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Interactive chat with the kernel
-    Chat,
+    Chat {
+        /// Maximum LLM loop iterations for this session
+        #[arg(long)]
+        max_iterations: Option<u32>,
+        /// Maximum LLM tokens for this session
+        #[arg(long)]
+        max_tokens: Option<u32>,
+        /// Maximum budget in USD for this session
+        #[arg(long)]
+        budget_usd: Option<f64>,
+    },
     /// First-run setup wizard
     Init,
     /// Start the kernel as a background daemon
@@ -71,6 +81,15 @@ enum Commands {
         /// Optional schedule (cron expression)
         #[arg(short, long)]
         schedule: Option<String>,
+        /// Maximum LLM loop iterations for this task
+        #[arg(long)]
+        max_iterations: Option<u32>,
+        /// Maximum LLM tokens for this task
+        #[arg(long)]
+        max_tokens: Option<u32>,
+        /// Maximum budget in USD for this task
+        #[arg(long)]
+        budget_usd: Option<f64>,
     },
     /// Check kernel status
     Status,
@@ -202,14 +221,45 @@ async fn main() -> anyhow::Result<()> {
     };
 
     match cli.command {
-        Commands::Chat => chat::run(config).await?,
+        Commands::Chat {
+            max_iterations,
+            max_tokens,
+            budget_usd,
+        } => {
+            let mut cfg = config;
+            if let Some(i) = max_iterations {
+                cfg.max_iterations_per_task = i;
+            }
+            if let Some(t) = max_tokens {
+                cfg.max_tokens_per_task = t;
+            }
+            if let Some(b) = budget_usd {
+                cfg.total_token_budget_usd_cents = Some((b * 100.0) as u64);
+            }
+            chat::run(cfg).await?
+        }
         Commands::Init => init::run().await?,
         Commands::Start { detach } => daemon::start(config, detach).await?,
         Commands::Run {
             task,
             mode,
             schedule,
-        } => run::execute(config, &task, &mode, schedule).await?,
+            max_iterations,
+            max_tokens,
+            budget_usd,
+        } => {
+            let mut cfg = config;
+            if let Some(i) = max_iterations {
+                cfg.max_iterations_per_task = i;
+            }
+            if let Some(t) = max_tokens {
+                cfg.max_tokens_per_task = t;
+            }
+            if let Some(b) = budget_usd {
+                cfg.total_token_budget_usd_cents = Some((b * 100.0) as u64);
+            }
+            run::execute(cfg, &task, &mode, schedule).await?
+        }
         Commands::Status => status::print_status().await?,
         Commands::Kill { id } => {
             if let Some(agent_id) = id {
