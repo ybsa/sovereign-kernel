@@ -18,14 +18,17 @@ Sets up your LLM API key, execution mode, and agent identity.
 | Command | What It Does |
 |---------|-------------|
 | `sovereign chat` | Interactive terminal REPL |
-| `sovereign start` | Start as background daemon |
+| `sovereign chat --budget-usd 0.05` | Chat with an explicit financial budget cap |
+| `sovereign start` | Start as foreground daemon |
+| `sovereign start --detach` | Start as detached background daemon |
 | `sovereign run "<task>"` | Run a task autonomously (NL Builder auto-detects mode) |
+| `sovereign run "<task>" --max-iterations 30` | Run with explicitly defined loop iteration limits |
 | `sovereign do "<task>"` | Fast alias for `run` — just do it. |
 | `sovereign run "<task>" --schedule "..."` | Schedule a recurring cron task |
 | `sovereign status` | Village overview — agents, jobs, daemon status |
 | `sovereign kill <agent-id>` | Kill a specific agent |
 | `sovereign kill` | Stop the daemon |
-| `sovereign stop` | Stop the daemon (legacy) |
+| `sovereign mcp list\|add <name>` | Manage dynamic MCP Tool servers |
 | `sovereign dashboard` | Open terminal web dashboard |
 | `sovereign hands list` | List all 30+ bundled hands |
 | `sovereign audit logs` | View cryptographic audit trail |
