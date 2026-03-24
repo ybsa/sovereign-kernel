@@ -55,9 +55,7 @@ enum ApiContentBlock {
         input: serde_json::Value,
     },
     #[serde(rename = "image")]
-    Image {
-        source: ApiImageSource,
-    },
+    Image { source: ApiImageSource },
     #[serde(rename = "tool_result")]
     ToolResult {
         tool_use_id: String,
@@ -268,7 +266,10 @@ impl LlmDriver for AnthropicDriver {
                 .post(&url)
                 .header("x-api-key", &self.api_key)
                 .header("anthropic-version", "2023-06-01")
-                .header("anthropic-beta", "computer-use-2024-10-22,prompt-caching-2024-07-31")
+                .header(
+                    "anthropic-beta",
+                    "computer-use-2024-10-22,prompt-caching-2024-07-31",
+                )
                 .json(&api_request)
                 .send()
                 .await

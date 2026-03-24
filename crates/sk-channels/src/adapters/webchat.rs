@@ -63,14 +63,19 @@ impl ChannelAdapter for WebChatAdapter {
 
     async fn start(
         &self,
-    ) -> Result<Pin<Box<dyn futures::Stream<Item = ChannelMessage> + Send>>, Box<dyn std::error::Error>>
-    {
+    ) -> Result<
+        Pin<Box<dyn futures::Stream<Item = ChannelMessage> + Send>>,
+        Box<dyn std::error::Error>,
+    > {
         let (tx, rx) = mpsc::channel::<ChannelMessage>(256);
         let port = self.port;
         let clients = self.clients.clone();
         let mut shutdown_rx = self.shutdown_rx.clone();
 
-        info!("Starting WebChat adapter (WebSocket server on port {})", port);
+        info!(
+            "Starting WebChat adapter (WebSocket server on port {})",
+            port
+        );
 
         // Spawn the Axum server
         tokio::spawn(async move {
@@ -114,7 +119,10 @@ impl ChannelAdapter for WebChatAdapter {
 
             // Push the message to the client's WebSocket task
             if let Err(e) = sender.send(text).await {
-                error!("Failed to send to WebChat client {}: {}", user.platform_id, e);
+                error!(
+                    "Failed to send to WebChat client {}: {}",
+                    user.platform_id, e
+                );
                 self.clients.remove(&user.platform_id);
             }
         }

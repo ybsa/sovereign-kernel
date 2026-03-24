@@ -2,10 +2,52 @@
 
 use sk_kernel::SovereignKernel;
 use sk_types::config::KernelConfig;
+use std::process::Command;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 
-pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
+pub async fn start(config: KernelConfig, detach: bool) -> anyhow::Result<()> {
+    if detach {
+        println!("🚀 Launching Sovereign in detached background mode...");
+        let exe = std::env::current_exe()?;
+
+        // Define the arguments to re-execute without --detach
+        let log_dir = config.data_dir.join("logs");
+        if !log_dir.exists() {
+            std::fs::create_dir_all(&log_dir)?;
+        }
+        let log_file = log_dir.join("daemon.json").to_string_lossy().to_string();
+
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            const DETACHED_PROCESS: u32 = 0x00000008;
+            Command::new(exe)
+                .arg("--log-file")
+                .arg(&log_file)
+                .arg("start")
+                .creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS)
+                .spawn()?;
+        }
+        #[cfg(not(windows))]
+        {
+            // On Unix, redirecting stdout/stderr to bitbucket helps detach
+            Command::new(exe)
+                .arg("--log-file")
+                .arg(&log_file)
+                .arg("start")
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()?;
+        }
+
+        println!("✅ Daemon successfully detached and started.");
+        println!("📄 Logs will be written to: {}", log_file);
+        return Ok(());
+    }
+
     println!("⚡ Starting Sovereign...");
 
     // Initialize kernel
@@ -56,7 +98,7 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
         // Fallback for missing config (from raw env) if Telegram wasn't explicitly configured in config but the token exists
         // Wait, since we are moving to configs, we might not need this. But let's keep it clean
         if let Ok(token) = std::env::var("TELEGRAM_BOT_TOKEN") {
-             if !token.is_empty() {
+            if !token.is_empty() {
                 println!("⚡ Connecting to Telegram (legacy env)...");
                 let tg_adapter = sk_channels::telegram::TelegramAdapter::new(token)
                     .await
@@ -75,8 +117,11 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
         if let Ok(token) = std::env::var(&discord_cfg.bot_token_env) {
             if !token.is_empty() {
                 println!("⚡ Connecting to Discord...");
-                let discord_adapter =
-                    sk_channels::discord::DiscordAdapter::new(token, discord_cfg.allowed_guilds.clone(), discord_cfg.intents);
+                let discord_adapter = sk_channels::discord::DiscordAdapter::new(
+                    token,
+                    discord_cfg.allowed_guilds.clone(),
+                    discord_cfg.intents,
+                );
                 manager
                     .start_adapter(Arc::new(discord_adapter))
                     .await
@@ -108,7 +153,10 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
         if let Ok(access_token) = std::env::var(&wa_cfg.access_token_env) {
             let verify_token = std::env::var(&wa_cfg.verify_token_env).unwrap_or_default();
             if !access_token.is_empty() && !wa_cfg.phone_number_id.is_empty() {
-                println!("⚡ Connecting to WhatsApp (Webhook Port: {})...", wa_cfg.webhook_port);
+                println!(
+                    "⚡ Connecting to WhatsApp (Webhook Port: {})...",
+                    wa_cfg.webhook_port
+                );
                 let wa_adapter = sk_channels::whatsapp::WhatsAppAdapter::new(
                     access_token,
                     verify_token,
@@ -149,7 +197,10 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
     // Start Signal Channel if configured
     if let Some(signal_cfg) = &config.channels.signal {
         if !signal_cfg.api_url.is_empty() && !signal_cfg.phone_number.is_empty() {
-            println!("⚡ Connecting to Signal (Rest API: {})...", signal_cfg.api_url);
+            println!(
+                "⚡ Connecting to Signal (Rest API: {})...",
+                signal_cfg.api_url
+            );
             let signal_adapter = sk_channels::adapters::signal::SignalAdapter::new(
                 signal_cfg.api_url.clone(),
                 signal_cfg.phone_number.clone(),
@@ -167,7 +218,10 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
     if let Some(matrix_cfg) = &config.channels.matrix {
         if let Ok(access_token) = std::env::var(&matrix_cfg.access_token_env) {
             if !access_token.is_empty() && !matrix_cfg.user_id.is_empty() {
-                println!("⚡ Connecting to Matrix (Server: {})...", matrix_cfg.homeserver_url);
+                println!(
+                    "⚡ Connecting to Matrix (Server: {})...",
+                    matrix_cfg.homeserver_url
+                );
                 let matrix_adapter = sk_channels::adapters::matrix::MatrixAdapter::new(
                     matrix_cfg.homeserver_url.clone(),
                     matrix_cfg.user_id.clone(),
@@ -185,7 +239,10 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
 
     // Start WebChat Channel if configured
     if let Some(wc_cfg) = &config.channels.webchat {
-        println!("⚡ Starting WebChat WebSocket server on port {}...", wc_cfg.port);
+        println!(
+            "⚡ Starting WebChat WebSocket server on port {}...",
+            wc_cfg.port
+        );
         let wc_adapter = sk_channels::adapters::webchat::WebChatAdapter::new(
             wc_cfg.port,
             wc_cfg.default_agent.clone(),
@@ -278,7 +335,8 @@ pub async fn start(config: KernelConfig) -> anyhow::Result<()> {
     #[cfg(unix)]
     let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
     #[cfg(unix)]
-    let mut sigusr1 = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::user_defined1())?;
+    let mut sigusr1 =
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::user_defined1())?;
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {

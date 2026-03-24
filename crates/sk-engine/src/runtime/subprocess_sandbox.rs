@@ -250,7 +250,7 @@ async fn kill_tree_unix(pid: u32, grace_ms: u64) -> Result<bool, String> {
             Err(_) => return Ok(true), // kill command failed, assume dead
             _ => {}                    // Still alive
         }
-        
+
         tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     }
 

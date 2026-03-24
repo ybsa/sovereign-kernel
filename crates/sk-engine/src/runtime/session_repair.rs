@@ -370,7 +370,9 @@ fn insert_synthetic_results(messages: &mut Vec<Message>) -> usize {
             .or_default()
             .push(ContentBlock::ToolResult {
                 tool_use_id,
-                content: sk_types::MessageContent::Text("[Tool execution was interrupted or lost]".to_string()),
+                content: sk_types::MessageContent::Text(
+                    "[Tool execution was interrupted or lost]".to_string(),
+                ),
                 is_error: true,
             });
     }
@@ -854,7 +856,11 @@ mod tests {
                     is_error,
                     content,
                     ..
-                } => tool_use_id == "tu-orphan" && *is_error && content.text_content().contains("interrupted"),
+                } => {
+                    tool_use_id == "tu-orphan"
+                        && *is_error
+                        && content.text_content().contains("interrupted")
+                }
                 _ => false,
             }),
             _ => false,

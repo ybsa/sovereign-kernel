@@ -11,13 +11,13 @@
 use chromiumoxide::browser::{Browser, BrowserConfig};
 use chromiumoxide::Page;
 use dashmap::DashMap;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use sk_types::config::BrowserConfig as AppBrowserConfig;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::{Mutex, OnceCell};
 use tracing::{info, warn};
-use futures::StreamExt;
 
 // ── Protocol types ──────────────────────────────────────────────────────────
 
@@ -52,18 +52,41 @@ struct BrowserSession {
 impl BrowserSession {
     async fn execute(&mut self, cmd: &BrowserCommand) -> Result<BrowserResponse, String> {
         self.last_active = Instant::now();
-        
+
         match cmd {
             BrowserCommand::Navigate { url } => {
-                let p = self.page.goto(url).await.map_err(|e| format!("Nav Error: {e}"))?;
-                p.wait_for_navigation().await.map_err(|e| format!("Nav Wait Error: {e}"))?;
-                
-                let title = self.page.evaluate("document.title").await.map_err(|e| format!("Title fetch error: {e}"))?.into_value::<String>().unwrap_or_default();
-                let page_url = self.page.url().await.map_err(|e| format!("URL fetch error: {e}"))?.unwrap_or_default();
-                
+                let p = self
+                    .page
+                    .goto(url)
+                    .await
+                    .map_err(|e| format!("Nav Error: {e}"))?;
+                p.wait_for_navigation()
+                    .await
+                    .map_err(|e| format!("Nav Wait Error: {e}"))?;
+
+                let title = self
+                    .page
+                    .evaluate("document.title")
+                    .await
+                    .map_err(|e| format!("Title fetch error: {e}"))?
+                    .into_value::<String>()
+                    .unwrap_or_default();
+                let page_url = self
+                    .page
+                    .url()
+                    .await
+                    .map_err(|e| format!("URL fetch error: {e}"))?
+                    .unwrap_or_default();
+
                 // Read clean markdown via Readability
-                let content = self.page.evaluate(include_str!("readability.js")).await.map_err(|e| format!("Readability error: {e}"))?.into_value::<String>().unwrap_or_default();
-                
+                let content = self
+                    .page
+                    .evaluate(include_str!("readability.js"))
+                    .await
+                    .map_err(|e| format!("Readability error: {e}"))?
+                    .into_value::<String>()
+                    .unwrap_or_default();
+
                 Ok(BrowserResponse {
                     success: true,
                     data: Some(serde_json::json!({
@@ -75,12 +98,25 @@ impl BrowserSession {
                 })
             }
             BrowserCommand::Click { selector } => {
-                let element = self.page.find_element(selector.as_str()).await.map_err(|e| format!("Element not found: {e}"))?;
-                element.click().await.map_err(|e| format!("Click failed: {e}"))?;
-                
-                let title = self.page.evaluate("document.title").await.ok().and_then(|v| v.into_value::<String>().ok()).unwrap_or_default();
+                let element = self
+                    .page
+                    .find_element(selector.as_str())
+                    .await
+                    .map_err(|e| format!("Element not found: {e}"))?;
+                element
+                    .click()
+                    .await
+                    .map_err(|e| format!("Click failed: {e}"))?;
+
+                let title = self
+                    .page
+                    .evaluate("document.title")
+                    .await
+                    .ok()
+                    .and_then(|v| v.into_value::<String>().ok())
+                    .unwrap_or_default();
                 let url = self.page.url().await.ok().flatten().unwrap_or_default();
-                
+
                 Ok(BrowserResponse {
                     success: true,
                     data: Some(serde_json::json!({ "title": title, "url": url })),
@@ -88,10 +124,20 @@ impl BrowserSession {
                 })
             }
             BrowserCommand::Type { selector, text } => {
-                let element = self.page.find_element(selector.as_str()).await.map_err(|e| format!("Element not found: {e}"))?;
-                element.click().await.map_err(|e| format!("Focus failed: {e}"))?;
-                element.type_str(text).await.map_err(|e| format!("Type failed: {e}"))?;
-                
+                let element = self
+                    .page
+                    .find_element(selector.as_str())
+                    .await
+                    .map_err(|e| format!("Element not found: {e}"))?;
+                element
+                    .click()
+                    .await
+                    .map_err(|e| format!("Focus failed: {e}"))?;
+                element
+                    .type_str(text)
+                    .await
+                    .map_err(|e| format!("Type failed: {e}"))?;
+
                 Ok(BrowserResponse {
                     success: true,
                     data: None,
@@ -100,17 +146,21 @@ impl BrowserSession {
             }
             BrowserCommand::Screenshot => {
                 use chromiumoxide::cdp::browser_protocol::page::CaptureScreenshotFormat;
-                let bytes = self.page.screenshot(
-                    chromiumoxide::page::ScreenshotParams::builder()
-                        .format(CaptureScreenshotFormat::Png)
-                        .full_page(false)
-                        .build()
-                ).await.map_err(|e| format!("Screenshot error: {e}"))?;
-                
+                let bytes = self
+                    .page
+                    .screenshot(
+                        chromiumoxide::page::ScreenshotParams::builder()
+                            .format(CaptureScreenshotFormat::Png)
+                            .full_page(false)
+                            .build(),
+                    )
+                    .await
+                    .map_err(|e| format!("Screenshot error: {e}"))?;
+
                 use base64::Engine;
                 let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
                 let url = self.page.url().await.ok().flatten().unwrap_or_default();
-                
+
                 Ok(BrowserResponse {
                     success: true,
                     data: Some(serde_json::json!({
@@ -121,10 +171,22 @@ impl BrowserSession {
                 })
             }
             BrowserCommand::ReadPage => {
-                let title = self.page.evaluate("document.title").await.ok().and_then(|v| v.into_value::<String>().ok()).unwrap_or_default();
+                let title = self
+                    .page
+                    .evaluate("document.title")
+                    .await
+                    .ok()
+                    .and_then(|v| v.into_value::<String>().ok())
+                    .unwrap_or_default();
                 let url = self.page.url().await.ok().flatten().unwrap_or_default();
-                let content = self.page.evaluate(include_str!("readability.js")).await.map_err(|e| format!("Readability error: {e}"))?.into_value::<String>().unwrap_or_default();
-                
+                let content = self
+                    .page
+                    .evaluate(include_str!("readability.js"))
+                    .await
+                    .map_err(|e| format!("Readability error: {e}"))?
+                    .into_value::<String>()
+                    .unwrap_or_default();
+
                 Ok(BrowserResponse {
                     success: true,
                     data: Some(serde_json::json!({
@@ -167,49 +229,63 @@ impl BrowserManager {
     }
 
     async fn get_browser(&self) -> Result<Arc<Browser>, String> {
-        self.browser.get_or_try_init(|| async {
-            let mut build = BrowserConfig::builder()
-                .window_size(self.config.viewport_width, self.config.viewport_height);
-            
-            if !self.config.headless {
-                build = build.with_head();
-            }
+        self.browser
+            .get_or_try_init(|| async {
+                let mut build = BrowserConfig::builder()
+                    .window_size(self.config.viewport_width, self.config.viewport_height);
 
-            let b_config = build.build().map_err(|e| format!("Config builder error: {e}"))?;
-            
-            let (browser, mut handler) = Browser::launch(b_config)
-                .await
-                .map_err(|e| format!("Failed to launch chromium: {e}"))?;
-            
-            tokio::spawn(async move {
-                while handler.next().await.is_some() {
-                    // pump events
+                if !self.config.headless {
+                    build = build.with_head();
                 }
-            });
 
-            Ok(Arc::new(browser))
-        }).await.cloned()
+                let b_config = build
+                    .build()
+                    .map_err(|e| format!("Config builder error: {e}"))?;
+
+                let (browser, mut handler) = Browser::launch(b_config)
+                    .await
+                    .map_err(|e| format!("Failed to launch chromium: {e}"))?;
+
+                tokio::spawn(async move {
+                    while handler.next().await.is_some() {
+                        // pump events
+                    }
+                });
+
+                Ok(Arc::new(browser))
+            })
+            .await
+            .cloned()
     }
 
-    async fn get_or_create_session(&self, agent_id: &str) -> Result<Arc<Mutex<BrowserSession>>, String> {
+    async fn get_or_create_session(
+        &self,
+        agent_id: &str,
+    ) -> Result<Arc<Mutex<BrowserSession>>, String> {
         if let Some(session) = self.sessions.get(agent_id) {
             return Ok(session.clone());
         }
 
         if self.sessions.len() >= self.config.max_sessions {
-            return Err(format!("Max browser sessions reached ({})", self.config.max_sessions));
+            return Err(format!(
+                "Max browser sessions reached ({})",
+                self.config.max_sessions
+            ));
         }
 
         let browser = self.get_browser().await?;
-        let page = browser.new_page("about:blank").await.map_err(|e| format!("Failed to create page: {e}"))?;
-        
+        let page = browser
+            .new_page("about:blank")
+            .await
+            .map_err(|e| format!("Failed to create page: {e}"))?;
+
         // Inject JS helper scripts if needed (e.g., Readability library)
-        
+
         let session = Arc::new(Mutex::new(BrowserSession {
             page,
             last_active: Instant::now(),
         }));
-        
+
         self.sessions.insert(agent_id.to_string(), session.clone());
         Ok(session)
     }
@@ -226,14 +302,20 @@ impl BrowserManager {
         let session_arc = self.get_or_create_session(agent_id).await?;
         let mut session = session_arc.lock().await;
 
-        let res = session.execute(&cmd).await.unwrap_or_else(|e| BrowserResponse {
-            success: false,
-            data: None,
-            error: Some(e),
-        });
+        let res = session
+            .execute(&cmd)
+            .await
+            .unwrap_or_else(|e| BrowserResponse {
+                success: false,
+                data: None,
+                error: Some(e),
+            });
 
         if !res.success {
-            let err = res.error.clone().unwrap_or_else(|| "Unknown error".to_string());
+            let err = res
+                .error
+                .clone()
+                .unwrap_or_else(|| "Unknown error".to_string());
             warn!(agent_id, error = %err, "Browser command failed");
         }
 
@@ -263,8 +345,17 @@ pub async fn tool_browser_navigate(
     let url = input["url"].as_str().ok_or("Missing 'url' parameter")?;
     super::web_fetch::check_ssrf(url)?;
 
-    let resp = mgr.send_command(agent_id, BrowserCommand::Navigate { url: url.to_string() }).await?;
-    if !resp.success { return Err(resp.error.unwrap_or_else(|| "Navigate failed".into())); }
+    let resp = mgr
+        .send_command(
+            agent_id,
+            BrowserCommand::Navigate {
+                url: url.to_string(),
+            },
+        )
+        .await?;
+    if !resp.success {
+        return Err(resp.error.unwrap_or_else(|| "Navigate failed".into()));
+    }
 
     let data = resp.data.unwrap_or_default();
     let title = data["title"].as_str().unwrap_or("(no title)");
@@ -272,7 +363,9 @@ pub async fn tool_browser_navigate(
     let content = data["content"].as_str().unwrap_or("");
     let wrapped = super::web_content::wrap_external_content(page_url, content);
 
-    Ok(format!("Navigated to: {page_url}\nTitle: {title}\n\n{wrapped}"))
+    Ok(format!(
+        "Navigated to: {page_url}\nTitle: {title}\n\n{wrapped}"
+    ))
 }
 
 pub async fn tool_browser_click(
@@ -281,8 +374,17 @@ pub async fn tool_browser_click(
     agent_id: &str,
 ) -> Result<String, String> {
     let selector = input["selector"].as_str().ok_or("Missing 'selector'")?;
-    let resp = mgr.send_command(agent_id, BrowserCommand::Click { selector: selector.into() }).await?;
-    if !resp.success { return Err(resp.error.unwrap_or_else(|| "Click failed".into())); }
+    let resp = mgr
+        .send_command(
+            agent_id,
+            BrowserCommand::Click {
+                selector: selector.into(),
+            },
+        )
+        .await?;
+    if !resp.success {
+        return Err(resp.error.unwrap_or_else(|| "Click failed".into()));
+    }
 
     let data = resp.data.unwrap_or_default();
     let title = data["title"].as_str().unwrap_or("(no title)");
@@ -297,8 +399,18 @@ pub async fn tool_browser_type(
 ) -> Result<String, String> {
     let selector = input["selector"].as_str().ok_or("Missing 'selector'")?;
     let text = input["text"].as_str().ok_or("Missing 'text'")?;
-    let resp = mgr.send_command(agent_id, BrowserCommand::Type { selector: selector.into(), text: text.into() }).await?;
-    if !resp.success { return Err(resp.error.unwrap_or_else(|| "Type failed".into())); }
+    let resp = mgr
+        .send_command(
+            agent_id,
+            BrowserCommand::Type {
+                selector: selector.into(),
+                text: text.into(),
+            },
+        )
+        .await?;
+    if !resp.success {
+        return Err(resp.error.unwrap_or_else(|| "Type failed".into()));
+    }
     Ok(format!("Typed into {selector}: {text}"))
 }
 
@@ -307,8 +419,12 @@ pub async fn tool_browser_screenshot(
     mgr: &BrowserManager,
     agent_id: &str,
 ) -> Result<String, String> {
-    let resp = mgr.send_command(agent_id, BrowserCommand::Screenshot).await?;
-    if !resp.success { return Err(resp.error.unwrap_or_else(|| "Screenshot failed".into())); }
+    let resp = mgr
+        .send_command(agent_id, BrowserCommand::Screenshot)
+        .await?;
+    if !resp.success {
+        return Err(resp.error.unwrap_or_else(|| "Screenshot failed".into()));
+    }
 
     let data = resp.data.unwrap_or_default();
     let b64 = data["image_base64"].as_str().unwrap_or("");
@@ -332,7 +448,8 @@ pub async fn tool_browser_screenshot(
         "screenshot": true,
         "url": url,
         "image_urls": image_urls,
-    }).to_string())
+    })
+    .to_string())
 }
 
 pub async fn tool_browser_read_page(
@@ -341,7 +458,9 @@ pub async fn tool_browser_read_page(
     agent_id: &str,
 ) -> Result<String, String> {
     let resp = mgr.send_command(agent_id, BrowserCommand::ReadPage).await?;
-    if !resp.success { return Err(resp.error.unwrap_or_else(|| "ReadPage failed".into())); }
+    if !resp.success {
+        return Err(resp.error.unwrap_or_else(|| "ReadPage failed".into()));
+    }
 
     let data = resp.data.unwrap_or_default();
     let title = data["title"].as_str().unwrap_or("(no title)");

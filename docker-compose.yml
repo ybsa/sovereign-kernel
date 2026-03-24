@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  sovereign-kernel:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sovereign-kernel:latest
+    container_name: sovereign-kernel-daemon
+    restart: unless-stopped
+    ports:
+      # API Bridge mapping
+      - "4200:4200"
+      # Dashboard mapping
+      - "8080:8080"
+    environment:
+      # Configure language model drivers in config.toml or here via environment overrides.
+      - RUST_LOG=info
+      # If you prefer env vars, drop them here:
+      # - ANTHROPIC_API_KEY=sk-ant-api...
+      # - OPENAI_API_KEY=sk-... 
+      # - TELEGRAM_BOT_TOKEN=...
+    volumes:
+      # Persist configuration and memory database locally
+      - sovereign_data:/home/sovereign/.sovereign-kernel
+
+volumes:
+  sovereign_data:
+    name: sovereign-kernel-data
+    driver: local

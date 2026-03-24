@@ -142,10 +142,13 @@ sovereign chat                             # Interactive agent REPL
 sovereign run "<task>"                     # Autonomous task execution
 sovereign run "<task>" --mode unrestricted # Full host access
 sovereign run "<task>" --schedule "cron"   # Scheduled recurring task
-sovereign start                            # Start as background daemon
+sovereign start                            # Start as foreground daemon
+sovereign start --detach                   # Start as detached background daemon
 sovereign status                           # Village overview (agents + jobs)
 sovereign kill <agent-id>                  # Kill a specific agent
 sovereign kill                             # Stop the daemon
+sovereign mcp list                         # List active MCP Tool Servers
+sovereign mcp add <name> <cmd>             # Add an MCP tool server dynamically
 sovereign dashboard [--port 8080]          # The Watchtower
 sovereign hands list                       # All bundled Hands
 sovereign hands activate <name>            # Start a Hand

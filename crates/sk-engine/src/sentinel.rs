@@ -10,7 +10,7 @@ use crate::llm_driver::{CompletionRequest, CompletionResponse, LlmDriver, LlmErr
 use crate::retry;
 use async_trait::async_trait;
 use std::sync::Arc;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 
 /// A driver that manages multiple fallback options.
 pub struct SentinelDriver {
@@ -32,10 +32,13 @@ impl SentinelDriver {
 
 #[async_trait]
 impl LlmDriver for SentinelDriver {
-    async fn complete(&self, mut request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
+    async fn complete(
+        &self,
+        mut request: CompletionRequest,
+    ) -> Result<CompletionResponse, LlmError> {
         for (i, (model_name, driver)) in self.entries.iter().enumerate() {
             let mut last_err = None;
-            
+
             // Update request with this driver's specific model name
             request.model = model_name.clone();
 
@@ -75,7 +78,7 @@ impl LlmDriver for SentinelDriver {
                             last_err = Some(e);
                             break; // Failover to next driver
                         }
-                        
+
                         warn!(
                             provider = driver.provider(),
                             model = %model_name,

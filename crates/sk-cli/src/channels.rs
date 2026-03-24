@@ -6,7 +6,7 @@ pub async fn run(config: KernelConfig, action: &str, channel: Option<&str>) -> a
     match action {
         "list" => {
             println!("📡 Configured Channels Settings:\n");
-            
+
             let mut any = false;
 
             if let Some(tg) = &config.channels.telegram {

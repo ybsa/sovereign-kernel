@@ -39,7 +39,11 @@ pub enum ControlEvent {
     /// Pong response.
     Pong,
     /// Live log entry.
-    Log { agent_id: String, text: String, level: String },
+    Log {
+        agent_id: String,
+        text: String,
+        level: String,
+    },
     /// Agent status update.
     Status { agent_id: String, state: String },
     /// Presence update for the village.
@@ -58,13 +62,13 @@ pub async fn ws_handler(
 /// Handle an upgraded WebSocket connection.
 async fn handle_socket(socket: WebSocket, kernel: Arc<SovereignKernel>) {
     let (mut sender, mut receiver) = socket.split();
-    
+
     // Subscribe to internal kernel events
     let mut kernel_events = kernel.event_bus.subscribe();
-    
+
     // Channel for sending events to this specific client
     let (tx, mut rx) = tokio::sync::mpsc::channel::<ControlEvent>(100);
-    
+
     // Event loop for sending to client
     let mut send_task = tokio::spawn(async move {
         while let Some(event) = rx.recv().await {
@@ -125,17 +129,17 @@ async fn handle_socket(socket: WebSocket, kernel: Arc<SovereignKernel>) {
         while let Ok(event) = kernel_events.recv().await {
             use crate::event_bus::KernelEvent;
             let control_event = match event {
-                KernelEvent::AgentStarted { agent_id } => Some(ControlEvent::Status { 
-                    agent_id, 
-                    state: "running".to_string() 
+                KernelEvent::AgentStarted { agent_id } => Some(ControlEvent::Status {
+                    agent_id,
+                    state: "running".to_string(),
                 }),
-                KernelEvent::AgentStopped { agent_id } => Some(ControlEvent::Status { 
-                    agent_id, 
-                    state: "stopped".to_string() 
+                KernelEvent::AgentStopped { agent_id } => Some(ControlEvent::Status {
+                    agent_id,
+                    state: "stopped".to_string(),
                 }),
-                KernelEvent::Presence { active_agents } => Some(ControlEvent::Presence { 
-                    active_agents 
-                }),
+                KernelEvent::Presence { active_agents } => {
+                    Some(ControlEvent::Presence { active_agents })
+                }
                 KernelEvent::Error { message } => Some(ControlEvent::Log {
                     agent_id: "system".to_string(),
                     text: message,
@@ -158,6 +162,6 @@ async fn handle_socket(socket: WebSocket, kernel: Arc<SovereignKernel>) {
         _ = (&mut recv_task) => { send_task.abort(); pipe_task.abort(); }
         _ = (&mut pipe_task) => { send_task.abort(); recv_task.abort(); }
     }
-    
+
     info!("WebSocket control plane connection closed");
 }

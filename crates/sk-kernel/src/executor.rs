@@ -144,7 +144,10 @@ pub fn create_agent_config(
                 kernel.metering.record_cost(aid, cost);
 
                 // Enforce global budget
-                kernel.config.blocking_read().check_budget(kernel.metering.total_cost())?;
+                kernel
+                    .config
+                    .blocking_read()
+                    .check_budget(kernel.metering.total_cost())?;
 
                 Ok(())
             }))
@@ -184,16 +187,27 @@ pub fn create_agent_config(
 
             // 0. Enforce ExecutionMode::Sandbox Restrictions
             if mode == sk_types::config::ExecutionMode::Sandbox {
-                let risk = crate::approval::ApprovalManager::classify_risk(&tool_call.name, Some(&tool_call.input));
-                let is_host_read = tool_call.name == "host_read_file" || tool_call.name == "host_list_dir";
+                let risk = crate::approval::ApprovalManager::classify_risk(
+                    &tool_call.name,
+                    Some(&tool_call.input),
+                );
+                let is_host_read =
+                    tool_call.name == "host_read_file" || tool_call.name == "host_list_dir";
                 let is_host_mutate = tool_call.name.starts_with("host_") && !is_host_read;
-                let is_raw_shell = tool_call.name == "shell_exec" && !tool_call.input.get("use_sandbox").and_then(|v| v.as_bool()).unwrap_or(false);
-                let is_dangerous = risk == sk_types::approval::RiskLevel::Critical || risk == sk_types::approval::RiskLevel::High;
+                let is_raw_shell = tool_call.name == "shell_exec"
+                    && !tool_call
+                        .input
+                        .get("use_sandbox")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
+                let is_dangerous = risk == sk_types::approval::RiskLevel::Critical
+                    || risk == sk_types::approval::RiskLevel::High;
 
                 if is_host_mutate || is_raw_shell || is_dangerous {
-                    return Err(sk_types::SovereignError::CapabilityDenied(
-                        format!("Tool '{}' is blocked by Sandbox mode. Switch to Unrestricted mode.", tool_call.name)
-                    ));
+                    return Err(sk_types::SovereignError::CapabilityDenied(format!(
+                        "Tool '{}' is blocked by Sandbox mode. Switch to Unrestricted mode.",
+                        tool_call.name
+                    )));
                 }
             }
 
@@ -723,11 +737,8 @@ pub fn create_agent_config(
                 "read_file" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::file_ops::handle_read_file(
-                            &workspaces_dir,
-                            path,
-                        )
-                        .map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::file_ops::handle_read_file(&workspaces_dir, path)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -758,11 +769,8 @@ pub fn create_agent_config(
                 "list_dir" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
-                        sk_tools::file_ops::handle_list_dir(
-                            &workspaces_dir,
-                            path,
-                        )
-                        .map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::file_ops::handle_list_dir(&workspaces_dir, path)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -772,11 +780,8 @@ pub fn create_agent_config(
                 "delete_file" => {
                     if let Some(args) = tool_call.input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
-                        sk_tools::file_ops::handle_delete_file(
-                            &workspaces_dir,
-                            path,
-                        )
-                        .map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::file_ops::handle_delete_file(&workspaces_dir, path)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -790,12 +795,8 @@ pub fn create_agent_config(
                             .get("destination")
                             .and_then(|v| v.as_str())
                             .unwrap_or("");
-                        sk_tools::file_ops::handle_move_file(
-                            &workspaces_dir,
-                            source,
-                            dest,
-                        )
-                        .map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::file_ops::handle_move_file(&workspaces_dir, source, dest)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -809,12 +810,8 @@ pub fn create_agent_config(
                             .get("destination")
                             .and_then(|v| v.as_str())
                             .unwrap_or("");
-                        sk_tools::file_ops::handle_copy_file(
-                            &workspaces_dir,
-                            source,
-                            dest,
-                        )
-                        .map(|out| healer_result(&tool_id, out, false))
+                        sk_tools::file_ops::handle_copy_file(&workspaces_dir, source, dest)
+                            .map(|out| healer_result(&tool_id, out, false))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -1252,7 +1249,8 @@ pub fn create_agent_config(
                 }
                 "speech_to_text" => {
                     if let Some(args) = tool_call.input.as_object() {
-                        let file_path = args.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
+                        let file_path =
+                            args.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
 
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current()

@@ -59,10 +59,7 @@ impl ModelRouter {
             if lower.contains("architect") || lower.contains("scientific") {
                 return TaskComplexity::FrontierReasoning;
             }
-            if lower.contains("code")
-                || lower.contains("debug")
-                || lower.contains("analyze")
-            {
+            if lower.contains("code") || lower.contains("debug") || lower.contains("analyze") {
                 return TaskComplexity::DeepReasoning;
             }
         }

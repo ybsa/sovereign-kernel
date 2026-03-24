@@ -68,38 +68,138 @@ impl ModelCapability {
 pub fn default_catalog() -> Vec<ModelCapability> {
     vec![
         // ── Anthropic ──────────────────────────────────────────────
-        ModelCapability::new("claude-3-5-sonnet-20241022", "anthropic", ModelTier::CloudReasoning, 200000, true).with_computer_use(),
-        ModelCapability::new("claude-3-5-haiku-20241022", "anthropic", ModelTier::CloudFast, 200000, true).with_vision(),
-        ModelCapability::new("claude-3-haiku-20240307", "anthropic", ModelTier::CloudFast, 200000, true).with_vision(),
-        ModelCapability::new("claude-3-opus-20240229", "anthropic", ModelTier::CloudFrontier, 200000, true).with_vision(),
-        
+        ModelCapability::new(
+            "claude-3-5-sonnet-20241022",
+            "anthropic",
+            ModelTier::CloudReasoning,
+            200000,
+            true,
+        )
+        .with_computer_use(),
+        ModelCapability::new(
+            "claude-3-5-haiku-20241022",
+            "anthropic",
+            ModelTier::CloudFast,
+            200000,
+            true,
+        )
+        .with_vision(),
+        ModelCapability::new(
+            "claude-3-haiku-20240307",
+            "anthropic",
+            ModelTier::CloudFast,
+            200000,
+            true,
+        )
+        .with_vision(),
+        ModelCapability::new(
+            "claude-3-opus-20240229",
+            "anthropic",
+            ModelTier::CloudFrontier,
+            200000,
+            true,
+        )
+        .with_vision(),
         // ── OpenAI ─────────────────────────────────────────────────
-        ModelCapability::new("gpt-4o", "openai", ModelTier::CloudReasoning, 128000, true).with_vision(),
-        ModelCapability::new("gpt-4o-mini", "openai", ModelTier::CloudFast, 128000, true).with_vision(),
-        ModelCapability::new("o1-preview", "openai", ModelTier::CloudFrontier, 128000, true),
+        ModelCapability::new("gpt-4o", "openai", ModelTier::CloudReasoning, 128000, true)
+            .with_vision(),
+        ModelCapability::new("gpt-4o-mini", "openai", ModelTier::CloudFast, 128000, true)
+            .with_vision(),
+        ModelCapability::new(
+            "o1-preview",
+            "openai",
+            ModelTier::CloudFrontier,
+            128000,
+            true,
+        ),
         ModelCapability::new("o1-mini", "openai", ModelTier::CloudReasoning, 128000, true),
-        ModelCapability::new("gpt-4-turbo", "openai", ModelTier::CloudReasoning, 128000, true).with_vision(),
-        
+        ModelCapability::new(
+            "gpt-4-turbo",
+            "openai",
+            ModelTier::CloudReasoning,
+            128000,
+            true,
+        )
+        .with_vision(),
         // ── Google Gemini ──────────────────────────────────────────
-        ModelCapability::new("gemini-2.0-flash-exp", "gemini", ModelTier::CloudFast, 1000000, true).with_vision(),
-        ModelCapability::new("gemini-1.5-pro", "gemini", ModelTier::CloudReasoning, 2000000, true).with_vision(),
-        ModelCapability::new("gemini-1.5-flash", "gemini", ModelTier::CloudFast, 1000000, true).with_vision(),
-        
+        ModelCapability::new(
+            "gemini-2.0-flash-exp",
+            "gemini",
+            ModelTier::CloudFast,
+            1000000,
+            true,
+        )
+        .with_vision(),
+        ModelCapability::new(
+            "gemini-1.5-pro",
+            "gemini",
+            ModelTier::CloudReasoning,
+            2000000,
+            true,
+        )
+        .with_vision(),
+        ModelCapability::new(
+            "gemini-1.5-flash",
+            "gemini",
+            ModelTier::CloudFast,
+            1000000,
+            true,
+        )
+        .with_vision(),
         // ── DeepSeek ───────────────────────────────────────────────
-        ModelCapability::new("deepseek-chat", "deepseek", ModelTier::CloudFast, 64000, true),
-        ModelCapability::new("deepseek-reasoner", "deepseek", ModelTier::CloudReasoning, 64000, true),
-        
+        ModelCapability::new(
+            "deepseek-chat",
+            "deepseek",
+            ModelTier::CloudFast,
+            64000,
+            true,
+        ),
+        ModelCapability::new(
+            "deepseek-reasoner",
+            "deepseek",
+            ModelTier::CloudReasoning,
+            64000,
+            true,
+        ),
         // ── Groq (Llama / Mixtral / Qwen) ──────────────────────────
-        ModelCapability::new("llama-3.3-70b-versatile", "groq", ModelTier::CloudReasoning, 128000, true),
-        ModelCapability::new("llama-3.1-8b-instant", "groq", ModelTier::CloudFast, 128000, true),
-        ModelCapability::new("mixtral-8x7b-32768", "groq", ModelTier::CloudFast, 32768, true),
-        
+        ModelCapability::new(
+            "llama-3.3-70b-versatile",
+            "groq",
+            ModelTier::CloudReasoning,
+            128000,
+            true,
+        ),
+        ModelCapability::new(
+            "llama-3.1-8b-instant",
+            "groq",
+            ModelTier::CloudFast,
+            128000,
+            true,
+        ),
+        ModelCapability::new(
+            "mixtral-8x7b-32768",
+            "groq",
+            ModelTier::CloudFast,
+            32768,
+            true,
+        ),
         // ── xAI Grok ───────────────────────────────────────────────
         ModelCapability::new("grok-beta", "xai", ModelTier::CloudFast, 128000, true),
-        
         // ── Local (Ollama / vLLM) ──────────────────────────────────
-        ModelCapability::new("llama3.3:latest", "local", ModelTier::LocalLight, 8192, true),
-        ModelCapability::new("qwen2.5-coder:7b", "local", ModelTier::LocalLight, 32768, true),
+        ModelCapability::new(
+            "llama3.3:latest",
+            "local",
+            ModelTier::LocalLight,
+            8192,
+            true,
+        ),
+        ModelCapability::new(
+            "qwen2.5-coder:7b",
+            "local",
+            ModelTier::LocalLight,
+            32768,
+            true,
+        ),
         ModelCapability::new("mistral:latest", "local", ModelTier::LocalLight, 8192, true),
         ModelCapability::new("phi3:latest", "local", ModelTier::LocalLight, 4096, true),
     ]

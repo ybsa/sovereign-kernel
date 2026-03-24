@@ -70,8 +70,7 @@ impl MeteringEngine {
     pub async fn load(&self) -> sk_types::SovereignResult<()> {
         if let Some(ref path) = self.persist_path {
             if path.exists() {
-                let data = fs_err::read_to_string(path)
-                    .map_err(sk_types::SovereignError::Io)?;
+                let data = fs_err::read_to_string(path).map_err(sk_types::SovereignError::Io)?;
                 let state: MeteringState = serde_json::from_str(&data)
                     .map_err(|e| sk_types::SovereignError::Internal(e.to_string()))?;
                 let mut lock = self.state.write().await;
@@ -98,11 +97,9 @@ impl MeteringEngine {
             let data = serde_json::to_string_pretty(&state)
                 .map_err(|e| sk_types::SovereignError::Internal(e.to_string()))?;
             if let Some(parent) = path.parent() {
-                fs_err::create_dir_all(parent)
-                    .map_err(sk_types::SovereignError::Io)?;
+                fs_err::create_dir_all(parent).map_err(sk_types::SovereignError::Io)?;
             }
-            fs_err::write(path, data)
-                .map_err(sk_types::SovereignError::Io)?;
+            fs_err::write(path, data).map_err(sk_types::SovereignError::Io)?;
         }
         Ok(())
     }
@@ -136,19 +133,31 @@ impl MeteringEngine {
     }
 
     /// Check if the global budget has been exceeded.
-    pub async fn check_global_quota(&self, budget: &sk_types::config::BudgetConfig) -> Result<(), String> {
+    pub async fn check_global_quota(
+        &self,
+        budget: &sk_types::config::BudgetConfig,
+    ) -> Result<(), String> {
         let state = self.state.read().await;
-        
+
         if budget.max_hourly_usd > 0.0 && state.hourly_cost >= budget.max_hourly_usd {
-            return Err(format!("Global hourly budget exceeded: ${:.4} / ${:.4}", state.hourly_cost, budget.max_hourly_usd));
+            return Err(format!(
+                "Global hourly budget exceeded: ${:.4} / ${:.4}",
+                state.hourly_cost, budget.max_hourly_usd
+            ));
         }
         if budget.max_daily_usd > 0.0 && state.daily_cost >= budget.max_daily_usd {
-            return Err(format!("Global daily budget exceeded: ${:.4} / ${:.4}", state.daily_cost, budget.max_daily_usd));
+            return Err(format!(
+                "Global daily budget exceeded: ${:.4} / ${:.4}",
+                state.daily_cost, budget.max_daily_usd
+            ));
         }
         if budget.max_monthly_usd > 0.0 && state.monthly_cost >= budget.max_monthly_usd {
-            return Err(format!("Global monthly budget exceeded: ${:.4} / ${:.4}", state.monthly_cost, budget.max_monthly_usd));
+            return Err(format!(
+                "Global monthly budget exceeded: ${:.4} / ${:.4}",
+                state.monthly_cost, budget.max_monthly_usd
+            ));
         }
-        
+
         Ok(())
     }
 
@@ -173,9 +182,21 @@ impl MeteringEngine {
             hourly_limit: budget.max_hourly_usd,
             daily_limit: budget.max_daily_usd,
             monthly_limit: budget.max_monthly_usd,
-            hourly_pct: if budget.max_hourly_usd > 0.0 { state.hourly_cost / budget.max_hourly_usd } else { 0.0 },
-            daily_pct: if budget.max_daily_usd > 0.0 { state.daily_cost / budget.max_daily_usd } else { 0.0 },
-            monthly_pct: if budget.max_monthly_usd > 0.0 { state.monthly_cost / budget.max_monthly_usd } else { 0.0 },
+            hourly_pct: if budget.max_hourly_usd > 0.0 {
+                state.hourly_cost / budget.max_hourly_usd
+            } else {
+                0.0
+            },
+            daily_pct: if budget.max_daily_usd > 0.0 {
+                state.daily_cost / budget.max_daily_usd
+            } else {
+                0.0
+            },
+            monthly_pct: if budget.max_monthly_usd > 0.0 {
+                state.monthly_cost / budget.max_monthly_usd
+            } else {
+                0.0
+            },
         }
     }
 
@@ -211,25 +232,47 @@ fn estimate_cost_rates(model: &str) -> (f64, f64) {
     // (truncating for brevity in this tool call, but I will include it in the write)
     // Actually, I must include the whole file if I overwrite.
     // I'll copy the existing rates logic from my previous view_file.
-    
+
     // ── Anthropic ──────────────────────────────────────────────
-    if model.contains("haiku") { return (0.25, 1.25); }
-    if model.contains("opus") { return (15.0, 75.0); }
-    if model.contains("sonnet") { return (3.0, 15.0); }
+    if model.contains("haiku") {
+        return (0.25, 1.25);
+    }
+    if model.contains("opus") {
+        return (15.0, 75.0);
+    }
+    if model.contains("sonnet") {
+        return (3.0, 15.0);
+    }
 
     // ── OpenAI ─────────────────────────────────────────────────
-    if model.contains("gpt-4o-mini") { return (0.15, 0.60); }
-    if model.contains("gpt-4o") { return (2.50, 10.0); }
-    if model.contains("gpt-4.1-mini") { return (0.40, 1.60); }
-    if model.contains("gpt-4.1") { return (2.00, 8.00); }
-    
+    if model.contains("gpt-4o-mini") {
+        return (0.15, 0.60);
+    }
+    if model.contains("gpt-4o") {
+        return (2.50, 10.0);
+    }
+    if model.contains("gpt-4.1-mini") {
+        return (0.40, 1.60);
+    }
+    if model.contains("gpt-4.1") {
+        return (2.00, 8.00);
+    }
+
     // ── Google Gemini ──────────────────────────────────────────
-    if model.contains("gemini-2.0-flash") || model.contains("gemini-flash") { return (0.10, 0.40); }
-    if model.contains("gemini") { return (0.15, 0.60); }
+    if model.contains("gemini-2.0-flash") || model.contains("gemini-flash") {
+        return (0.10, 0.40);
+    }
+    if model.contains("gemini") {
+        return (0.15, 0.60);
+    }
 
     // ── DeepSeek ───────────────────────────────────────────────
-    if model.contains("deepseek-reasoner") || model.contains("deepseek-r1") { return (0.55, 2.19); }
-    if model.contains("deepseek") { return (0.27, 1.10); }
+    if model.contains("deepseek-reasoner") || model.contains("deepseek-r1") {
+        return (0.55, 2.19);
+    }
+    if model.contains("deepseek") {
+        return (0.27, 1.10);
+    }
 
     // ── Default ──────────────────────────────────────────────
     (1.0, 3.0)

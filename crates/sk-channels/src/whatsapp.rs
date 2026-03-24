@@ -124,7 +124,9 @@ async fn get_webhook(
     State(state): State<Arc<WebhookState>>,
     Query(query): Query<VerifyQuery>,
 ) -> impl IntoResponse {
-    if let (Some(mode), Some(token), Some(challenge)) = (query.mode, query.verify_token, query.challenge) {
+    if let (Some(mode), Some(token), Some(challenge)) =
+        (query.mode, query.verify_token, query.challenge)
+    {
         if mode == "subscribe" && token == state.verify_token {
             info!("WhatsApp Webhook verified successfully.");
             return (StatusCode::OK, challenge).into_response();
@@ -150,7 +152,9 @@ async fn post_webhook(
                         let mut display_names = HashMap::new();
                         if let Some(contacts) = value.contacts {
                             for contact in contacts {
-                                if let (Some(wa_id), Some(profile)) = (contact.wa_id, contact.profile) {
+                                if let (Some(wa_id), Some(profile)) =
+                                    (contact.wa_id, contact.profile)
+                                {
                                     display_names.insert(wa_id, profile.name);
                                 }
                             }
@@ -160,10 +164,15 @@ async fn post_webhook(
                             for msg in messages {
                                 if let Some(text) = msg.text {
                                     let sender_id = msg.from.clone();
-                                    
+
                                     // Filter by allowed users
-                                    if !state.allowed_users.is_empty() && !state.allowed_users.contains(&sender_id) {
-                                        warn!("Message from unauthorized user {} ignored.", sender_id);
+                                    if !state.allowed_users.is_empty()
+                                        && !state.allowed_users.contains(&sender_id)
+                                    {
+                                        warn!(
+                                            "Message from unauthorized user {} ignored.",
+                                            sender_id
+                                        );
                                         continue;
                                     }
 
@@ -215,7 +224,8 @@ impl ChannelAdapter for WhatsAppAdapter {
 
     async fn start(
         &self,
-    ) -> Result<Pin<Box<dyn Stream<Item = ChannelMessage> + Send>>, Box<dyn std::error::Error>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = ChannelMessage> + Send>>, Box<dyn std::error::Error>>
+    {
         let (tx, rx) = mpsc::channel(100);
         let rx_stream = tokio_stream::wrappers::ReceiverStream::new(rx);
 
@@ -230,13 +240,13 @@ impl ChannelAdapter for WhatsAppAdapter {
             .with_state(state);
 
         let port = self.webhook_port;
-        
+
         let mut shutdown_rx = self.shutdown_rx.clone();
 
         tokio::spawn(async move {
             let addr = std::net::SocketAddr::from(([0, 0, 0, 0], port));
             info!("WhatsApp webhook server listening on {addr}/webhook");
-            
+
             let listener = tokio::net::TcpListener::bind(&addr).await;
             if let Ok(listener) = listener {
                 let server = axum::serve(listener, app);

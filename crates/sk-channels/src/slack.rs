@@ -89,10 +89,11 @@ impl ChannelAdapter for SlackAdapter {
 
     async fn start(
         &self,
-    ) -> Result<Pin<Box<dyn Stream<Item = ChannelMessage> + Send>>, Box<dyn std::error::Error>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = ChannelMessage> + Send>>, Box<dyn std::error::Error>>
+    {
         let (tx, rx) = mpsc::channel(100);
         let rx_stream = tokio_stream::wrappers::ReceiverStream::new(rx);
-        
+
         let ws_url = self.get_ws_url().await?;
         info!("Connecting to Slack Socket Mode...");
 
@@ -219,7 +220,8 @@ impl ChannelAdapter for SlackAdapter {
         content: ChannelContent,
         thread_id: &str,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.post_message(&user.platform_id, content, Some(thread_id)).await
+        self.post_message(&user.platform_id, content, Some(thread_id))
+            .await
     }
 
     async fn send_typing(&self, _user: &ChannelUser) -> Result<(), Box<dyn std::error::Error>> {
@@ -239,7 +241,7 @@ impl ChannelAdapter for SlackAdapter {
         } else {
             "https://slack.com/api/reactions.add"
         };
-        
+
         let mut clean_emoji = reaction.emoji.clone();
         // Remove unicode variation selectors or find Slack alias
         // For simplicity, we assume we use valid aliases here or just pass what we get.

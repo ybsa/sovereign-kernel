@@ -22,6 +22,7 @@ mod dashboard;
 mod doctor;
 mod hands;
 mod init;
+mod mcp;
 mod middleware;
 mod openai_compat;
 mod run;
@@ -54,7 +55,11 @@ enum Commands {
     /// First-run setup wizard
     Init,
     /// Start the kernel as a background daemon
-    Start,
+    Start {
+        /// Detach the process and run in background
+        #[arg(short, long)]
+        detach: bool,
+    },
     /// Run a task autonomously
     #[command(alias = "do")]
     Run {
@@ -111,6 +116,15 @@ enum Commands {
         /// Agent ID or name
         id: Option<String>,
     },
+    /// Manage MCP server connections (list, add, remove)
+    Mcp {
+        /// Action: list, add, remove
+        #[arg(default_value = "list")]
+        action: String,
+        /// Additional arguments (name, command, args...)
+        #[arg(trailing_var_arg = true)]
+        args: Vec<String>,
+    },
     /// Manage channel bridges (list, info)
     Channels {
         /// Action: list, info
@@ -145,7 +159,9 @@ async fn main() -> anyhow::Result<()> {
     if let Some(ref log_path) = cli.log_file {
         let path = std::path::Path::new(log_path);
         let dir = path.parent().unwrap_or(std::path::Path::new("."));
-        let prefix = path.file_name().unwrap_or_else(|| std::ffi::OsStr::new("sovereign.log"));
+        let prefix = path
+            .file_name()
+            .unwrap_or_else(|| std::ffi::OsStr::new("sovereign.log"));
 
         let file_appender = tracing_appender::rolling::daily(dir, prefix);
         let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
@@ -188,7 +204,7 @@ async fn main() -> anyhow::Result<()> {
     match cli.command {
         Commands::Chat => chat::run(config).await?,
         Commands::Init => init::run().await?,
-        Commands::Start => daemon::start(config).await?,
+        Commands::Start { detach } => daemon::start(config, detach).await?,
         Commands::Run {
             task,
             mode,
@@ -224,6 +240,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Commands::Agents { action, id } => agents::run(config, &action, id).await?,
+        Commands::Mcp { action, args } => mcp::run(config, &action, &args).await?,
         Commands::Doctor => doctor::run(&config).await?,
         Commands::Treasury(args) => {
             let api_url = config.api_listen.clone();

@@ -8,8 +8,8 @@
 //! - Network connectivity (LLM providers, MCP servers)
 //! - Daemon status
 
-use std::path::PathBuf;
 use sk_types::config::KernelConfig;
+use std::path::PathBuf;
 
 pub async fn run(config: &KernelConfig) -> anyhow::Result<()> {
     println!("═══════════════════════════════════════════════════════");
@@ -22,7 +22,9 @@ pub async fn run(config: &KernelConfig) -> anyhow::Result<()> {
     print!("📁 Checking directories... ");
     let dirs = vec![
         config.data_dir.clone(),
-        dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")).join("sovereign-kernel"),
+        dirs::config_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join("sovereign-kernel"),
     ];
 
     for d in dirs {
@@ -39,7 +41,9 @@ pub async fn run(config: &KernelConfig) -> anyhow::Result<()> {
             issues += 1;
         }
     }
-    if issues == 0 { println!("✅ OK"); }
+    if issues == 0 {
+        println!("✅ OK");
+    }
 
     // 2. Check Soul Identity
     print!("👻 Checking Soul identity... ");
@@ -86,7 +90,7 @@ pub async fn run(config: &KernelConfig) -> anyhow::Result<()> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()?;
-    
+
     match client.get("https://api.anthropic.com").send().await {
         Ok(_) => println!("✅ OK"),
         Err(e) => {
@@ -99,7 +103,10 @@ pub async fn run(config: &KernelConfig) -> anyhow::Result<()> {
     if issues == 0 {
         println!("  ✨ Your Sovereign Kernel is HEALTHY and ready for duty.");
     } else {
-        println!("  ⚠️ Found {} potential issues. Please review the log above.", issues);
+        println!(
+            "  ⚠️ Found {} potential issues. Please review the log above.",
+            issues
+        );
     }
     println!("═══════════════════════════════════════════════════════\n");
 

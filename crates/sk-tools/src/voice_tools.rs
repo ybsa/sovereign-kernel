@@ -69,7 +69,10 @@ pub async fn handle_text_to_speech(
     let client = reqwest::Client::new();
 
     let mut headers = HeaderMap::new();
-    headers.insert(AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {}", api_key)).unwrap());
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", api_key)).unwrap(),
+    );
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application_json"));
 
     let body = json!({
@@ -94,7 +97,10 @@ pub async fn handle_text_to_speech(
         return Err(format!("TTS API error ({}): {}", status, err_body));
     }
 
-    let bytes = response.bytes().await.map_err(|e| format!("Failed to read TTS body: {}", e))?;
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read TTS body: {}", e))?;
 
     let path = if let Some(p) = output_path {
         p.to_string()
@@ -104,7 +110,10 @@ pub async fn handle_text_to_speech(
 
     fs::write(&path, bytes).map_err(|e| format!("Failed to write TTS file to {}: {}", path, e))?;
 
-    Ok(format!("Speech synthesized successfully and saved to: {}", path))
+    Ok(format!(
+        "Speech synthesized successfully and saved to: {}",
+        path
+    ))
 }
 
 /// Handle a speech_to_text call.

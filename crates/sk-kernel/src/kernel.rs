@@ -200,7 +200,7 @@ impl SovereignKernel {
         let supervisor = Arc::new(crate::supervisor::Supervisor::new());
         let agents = Arc::new(crate::registry::AgentRegistry::new());
         let sandbox_pool = Arc::new(sk_engine::runtime::docker_sandbox::ContainerPool::new());
-        
+
         let mut metering = crate::metering::MeteringEngine::new();
         metering.set_persist_path(config.data_dir.join("metering.json"));
         metering.load().await.ok(); // Ignore errors if file doesn't exist yet
@@ -286,15 +286,22 @@ impl SovereignKernel {
         let config_value = serde_json::Value::Null;
 
         agent_config.checkpoint_handler = Some(Box::new(move |_sess| {
-            k.memory
-                .checkpoint
-                .save(&aid, &sid.0, &config_value, &serde_json::Value::Null, "active")
+            k.memory.checkpoint.save(
+                &aid,
+                &sid.0,
+                &config_value,
+                &serde_json::Value::Null,
+                "active",
+            )
         }));
 
         // 1. Create and store cancellation token
         let token = CancellationToken::new();
         self.active_loops.insert(aid, token.clone());
-        self.event_bus.publish(crate::event_bus::KernelEvent::AgentStarted { agent_id: aid.to_string() });
+        self.event_bus
+            .publish(crate::event_bus::KernelEvent::AgentStarted {
+                agent_id: aid.to_string(),
+            });
 
         // 2. Wrap the loop in a select! to handle cancellation
         let result = tokio::select! {
@@ -309,11 +316,20 @@ impl SovereignKernel {
 
         // 3. Remove token after completion
         self.active_loops.remove(&aid);
-        self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { agent_id: aid.to_string() });
+        self.event_bus
+            .publish(crate::event_bus::KernelEvent::AgentStopped {
+                agent_id: aid.to_string(),
+            });
 
         // Save terminal checkpoint status
         let terminal_status = if result.is_ok() { "completed" } else { "error" };
-        let _ = self.memory.checkpoint.save(&session.agent_id, &session.id.0, &serde_json::Value::Null, &serde_json::Value::Null, terminal_status);
+        let _ = self.memory.checkpoint.save(
+            &session.agent_id,
+            &session.id.0,
+            &serde_json::Value::Null,
+            &serde_json::Value::Null,
+            terminal_status,
+        );
 
         let result = result?;
 
@@ -329,7 +345,10 @@ impl SovereignKernel {
     pub fn stop_agent(&self, id: &AgentId) -> bool {
         if let Some((_, token)) = self.active_loops.remove(id) {
             token.cancel();
-            self.event_bus.publish(crate::event_bus::KernelEvent::AgentStopped { agent_id: id.to_string() });
+            self.event_bus
+                .publish(crate::event_bus::KernelEvent::AgentStopped {
+                    agent_id: id.to_string(),
+                });
             true
         } else {
             false
@@ -391,9 +410,13 @@ impl SovereignKernel {
         let config_value = serde_json::Value::Null;
 
         agent_config.checkpoint_handler = Some(Box::new(move |_sess| {
-            k.memory
-                .checkpoint
-                .save(&aid, &sid.0, &config_value, &serde_json::Value::Null, "active")
+            k.memory.checkpoint.save(
+                &aid,
+                &sid.0,
+                &config_value,
+                &serde_json::Value::Null,
+                "active",
+            )
         }));
 
         // Trigger loop continuation
@@ -405,7 +428,13 @@ impl SovereignKernel {
         .await;
 
         let terminal_status = if result.is_ok() { "completed" } else { "error" };
-        let _ = self.memory.checkpoint.save(&agent_id, &session.id.0, &serde_json::Value::Null, &serde_json::Value::Null, terminal_status);
+        let _ = self.memory.checkpoint.save(
+            &agent_id,
+            &session.id.0,
+            &serde_json::Value::Null,
+            &serde_json::Value::Null,
+            terminal_status,
+        );
 
         // Save session after resurrection
         let _ = self.memory.sessions.save(&session);
@@ -461,11 +490,14 @@ impl SovereignKernel {
                 let statuses = crate::heartbeat::check_agents(&hb_info, &hb_config);
 
                 // Publish presence info to event bus (The Beacon)
-                let active_agents: Vec<String> = statuses.iter()
+                let active_agents: Vec<String> = statuses
+                    .iter()
                     .filter(|s| !s.unresponsive)
                     .map(|s| s.agent_id.to_string())
                     .collect();
-                kernel.event_bus.publish(crate::event_bus::KernelEvent::Presence { active_agents });
+                kernel
+                    .event_bus
+                    .publish(crate::event_bus::KernelEvent::Presence { active_agents });
 
                 for status in statuses {
                     if status.unresponsive {
@@ -584,7 +616,10 @@ impl SovereignKernel {
     }
 
     /// Apply hot-reload actions from a reload plan.
-    pub async fn apply_hot_actions(&self, actions: &[crate::config_reload::HotAction]) -> SovereignResult<()> {
+    pub async fn apply_hot_actions(
+        &self,
+        actions: &[crate::config_reload::HotAction],
+    ) -> SovereignResult<()> {
         for action in actions {
             use crate::config_reload::HotAction::*;
             info!("Applying hot-reload action: {:?}", action);
@@ -596,7 +631,7 @@ impl SovereignKernel {
                         .join("crates")
                         .join("sk-tools")
                         .join("skills");
-            
+
                     if !skills_path.exists() {
                         if let Ok(exe) = std::env::current_exe() {
                             if let Some(parent) = exe.parent() {
@@ -612,7 +647,10 @@ impl SovereignKernel {
                 UpdateCronConfig => {
                     // CronScheduler config updates handled on next invocation
                     let config = self.config.read().await;
-                    info!("Cron configuration updated (max_jobs={}).", config.max_cron_jobs);
+                    info!(
+                        "Cron configuration updated (max_jobs={}).",
+                        config.max_cron_jobs
+                    );
                 }
                 UpdateApprovalPolicy => {
                     // Safety gate policy updates handled on next invocation
@@ -627,8 +665,12 @@ impl SovereignKernel {
                     for server in &config.mcp_servers {
                         let entry = sk_types::config::McpServerEntry {
                             transport: match &server.transport {
-                                sk_types::config::McpTransportEntry::Stdio { .. } => "stdio".to_string(),
-                                sk_types::config::McpTransportEntry::Sse { .. } => "sse".to_string(),
+                                sk_types::config::McpTransportEntry::Stdio { .. } => {
+                                    "stdio".to_string()
+                                }
+                                sk_types::config::McpTransportEntry::Sse { .. } => {
+                                    "sse".to_string()
+                                }
                             },
                             command: match &server.transport {
                                 sk_types::config::McpTransportEntry::Stdio { command, .. } => {
@@ -637,7 +679,9 @@ impl SovereignKernel {
                                 _ => None,
                             },
                             args: match &server.transport {
-                                sk_types::config::McpTransportEntry::Stdio { args, .. } => args.clone(),
+                                sk_types::config::McpTransportEntry::Stdio { args, .. } => {
+                                    args.clone()
+                                }
                                 _ => Vec::new(),
                             },
                             env: match &server.env {
@@ -658,7 +702,9 @@ impl SovereignKernel {
                                     .collect(),
                             },
                             url: match &server.transport {
-                                sk_types::config::McpTransportEntry::Sse { url, .. } => Some(url.clone()),
+                                sk_types::config::McpTransportEntry::Sse { url, .. } => {
+                                    Some(url.clone())
+                                }
                                 _ => None,
                             },
                         };
@@ -668,7 +714,10 @@ impl SovereignKernel {
                     info!("MCP servers hot-reloaded.");
                 }
                 _ => {
-                    warn!("Hot-reload action {:?} is partially implemented or a no-op currently.", action);
+                    warn!(
+                        "Hot-reload action {:?} is partially implemented or a no-op currently.",
+                        action
+                    );
                 }
             }
         }
@@ -697,7 +746,7 @@ async fn init_llm_driver(
     String,
 )> {
     let dm = &config.default_model;
-    
+
     // 1. Initialize primary driver
     let primary_api_key = std::env::var(&dm.api_key_env).unwrap_or_default();
     let (primary_driver, primary_model) = create_driver(
@@ -709,14 +758,14 @@ async fn init_llm_driver(
 
     // 2. Initialize fallbacks
     let mut entries = vec![(primary_model.clone(), primary_driver)];
-    
+
     for fallback in &config.fallback_providers {
         let fb_api_key = if !fallback.api_key_env.is_empty() {
             std::env::var(&fallback.api_key_env).unwrap_or_default()
         } else {
             String::new()
         };
-        
+
         if let Ok((driver, model)) = create_driver(
             &fallback.provider,
             &fallback.model,
@@ -730,7 +779,11 @@ async fn init_llm_driver(
     // 3. Auto-detect additional fallbacks if none were explicitly configured
     if entries.len() == 1 {
         let auto_fallbacks = [
-            ("anthropic", "claude-3-5-sonnet-20241022", "ANTHROPIC_API_KEY"),
+            (
+                "anthropic",
+                "claude-3-5-sonnet-20241022",
+                "ANTHROPIC_API_KEY",
+            ),
             ("openai", "gpt-4o", "OPENAI_API_KEY"),
             ("gemini", "gemini-1.5-pro", "GEMINI_API_KEY"),
             ("groq", "llama-3.3-70b-versatile", "GROQ_API_KEY"),
@@ -743,7 +796,8 @@ async fn init_llm_driver(
             }
             if let Ok(api_key) = std::env::var(env_var) {
                 if !api_key.is_empty() {
-                    if let Ok((driver, model_name)) = create_driver(provider, model, &api_key, None) {
+                    if let Ok((driver, model_name)) = create_driver(provider, model, &api_key, None)
+                    {
                         entries.push((model_name, driver));
                     }
                 }
@@ -751,10 +805,12 @@ async fn init_llm_driver(
         }
     }
 
-    info!(providers = entries.len(), "Sentinel initialized with failover chain");
-    let sentinel: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = Arc::new(
-        sk_engine::sentinel::SentinelDriver::new(entries)
+    info!(
+        providers = entries.len(),
+        "Sentinel initialized with failover chain"
     );
+    let sentinel: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> =
+        Arc::new(sk_engine::sentinel::SentinelDriver::new(entries));
 
     Ok((sentinel, primary_model))
 }

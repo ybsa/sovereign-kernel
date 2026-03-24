@@ -328,7 +328,11 @@ async fn api_audit(state: axum::extract::State<Arc<AppState>>) -> axum::Json<Vec
                 timestamp: log.timestamp,
                 action: log.action_type,
                 agent: log.agent_id.to_string(),
-                details: format!("Mode: {} | Hash: {}", log.execution_mode, &log.hash[..std::cmp::min(8, log.hash.len())]),
+                details: format!(
+                    "Mode: {} | Hash: {}",
+                    log.execution_mode,
+                    &log.hash[..std::cmp::min(8, log.hash.len())]
+                ),
             });
         }
     }
