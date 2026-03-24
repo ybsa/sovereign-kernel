@@ -75,7 +75,7 @@ Telegram / Discord / WhatsApp / Slack / Signal / iMessage / Matrix / IRC / Teams
 
 Sovereign Kernel includes hard limits, global budgeting, and strict gating to prevent runaway costs and unintended damage.
 
-- **Hard Limits**: Default 15 iterations / 200k tokens per task.
+- **Hard Limits**: Unlimited by default. Pass `--max-iterations`, `--max-tokens`, and `--budget-usd` to override via CLI.
 - **Approval Gated**: Dangerous actions require approval — even in unrestricted mode.
 - **Global Budget**: USD cap across all agents (e.g., $5.00 limit) via The Treasury.
 - **Forensics**: Step-by-step JSONL dumps with secrets automatically redacted.

@@ -5,9 +5,9 @@ Sovereign Kernel includes a comprehensive safety system designed to prevent runa
 ## Core Safety Mechanisms
 
 ### 1. Hard Reasoning Limits
-To prevent agents from getting stuck in infinite loops (hallucinating or repeatedly failing at the same step), the kernel enforces:
-- **Max Iterations**: Default **15** LLM calls per task.
-- **Max Tokens**: Default **200,000** total tokens (input + output) per task.
+To prevent agents from getting stuck in infinite loops (hallucinating or repeatedly failing at the same step), the kernel enforces computational bounds. By default, these are **unlimited** (or bound only by the LLM context window), but can be explicitly constrained:
+- **Max Iterations**: `--max-iterations` (Default: Unlimited)
+- **Max Tokens**: `--max-tokens` (Default: Unlimited)
 - **Persona Guidance**: The Witch (Summoner) and Builder (Architect) are programmed to respect these limits when planning missions.
 
 If an agent exceeds these limits, the task is immediately aborted with a `LoopLimitExceeded` error, preventing further token burn.
@@ -34,8 +34,8 @@ Add this to your `kernel.toml` (usually in `~/.Sovereign Kernel/config/`):
 
 ```toml
 [safety]
-max_iterations_per_task = 30          # override default 15
-max_tokens_per_task = 500_000         # override default 200k
+max_iterations_per_task = 30          # local override
+max_tokens_per_task = 500_000         # local override
 total_token_budget_usd_cents = 500    # $5.00 global cap
 step_dump_enabled = true
 approval_whitelist = [
@@ -47,14 +47,14 @@ approval_whitelist = [
 
 ## CLI Usage
 
-You can override these safety settings on the fly:
+You can override these safety settings on the fly for any execution:
 
 ```bash
 # Chat with detailed step logging enabled
-sovereign chat --step-dump
+sovereign chat --step-dump --budget-usd 0.05
 
-# Run a task with a higher iteration limit
-sovereign run "Refactor the whole project" --max-iterations 100
+# Run a task with explicit iteration limits
+sovereign run "Refactor the whole project" --max-iterations 100 --max-tokens 500000
 
 # Start the daemon with a strict $2 budget
 sovereign start --budget-cents 200
