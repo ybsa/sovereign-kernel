@@ -7,13 +7,13 @@ This document serves as both a directory map of the Sovereign Kernel repository 
 To make the AI ecosystem feel cohesive and flavorful, we use specific lore terms in the documentation. For the sake of maintainability, the internal Rust codebase and configuration files retain standard software engineering names.
 
 | Lore Term | Internal/Standard Term | Description |
-|-----------|------------------------|-------------|
+| --- | --- | --- |
 | **The King** | `Orchestrator` / `Kernel` | The central authority and supervisor. He stays in the base, ensures safety, and manages the daemon's lifecycle. |
 | **The Witch** | `Orchestrator` / `NLP` | The high-level seer. She analyzes tasks and "summons" temporary workers (Skeletons). |
 | **The Builder** | `Forge` / `Architect` | The master crafter. He/She "forges" the permanent expert blueprints (Hands). |
 | **The Healer** | `Compactor` | The master of memory. He performs "token healing" by summarizing long histories, ensuring agents don't get overwhelmed and stay sharp. |
-| **PEKA**| `Permanent Agent` / `Hand`| **The Terminal Master.** Dedicated specialist for raw shell management and long-running processes. |
-| **The Grimoires (Hands)**| `Hand` (`sk-hands`) | **Permanent Expert Blueprints.** These are pre-made, high-level roles (like Researcher or Coder) with specialized tools. |
+| **PEKA** | `Permanent Agent` / `Hand` | **The Terminal Master.** Dedicated specialist for raw shell management and long-running processes. |
+| **The Grimoires (Hands)** | `Hand` (`sk-hands`) | **Permanent Expert Blueprints.** These are pre-made, high-level roles (like Researcher or Coder) with specialized tools. |
 | **The Skeletons** | `Worker` / `Sub-Agent` | **Temporary Disposable Workers.** Sandboxed agents summoned by the Witch to perform a specific, isolated task until it is complete. |
 | **The Laboratory** | `Tools` (`sk-tools`) | The collection of functions, actions, and capabilities that agents can execute. |
 | **The Phylactery** | `Memory Substrate` | The SQLite-backed local database where all memories and facts are stored persistently. |
@@ -55,4 +55,5 @@ sovereign-kernel/
 ├── .github/workflows/            # CI/CD (cargo check, clippy, test)
 ├── Cargo.toml                    # Master Workspace Cargo configuration
 └── README.md                     # The Front Page for the Sovereign Kernel
+
 ```

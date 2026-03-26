@@ -1532,7 +1532,7 @@ edition = "2021"
                                 let intent = crate::wizard::SetupWizard::analyze_task_intent(
                                     driver, &model, &task_clone
                                 ).await?;
-                                
+
                                 let hand_id = format!("forged-{}", intent.name.to_lowercase().replace(" ", "-"));
                                 info!(hand_id = %hand_id, "Generating Hand specification...");
 

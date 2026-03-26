@@ -15,7 +15,7 @@ Every email action has real consequences. Be conservative, always draft before s
 Classify every email into one of these buckets:
 
 | Category | Action |
-|----------|--------|
+| --- | --- |
 | **Action required** | Draft reply, notify user |
 | **FYI only** | Read + archive, update knowledge graph |
 | **Waiting for reply** | Check thread age, schedule follow-up |
@@ -25,12 +25,14 @@ Classify every email into one of these buckets:
 ## Email Writing Standards
 
 ### Subject Lines
+
 - Be specific: `"Q2 Budget Review — Action Required by Friday"`
 - Not vague: `"RE: RE: RE: meeting"`
 - Prefix codes: `[ACTION]`, `[FYI]`, `[URGENT]`, `[WAITING]`
 
 ### Body Structure
-```
+
+```text
 [Greeting] — match formality to sender's tone
 
 [Context] — one sentence reference to why you're writing
@@ -40,9 +42,11 @@ Classify every email into one of these buckets:
 [Action] — one explicit ask or next step with deadline
 
 [Signature]
+
 ```
 
 ### Tone Calibration
+
 - Mirror the sender's formality level
 - If unsure, be slightly more formal than necessary
 - Avoid corporate jargon and filler phrases
@@ -50,6 +54,7 @@ Classify every email into one of these buckets:
 ## Draft Mode Protocol
 
 When draft_mode is ON (default):
+
 1. Write the complete email
 2. Present to user: "Ready to send this email:"
 3. Show: To, Subject, Body
@@ -88,6 +93,7 @@ with smtplib.SMTP(host, port) as s:
     s.send_message(msg)
 
 print(f'Sent to TO_ADDRESS at {datetime.now().isoformat()}')
+
 ```
 
 ## IMAP Read Script Template
@@ -105,6 +111,7 @@ mail.login(user, pwd)
 mail.select('INBOX')
 
 # Search unseen
+
 typ, data = mail.search(None, 'UNSEEN')
 ids = data[0].split()[-20:]  # Last 20 unread
 
@@ -125,12 +132,14 @@ for num in ids:
     else:
         body = msg.get_payload(decode=True).decode('utf-8', errors='replace')
     print(f'FROM: {sender}\nDATE: {date}\nSUBJECT: {subject}\n\n{body[:500]}\n---')
+
 ```
 
 ## Contact Knowledge Graph
 
 For every contact encountered:
-```
+
+```json
 knowledge_add_entity({
   "type": "contact",
   "name": "Full Name",
@@ -138,15 +147,18 @@ knowledge_add_entity({
   "company": "Company Name",
   "last_interaction": "ISO date"
 })
+
 ```
 
 ## Follow-up Tracking
 
 When waiting for a reply:
-```
+
+```json
 schedule_create({
   "name": "follow-up: [subject] to [person]",
-  "cron": "0 9 * * 1",  // Next Monday at 9am
+  "cron": "0 9 * * 1",
   "task": "Check if [person] replied to [subject] thread"
 })
+
 ```

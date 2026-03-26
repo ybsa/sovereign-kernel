@@ -71,11 +71,15 @@ Confirm voice + speaker before long output.
 When Peter asks for a "voice" reply (e.g., "crazy scientist voice", "explain in voice"), generate audio and send it:
 
 ```bash
+
 # Generate audio file
+
 sag -v Clawd -o /tmp/voice-reply.mp3 "Your message here"
 
 # Then include in reply:
+
 # MEDIA:/tmp/voice-reply.mp3
+
 ```
 
 Voice character tips:

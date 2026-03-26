@@ -39,6 +39,7 @@ TODO: add Linux CLI support guidance once CodexBar CLI install path is documente
 python {baseDir}/scripts/model_usage.py --provider codex --mode current
 python {baseDir}/scripts/model_usage.py --provider codex --mode all
 python {baseDir}/scripts/model_usage.py --provider claude --mode all --format json --pretty
+
 ```
 
 ## Current model logic
@@ -57,6 +58,7 @@ python {baseDir}/scripts/model_usage.py --provider claude --mode all --format js
 codexbar cost --provider codex --format json > /tmp/cost.json
 python {baseDir}/scripts/model_usage.py --input /tmp/cost.json --mode all
 cat /tmp/cost.json | python {baseDir}/scripts/model_usage.py --input - --mode current
+
 ```
 
 ## Output

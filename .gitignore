@@ -2,14 +2,27 @@
 target/
 **/target/
 
-# OS junk
-.DS_Store
-Thumbs.db
-
-# IDEs
-.vscode/
-
 # Environment and Logs
 .env
 *.log
 logs/
+*.jsonl
+
+# Databases
+*.db
+*.db-wal
+*.db-shm
+
+# Memory Exports
+sovereign_memory_export.*
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini

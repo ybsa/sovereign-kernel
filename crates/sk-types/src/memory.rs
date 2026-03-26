@@ -240,10 +240,12 @@ pub enum ExportFormat {
     Json,
     /// MessagePack binary format.
     MessagePack,
+    /// Human-readable Markdown format.
+    Markdown,
 }
 
 /// Report from memory import.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ImportReport {
     /// Number of entities imported.
     pub entities_imported: u64,
@@ -251,6 +253,8 @@ pub struct ImportReport {
     pub relations_imported: u64,
     /// Number of memories imported.
     pub memories_imported: u64,
+    /// Number of KV pairs imported.
+    pub kv_imported: u64,
     /// Errors encountered during import.
     pub errors: Vec<String>,
 }

@@ -41,6 +41,7 @@ Use this skill immediately when the user asks any of:
 summarize "https://example.com" --model google/gemini-3-flash-preview
 summarize "/path/to/file.pdf" --model google/gemini-3-flash-preview
 summarize "https://youtu.be/dQw4w9WgXcQ" --youtube auto
+
 ```
 
 ## YouTube: summary vs transcript
@@ -49,6 +50,7 @@ Best-effort transcript (URLs only):
 
 ```bash
 summarize "https://youtu.be/dQw4w9WgXcQ" --youtube auto --extract-only
+
 ```
 
 If the user asked for a transcript but it’s huge, return a tight summary first, then ask which section/time range to expand.
@@ -79,6 +81,7 @@ Optional config file: `~/.summarize/config.json`
 
 ```json
 { "model": "openai/gpt-5.2" }
+
 ```
 
 Optional services:

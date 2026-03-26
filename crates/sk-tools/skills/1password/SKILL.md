@@ -59,6 +59,7 @@ tmux -S "$SOCKET" send-keys -t "$SESSION":0.0 -- "op whoami" Enter
 tmux -S "$SOCKET" send-keys -t "$SESSION":0.0 -- "op vault list" Enter
 tmux -S "$SOCKET" capture-pane -p -J -t "$SESSION":0.0 -S -200
 tmux -S "$SOCKET" kill-session -t "$SESSION"
+
 ```
 
 ## Guardrails

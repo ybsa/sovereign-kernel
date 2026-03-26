@@ -10,6 +10,7 @@ runtime: prompt_only
 ## Research Methodology
 
 ### Research Process (5 phases)
+
 1. **Define**: Clarify the question, identify what's known vs unknown, set scope
 2. **Search**: Systematic multi-strategy search across diverse sources
 3. **Evaluate**: Assess source quality, extract relevant data, note limitations
@@ -17,8 +18,9 @@ runtime: prompt_only
 5. **Verify**: Cross-check critical claims, identify remaining uncertainties
 
 ### Question Types & Strategies
+
 | Question Type | Strategy | Example |
-|--------------|----------|---------|
+| --- | --- | --- |
 | Factual | Find authoritative primary source | "What is the population of Tokyo?" |
 | Comparative | Multi-source balanced analysis | "React vs Vue for large apps?" |
 | Causal | Evidence chain + counterfactuals | "Why did Theranos fail?" |
@@ -28,8 +30,10 @@ runtime: prompt_only
 | Controversial | Multiple perspectives + primary sources | "Is remote work more productive?" |
 
 ### Decomposition Technique
+
 Complex questions should be broken into sub-questions:
-```
+
+```text
 Main: "Should our startup use microservices?"
 Sub-questions:
   1. What are microservices? (definitional)
@@ -38,6 +42,7 @@ Sub-questions:
   4. What are the operational costs? (factual)
   5. What do similar startups use? (case studies)
   6. What are the migration paths? (how-to)
+
 ```
 
 ---
@@ -45,42 +50,49 @@ Sub-questions:
 ## CRAAP Source Evaluation Framework
 
 ### Currency
+
 - When was it published or last updated?
 - Is the information still current for the topic?
 - Are the links functional?
 - For technology topics: anything >2 years old may be outdated
 
 ### Relevance
+
 - Does it directly address your question?
 - Who is the intended audience?
 - Is the level of detail appropriate?
 - Would you cite this in your report?
 
 ### Authority
+
 - Who is the author? What are their credentials?
 - What institution published this?
 - Is there contact information?
 - Does the URL domain indicate authority? (.gov, .edu, reputable org)
 
 ### Accuracy
+
 - Is the information supported by evidence?
 - Has it been reviewed or refereed?
 - Can you verify the claims from other sources?
 - Are there factual errors, typos, or broken logic?
 
 ### Purpose
+
 - Why does this information exist?
 - Is it informational, commercial, persuasive, or entertainment?
 - Is the bias clear or hidden?
 - Does the author/organization benefit from you believing this?
 
 ### Scoring
-```
+
+```text
 A (Authoritative):  Passes all 5 CRAAP criteria
 B (Reliable):       Passes 4/5, minor concern on one
 C (Useful):         Passes 3/5, use with caveats
 D (Weak):           Passes 2/5 or fewer
 F (Unreliable):     Fails most criteria, do not cite
+
 ```
 
 ---
@@ -98,6 +110,7 @@ F (Unreliable):     Fails most criteria, do not cite
 **Wildcard**: `"how to * in python"` — fill-in-the-blank
 
 ### Multi-Strategy Search Pattern
+
 For each research question, use at least 3 search strategies:
 1. **Direct**: The question as-is
 2. **Authoritative**: `site:gov OR site:edu OR site:org [topic]`
@@ -107,8 +120,9 @@ For each research question, use at least 3 search strategies:
 6. **Contrarian**: `[topic] criticism` or `[topic] problems` or `[topic] myths`
 
 ### Source Discovery by Domain
+
 | Domain | Best Sources | Search Pattern |
-|--------|-------------|---------------|
+| --- | --- | --- |
 | Technology | Official docs, GitHub, Stack Overflow, engineering blogs | `[tech] documentation`, `site:github.com [tech]` |
 | Science | PubMed, arXiv, Nature, Science | `site:arxiv.org [topic]`, `[topic] systematic review` |
 | Business | SEC filings, industry reports, HBR | `[company] 10-K`, `[industry] report [year]` |
@@ -122,7 +136,8 @@ For each research question, use at least 3 search strategies:
 ## Cross-Referencing Techniques
 
 ### Verification Levels
-```
+
+```text
 Level 1: Single source (unverified)
   → Mark as "reported by [source]"
 
@@ -134,9 +149,11 @@ Level 3: Primary source + secondary confirmation (verified)
 
 Level 4: Expert consensus (well-established)
   → Mark as "widely accepted" or "scientific consensus"
+
 ```
 
 ### Contradiction Resolution
+
 When sources disagree:
 1. Check which source is more authoritative (CRAAP scores)
 2. Check which is more recent (newer may have updated info)
@@ -151,7 +168,8 @@ When sources disagree:
 ## Synthesis Patterns
 
 ### Narrative Synthesis
-```
+
+```text
 The evidence suggests [main finding].
 
 [Source A] found that [finding 1], which is consistent with
@@ -160,10 +178,12 @@ presents a contrasting view: [finding 3].
 
 The weight of evidence favors [conclusion] because [reasoning].
 A key limitation is [gap or uncertainty].
+
 ```
 
 ### Structured Synthesis
-```
+
+```text
 FINDING 1: [Claim]
   Evidence for: [Source A], [Source B] — [details]
   Evidence against: [Source C] — [details]
@@ -172,9 +192,11 @@ FINDING 1: [Claim]
 
 FINDING 2: [Claim]
   ...
+
 ```
 
 ### Gap Analysis
+
 After synthesis, explicitly note:
 - What questions remain unanswered?
 - What data would strengthen the conclusions?
@@ -186,36 +208,47 @@ After synthesis, explicitly note:
 ## Citation Formats
 
 ### Inline URL
-```
+
+```text
 According to a 2024 study (https://example.com/study), the effect was significant.
+
 ```
 
 ### Footnotes
-```
+
+```text
 According to a 2024 study[1], the effect was significant.
 
 ---
 [1] https://example.com/study — "Title of Study" by Author, Published Date
+
 ```
 
 ### Academic (APA)
-```
+
+```text
 In-text: (Smith, 2024)
 Reference: Smith, J. (2024). Title of the article. *Journal Name*, 42(3), 123-145. https://doi.org/10.xxxx
+
 ```
 
 For web sources (APA):
-```
+
+```text
 Author, A. A. (Year, Month Day). Title of page. Site Name. https://url
+
 ```
 
 ### Numbered References
-```
+
+```text
 According to recent research [1], the finding was confirmed by independent analysis [2].
 
 ## References
+
 1. Author (Year). Title. URL
 2. Author (Year). Title. URL
+
 ```
 
 ---
@@ -223,59 +256,80 @@ According to recent research [1], the finding was confirmed by independent analy
 ## Output Templates
 
 ### Brief Report
+
 ```markdown
+
 # [Question]
+
 **Date**: YYYY-MM-DD | **Sources**: N | **Confidence**: high/medium/low
 
 ## Answer
+
 [2-3 paragraph direct answer]
 
 ## Key Evidence
+
 - [Finding 1] — [source]
 - [Finding 2] — [source]
 - [Finding 3] — [source]
 
 ## Caveats
+
 - [Limitation or uncertainty]
 
 ## Sources
+
 1. [Source](url)
 2. [Source](url)
+
 ```
 
 ### Detailed Report
+
 ```markdown
+
 # Research Report: [Question]
+
 **Date**: YYYY-MM-DD | **Depth**: thorough | **Sources Consulted**: N
 
 ## Executive Summary
+
 [1 paragraph synthesis]
 
 ## Background
+
 [Context needed to understand the findings]
 
 ## Methodology
+
 [How the research was conducted, what was searched, how sources were evaluated]
 
 ## Findings
 
 ### [Sub-question 1]
+
 [Detailed findings with inline citations]
 
 ### [Sub-question 2]
+
 [Detailed findings with inline citations]
 
 ## Analysis
+
 [Synthesis across findings, patterns identified, implications]
 
 ## Contradictions & Open Questions
+
 [Areas of disagreement, gaps in knowledge]
 
 ## Confidence Assessment
+
 [Overall confidence level with reasoning]
 
 ## Sources
+
 [Full bibliography in chosen citation format]
+
 ```
 
 ---
@@ -307,6 +361,7 @@ Be aware of these biases during research:
 ## Domain-Specific Research Tips
 
 ### Technology Research
+
 - Always check the official documentation first
 - Compare documentation version with the latest release
 - Stack Overflow answers may be outdated — check the date
@@ -314,12 +369,14 @@ Be aware of these biases during research:
 - Benchmarks without methodology descriptions are unreliable
 
 ### Business Research
+
 - SEC filings (10-K, 10-Q) are the most reliable public company data
 - Press releases are marketing — verify claims independently
 - Analyst reports may have conflicts of interest — check disclaimers
 - Employee reviews (Glassdoor) provide internal perspective but are biased
 
 ### Scientific Research
+
 - Systematic reviews and meta-analyses are strongest evidence
 - Single studies should not be treated as definitive
 - Check if findings have been replicated

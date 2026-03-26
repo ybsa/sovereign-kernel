@@ -61,36 +61,47 @@ Use `imsg` to read and send iMessage/SMS via macOS Messages.app.
 
 ```bash
 imsg chats --limit 10 --json
+
 ```
 
 ### View History
 
 ```bash
+
 # By chat ID
+
 imsg history --chat-id 1 --limit 20 --json
 
 # With attachments info
+
 imsg history --chat-id 1 --limit 20 --attachments --json
+
 ```
 
 ### Watch for New Messages
 
 ```bash
 imsg watch --chat-id 1 --attachments
+
 ```
 
 ### Send Messages
 
 ```bash
+
 # Text only
+
 imsg send --to "+14155551212" --text "Hello!"
 
 # With attachment
+
 imsg send --to "+14155551212" --text "Check this out" --file /path/to/image.jpg
 
 # Specify service
+
 imsg send --to "+14155551212" --text "Hi" --service imessage
 imsg send --to "+14155551212" --text "Hi" --service sms
+
 ```
 
 ## Service Options
@@ -111,12 +122,17 @@ imsg send --to "+14155551212" --text "Hi" --service sms
 User: "Text mom that I'll be late"
 
 ```bash
+
 # 1. Find mom's chat
+
 imsg chats --limit 20 --json | jq '.[] | select(.displayName | contains("Mom"))'
 
 # 2. Confirm with user
+
 # "Found Mom at +1555123456. Send 'I'll be late' via iMessage?"
 
 # 3. Send after confirmation
+
 imsg send --to "+1555123456" --text "I'll be late"
+
 ```

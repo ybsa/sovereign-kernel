@@ -14,6 +14,7 @@ The Voice capability allows agents to interact with the world through sound. It 
 ## Available Tools
 
 ### 1. text_to_speech
+
 Converts written text into high-quality spoken audio.
 - **Parameters**:
   - `text`: The message to speak.
@@ -22,12 +23,14 @@ Converts written text into high-quality spoken audio.
 - **Usage**: Use this to "speak" to the user or generate audio content for other tools.
 
 ### 2. speech_to_text
+
 Transcribes audio files into written text.
 - **Parameters**:
   - `file_path`: Path to an audio file (mp3, wav, etc.).
 - **Usage**: Use this to process voice notes, meeting recordings, or any audio input.
 
 ## Guidelines
+
 - Always ensure `OPENAI_API_KEY` is set in the environment.
 - When generating speech, favor the 'alloy' or 'nova' voices for neutral, clear synthesis.
 - Transcription works best with clear audio and supports multiple languages automatically.

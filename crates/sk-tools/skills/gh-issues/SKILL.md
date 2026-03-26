@@ -12,8 +12,9 @@ You are a king. Follow these 6 phases exactly. Do not skip phases.
 
 IMPORTANT — No `gh` CLI dependency. This skill uses curl + the GitHub REST API exclusively. The GH_TOKEN env var is already injected by OpenClaw. Pass it as a Bearer token in all API calls:
 
-```
+```text
 curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" ...
+
 ```
 
 ---
@@ -33,7 +34,7 @@ Positional:
 
 Flags (all optional):
 | Flag | Default | Description |
-|------|---------|-------------|
+| --- | --- | --- |
 | --label | _(none)_ | Filter by label (e.g. bug, `enhancement`) |
 | --limit | 10 | Max issues to fetch per poll |
 | --milestone | _(none)_ | Filter by milestone title |
@@ -72,33 +73,38 @@ Derived values:
 **Token Resolution:**
 First, ensure GH_TOKEN is available. Check environment:
 
-```
+```text
 echo $GH_TOKEN
+
 ```
 
 If empty, read from config:
 
-```
+```text
 cat ~/.openclaw/openclaw.json | jq -r '.skills.entries["gh-issues"].apiKey // empty'
+
 ```
 
 If still empty, check `/data/.clawdbot/openclaw.json`:
 
-```
+```text
 cat /data/.clawdbot/openclaw.json | jq -r '.skills.entries["gh-issues"].apiKey // empty'
+
 ```
 
 Export as GH_TOKEN for subsequent commands:
 
-```
+```text
 export GH_TOKEN="<token>"
+
 ```
 
 Build and run a curl request to the GitHub Issues API via exec:
 
-```
+```text
 curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/{SOURCE_REPO}/issues?per_page={limit}&state={state}&{query_params}"
+
 ```
 
 Where {query_params} is built from:
@@ -127,7 +133,7 @@ Parse the JSON response. For each issue, extract: number, title, body, labels (a
 Display a markdown table of fetched issues:
 
 | #   | Title                         | Labels        |
-| --- | ----------------------------- | ------------- |
+| --- | --- | --- |
 | 42  | Fix null pointer in parser    | bug, critical |
 | 37  | Add retry logic for API calls | enhancement   |
 
@@ -340,7 +346,7 @@ For each issue, construct the following prompt and pass it to sessions_spawn. Va
 
 When constructing the task, replace all template variables including {notify_channel} with actual values.
 
-```
+```text
 You are a focused code-fix agent. Your task is to fix a single GitHub issue and open a PR.
 
 IMPORTANT: Do NOT use the gh CLI — it is not installed. Use curl with the GitHub REST API for all GitHub operations.
@@ -373,17 +379,19 @@ Body: {body}
 Follow these steps in order. If any step fails, report the failure and stop.
 
 0. SETUP — Ensure GH_TOKEN is available:
+
 ```
 
 export GH_TOKEN=$(node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('/data/.clawdbot/openclaw.json','utf8')); console.log(c.skills?.entries?.['gh-issues']?.apiKey || '')")
 
-```
+```text
 If that fails, also try:
+
 ```
 
 export GH_TOKEN=$(cat ~/.openclaw/openclaw.json 2>/dev/null | node -e "const fs=require('fs');const d=JSON.parse(fs.readFileSync(0,'utf8'));console.log(d.skills?.entries?.['gh-issues']?.apiKey||'')")
 
-```
+```text
 Verify: echo "Token: ${GH_TOKEN:0:10}..."
 
 1. CONFIDENCE CHECK — Before implementing, assess whether this issue is actionable:
@@ -463,6 +471,7 @@ Extract the `html_url` from the response — this is the PR link.
 - Any caveats or concerns
 
 10. NOTIFY (if notify_channel is set) — If {notify_channel} is not empty, send a notification to the Telegram channel:
+
 ```
 
 Use the message tool with:
@@ -478,7 +487,7 @@ Use the message tool with:
 
 Files changed: {files_changed_list}"
 
-```
+```text
 </instructions>
 
 <constraints>
@@ -490,6 +499,7 @@ Files changed: {files_changed_list}"
 - GH_TOKEN is already in the environment — do NOT prompt for auth
 - Time limit: you have 60 minutes max. Be thorough — analyze properly, test your fix, don't rush.
 </constraints>
+
 ```
 
 ### Spawn configuration per sub-agent:
@@ -515,7 +525,7 @@ After ALL sub-agents complete (or timeout), collect their results. Store the lis
 Present a summary table:
 
 | Issue                 | Status    | PR                             | Notes                          |
-| --------------------- | --------- | ------------------------------ | ------------------------------ |
+| --- | --- | --- | --- |
 | #42 Fix null pointer  | PR opened | https://github.com/.../pull/99 | 3 files changed                |
 | #37 Add retry logic   | Failed    | --                             | Could not identify target code |
 | #15 Update docs       | Timed out | --                             | Too complex for auto-fix       |
@@ -535,7 +545,7 @@ End with a one-line summary:
 **Send notification to channel (if --notify-channel is set):**
 If `--notify-channel` was provided, send the final summary to that Telegram channel using the `message` tool:
 
-```
+```text
 Use the message tool with:
 - action: "send"
 - channel: "telegram"
@@ -548,6 +558,7 @@ Processed {N} issues: {success} PRs opened, {failed} failed, {skipped} skipped.
 
 Where PR_LIST includes only successfully opened PRs in format:
 • #{issue_number}: {PR_url} ({notes})
+
 ```
 
 Then proceed to Phase 6.
@@ -589,9 +600,10 @@ Collect PRs to check for review comments:
 
 **If `--reviews-only` or subsequent watch cycle:** Fetch all open PRs with `fix/issue-` branch pattern:
 
-```
+```text
 curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/{SOURCE_REPO}/pulls?state=open&per_page=100"
+
 ```
 
 Filter to only PRs where `head.ref` starts with `fix/issue-`.
@@ -606,23 +618,26 @@ For each PR, fetch reviews from multiple sources:
 
 **Fetch PR reviews:**
 
-```
+```text
 curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/{SOURCE_REPO}/pulls/{pr_number}/reviews"
+
 ```
 
 **Fetch PR review comments (inline/file-level):**
 
-```
+```text
 curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/{SOURCE_REPO}/pulls/{pr_number}/comments"
+
 ```
 
 **Fetch PR issue comments (general conversation):**
 
-```
+```text
 curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/{SOURCE_REPO}/issues/{pr_number}/comments"
+
 ```
 
 **Fetch PR body for embedded reviews:**
@@ -631,9 +646,10 @@ Some review tools (like Greptile) embed their feedback directly in the PR body. 
 - `<!-- greptile_comment -->` markers
 - Other structured review sections in the PR body
 
-```
+```text
 curl -s -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
   "https://api.github.com/repos/{SOURCE_REPO}/pulls/{pr_number}"
+
 ```
 
 Extract the `body` field and parse for embedded review content.
@@ -642,8 +658,9 @@ Extract the `body` field and parse for embedded review content.
 
 **Determine the bot's own username** for filtering:
 
-```
+```text
 curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/user | jq -r '.login'
+
 ```
 
 Store as `BOT_USERNAME`. Exclude any comment where `user.login` equals `BOT_USERNAME`.
@@ -693,11 +710,12 @@ If no actionable comments found across any PR, report "No actionable review comm
 
 Display a table of PRs with pending actionable comments:
 
-```
+```text
 | PR | Branch | Actionable Comments | Sources |
-|----|--------|---------------------|---------|
+| --- | --- | --- | --- |
 | #99 | fix/issue-42 | 2 comments | @reviewer1, greptile |
 | #101 | fix/issue-37 | 1 comment | @reviewer2 |
+
 ```
 
 If `--yes` is NOT set and this is not a subsequent watch poll: ask the user to confirm which PRs to address ("all", comma-separated PR numbers, or "skip").
@@ -708,7 +726,7 @@ For each PR with actionable comments, spawn a sub-agent. Launch up to 8 concurre
 
 **Review fix sub-agent prompt:**
 
-```
+```text
 You are a PR review handler agent. Your task is to address review comments on a pull request by making the requested changes, pushing updates, and replying to each comment.
 
 IMPORTANT: Do NOT use the gh CLI — it is not installed. Use curl with the GitHub REST API for all GitHub operations.
@@ -743,11 +761,12 @@ Each comment has:
 Follow these steps in order:
 
 0. SETUP — Ensure GH_TOKEN is available:
+
 ```
 
 export GH_TOKEN=$(node -e "const fs=require('fs'); const c=JSON.parse(fs.readFileSync('/data/.clawdbot/openclaw.json','utf8')); console.log(c.skills?.entries?.['gh-issues']?.apiKey || '')")
 
-```
+```text
 Verify: echo "Token: ${GH_TOKEN:0:10}..."
 
 1. CHECKOUT — Switch to the PR branch:
@@ -814,6 +833,7 @@ For comments you could NOT address, reply explaining why:
 - GH_TOKEN is already in the environment — do not prompt for auth
 - Time limit: 60 minutes max
 </constraints>
+
 ```
 
 **Spawn configuration per sub-agent:**
@@ -826,11 +846,12 @@ For comments you could NOT address, reply explaining why:
 
 After all review sub-agents complete, present a summary:
 
-```
+```text
 | PR | Comments Addressed | Comments Skipped | Commit | Status |
-|----|-------------------|-----------------|--------|--------|
+| --- | --- | --- | --- | --- |
 | #99 fix/issue-42 | 3 | 0 | abc123f | All addressed |
 | #101 fix/issue-37 | 1 | 1 | def456a | 1 needs manual review |
+
 ```
 
 Add comment IDs from this batch to `ADDRESSED_COMMENTS` set to prevent re-processing.

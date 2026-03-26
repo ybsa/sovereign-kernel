@@ -21,6 +21,7 @@ Transcribe an audio file via OpenAI’s `/v1/audio/transcriptions` endpoint.
 
 ```bash
 {baseDir}/scripts/transcribe.sh /path/to/audio.m4a
+
 ```
 
 Defaults:
@@ -35,6 +36,7 @@ Defaults:
 {baseDir}/scripts/transcribe.sh /path/to/audio.m4a --language en
 {baseDir}/scripts/transcribe.sh /path/to/audio.m4a --prompt "Speaker names: Peter, Daniel"
 {baseDir}/scripts/transcribe.sh /path/to/audio.m4a --json --out /tmp/transcript.json
+
 ```
 
 ## API key
@@ -49,4 +51,5 @@ Set `OPENAI_API_KEY`, or configure it in `~/.openclaw/openclaw.json`:
     },
   },
 }
+
 ```

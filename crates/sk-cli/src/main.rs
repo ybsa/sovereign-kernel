@@ -23,6 +23,7 @@ mod doctor;
 mod hands;
 mod init;
 mod mcp;
+mod memory;
 mod middleware;
 mod openai_compat;
 mod run;
@@ -156,6 +157,9 @@ enum Commands {
     Doctor,
     /// Manage budgets and track LLM costs
     Treasury(treasury::TreasuryArgs),
+    /// Manage and export agent memory
+    #[command(subcommand)]
+    Memory(memory::MemoryCommands),
 }
 
 #[tokio::main]
@@ -299,6 +303,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Channels { action, channel } => {
             channels::run(config, &action, channel.as_deref()).await?;
+        }
+        Commands::Memory(command) => {
+            memory::handle_memory_command(command).await?;
         }
     }
 

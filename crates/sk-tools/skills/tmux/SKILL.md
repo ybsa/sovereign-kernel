@@ -32,7 +32,7 @@ Control tmux sessions by sending keystrokes and reading output. Essential for ma
 ## Example Sessions
 
 | Session                 | Purpose                     |
-| ----------------------- | --------------------------- |
+| --- | --- |
 | `shared`                | Primary interactive session |
 | `skeleton-2` - `skeleton-8` | Parallel skeleton sessions    |
 
@@ -43,62 +43,83 @@ Control tmux sessions by sending keystrokes and reading output. Essential for ma
 ```bash
 tmux list-sessions
 tmux ls
+
 ```
 
 ### Capture Output
 
 ```bash
+
 # Last 20 lines of pane
+
 tmux capture-pane -t shared -p | tail -20
 
 # Entire scrollback
+
 tmux capture-pane -t shared -p -S -
 
 # Specific pane in window
+
 tmux capture-pane -t shared:0.0 -p
+
 ```
 
 ### Send Keys
 
 ```bash
+
 # Send text (doesn't press Enter)
+
 tmux send-keys -t shared "hello"
 
 # Send text + Enter
+
 tmux send-keys -t shared "y" Enter
 
 # Send special keys
+
 tmux send-keys -t shared Enter
 tmux send-keys -t shared Escape
 tmux send-keys -t shared C-c          # Ctrl+C
 tmux send-keys -t shared C-d          # Ctrl+D (EOF)
 tmux send-keys -t shared C-z          # Ctrl+Z (suspend)
+
 ```
 
 ### Window/Pane Navigation
 
 ```bash
+
 # Select window
+
 tmux select-window -t shared:0
 
 # Select pane
+
 tmux select-pane -t shared:0.1
 
 # List windows
+
 tmux list-windows -t shared
+
 ```
 
 ### Session Management
 
 ```bash
+
 # Create new session
+
 tmux new-session -d -s newsession
 
 # Kill session
+
 tmux kill-session -t sessionname
 
 # Rename session
+
 tmux rename-session -t old new
+
 ```
 
 ## Sending Input Safely
@@ -109,6 +130,7 @@ For interactive TUIs (Claude Code, Codex, etc.), split text and Enter into separ
 tmux send-keys -t shared -l -- "Please apply the patch in src/foo.ts"
 sleep 0.1
 tmux send-keys -t shared Enter
+
 ```
 
 ## Claude Code Session Patterns
@@ -116,18 +138,25 @@ tmux send-keys -t shared Enter
 ### Check if Session Needs Input
 
 ```bash
+
 # Look for prompts
+
 tmux capture-pane -t skeleton-3 -p | tail -10 | grep -E "❯|Yes.*No|proceed|permission"
+
 ```
 
 ### Approve Claude Code Prompt
 
 ```bash
+
 # Send 'y' and Enter
+
 tmux send-keys -t skeleton-3 'y' Enter
 
 # Or select numbered option
+
 tmux send-keys -t skeleton-3 '2' Enter
+
 ```
 
 ### Check All Sessions Status
@@ -137,12 +166,14 @@ for s in shared skeleton-2 skeleton-3 skeleton-4 skeleton-5 skeleton-6 skeleton-
   echo "=== $s ==="
   tmux capture-pane -t $s -p 2>/dev/null | tail -5
 done
+
 ```
 
 ### Send Task to Session
 
 ```bash
 tmux send-keys -t skeleton-4 "Fix the bug in auth.js" Enter
+
 ```
 
 ## Notes

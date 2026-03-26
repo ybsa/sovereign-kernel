@@ -3451,6 +3451,7 @@ dependencies = [
  "sha2",
  "sk-types",
  "tempfile",
+ "tokio",
  "tokio-test",
  "tracing",
  "uuid",

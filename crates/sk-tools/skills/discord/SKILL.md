@@ -39,6 +39,7 @@ Send message:
   "message": "hello",
   "silent": true
 }
+
 ```
 
 Send with media:
@@ -51,6 +52,7 @@ Send with media:
   "message": "see attachment",
   "media": "file:///tmp/example.png"
 }
+
 ```
 
 - Optional `silent: true` to suppress Discord notifications.
@@ -65,6 +67,7 @@ Send with components v2 (recommended for rich UI):
   "message": "Status update",
   "components": "[Carbon v2 components]"
 }
+
 ```
 
 - `components` expects Carbon component instances (Container, TextDisplay, etc.) from JS/TS integrations.
@@ -80,6 +83,7 @@ Legacy embeds (not recommended):
   "message": "Status update",
   "embeds": [{ "title": "Legacy", "description": "Embeds are legacy." }]
 }
+
 ```
 
 - `embeds` are ignored when components v2 are present.
@@ -94,6 +98,7 @@ React:
   "messageId": "456",
   "emoji": "✅"
 }
+
 ```
 
 Read:
@@ -105,6 +110,7 @@ Read:
   "to": "channel:123",
   "limit": 20
 }
+
 ```
 
 Edit / delete:
@@ -117,6 +123,7 @@ Edit / delete:
   "messageId": "456",
   "message": "fixed typo"
 }
+
 ```
 
 ```json
@@ -126,6 +133,7 @@ Edit / delete:
   "channelId": "123",
   "messageId": "456"
 }
+
 ```
 
 Poll:
@@ -140,6 +148,7 @@ Poll:
   "pollMulti": false,
   "pollDurationHours": 24
 }
+
 ```
 
 Pins:
@@ -151,6 +160,7 @@ Pins:
   "channelId": "123",
   "messageId": "456"
 }
+
 ```
 
 Threads:
@@ -163,6 +173,7 @@ Threads:
   "messageId": "456",
   "threadName": "bug triage"
 }
+
 ```
 
 Search:
@@ -176,6 +187,7 @@ Search:
   "channelIds": ["123", "456"],
   "limit": 10
 }
+
 ```
 
 Presence (often gated):
@@ -188,6 +200,7 @@ Presence (often gated):
   "activityName": "with fire",
   "status": "online"
 }
+
 ```
 
 ## Writing Style (Discord)

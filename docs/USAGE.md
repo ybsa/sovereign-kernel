@@ -1,235 +1,425 @@
-# 📖 Sovereign Kernel — Usage Guide
+# Sovereign Kernel — Usage Guide
 
-## 🚀 Quick Start
+## Table of Contents
+
+- [Getting Started](#getting-started)
+- [CLI Commands](#cli-commands)
+- [Agent Configuration](#agent-configuration)
+- [Memory Management](#memory-management)
+- [Tool Reference](#tool-reference)
+- [Execution Modes](#execution-modes)
+- [Autonomous Scheduling](#autonomous-scheduling)
+- [Hands (Capability Agents)](#hands-capability-agents)
+- [Web Dashboard](#web-dashboard)
+- [Audit Trail](#audit-trail)
+- [Agent Identity (Soul Files)](#agent-identity-soul-files)
+- [Token Efficiency (The Healer)](#token-efficiency-the-healer)
+- [Configuration Reference](#configuration-reference)
+
+---
+
+## Getting Started
 
 ### 1. Build
+
 ```bash
 cargo build --release
+
 ```
 
 ### 2. First-Time Setup
+
 ```bash
-./target/release/sovereign init       # Interactive setup wizard
+sovereign init
+
 ```
-Sets up your LLM API key, execution mode, and agent identity.
 
-### 3. Run
+This interactive wizard will:
 
-| Command | What It Does |
-|---------|-------------|
+- Detect available LLM API keys in your environment
+- Validate connectivity to your chosen provider
+- Generate `~/.sovereign-kernel/config.toml`
+- Set your default execution mode
+
+### 3. Verify
+
+```bash
+sovereign doctor        # Checks API keys, system deps, connectivity
+
+```
+
+### 4. Run
+
+| Command | Description |
+| --- | --- |
 | `sovereign chat` | Interactive terminal REPL |
-| `sovereign chat --budget-usd 0.05` | Chat with an explicit financial budget cap |
+| `sovereign chat --budget-usd 0.05` | Chat with an explicit spending cap |
+| `sovereign run "<task>"` | Run a task autonomously |
+| `sovereign run "<task>" --max-iterations 30` | Run with explicit loop limits |
+| `sovereign do "<task>"` | Fast alias for `run` |
 | `sovereign start` | Start as foreground daemon |
-| `sovereign start --detach` | Start as detached background daemon |
-| `sovereign run "<task>"` | Run a task autonomously (NL Builder auto-detects mode) |
-| `sovereign run "<task>" --max-iterations 30` | Run with explicitly defined loop iteration limits |
-| `sovereign do "<task>"` | Fast alias for `run` — just do it. |
-| `sovereign run "<task>" --schedule "..."` | Schedule a recurring cron task |
-| `sovereign status` | Village overview — agents, jobs, daemon status |
+| `sovereign start --detach` | Start as background daemon |
+| `sovereign status` | Village overview (agents, jobs, daemon status) |
 | `sovereign kill <agent-id>` | Kill a specific agent |
 | `sovereign kill` | Stop the daemon |
-| `sovereign mcp list\|add <name>` | Manage dynamic MCP Tool servers |
-| `sovereign dashboard` | Open terminal web dashboard |
-| `sovereign hands list` | List all 30+ bundled hands |
-| `sovereign audit logs` | View cryptographic audit trail |
+| `sovereign dashboard` | Open web dashboard (The Watchtower) |
 
 ---
 
-## 🛠️ Setting Your LLM API Key
+## CLI Commands
 
-Add to your `.env` file in the project root (the kernel auto-detects which key is set):
+### Core
+
+```bash
+sovereign init                            # First-run wizard
+sovereign chat                            # Interactive REPL
+sovereign run "<task>"                    # Autonomous task execution
+sovereign run "<task>" --mode unrestricted # Full host access
+sovereign run "<task>" --schedule "cron"   # Scheduled recurring task
+sovereign start [--detach]                # Daemon lifecycle
+sovereign status                          # Village overview
+sovereign kill [<agent-id>]              # Stop agent or daemon
+sovereign doctor                          # System diagnostics
+
+```
+
+### Memory
+
+```bash
+sovereign memory stats                    # Agent count, memory entries
+sovereign memory export --format json     # Export brain to JSON
+sovereign memory export --format markdown # Human-readable export
+sovereign memory import --input <file>    # Restore brain from file
+
+```
+
+### Management
+
+```bash
+sovereign hands list                      # All 30+ bundled hands
+sovereign hands activate <name>           # Start a capability hand
+sovereign hands status                    # Running hand instances
+sovereign dashboard [--port 8080]         # Embedded web dashboard
+sovereign audit logs                      # Cryptographic audit trail
+sovereign audit verify                    # Verify Merkle chain integrity
+sovereign treasury status                 # Budget and spending
+sovereign mcp list                        # Active MCP tool servers
+sovereign mcp add <name> <cmd>            # Add MCP tool server
+sovereign channels list                   # Configured channel adapters
+sovereign usage                           # Cost report (The Chronicler)
+sovereign tunnel --tailscale|--ssh        # Remote access (The Cartographer)
+
+```
+
+---
+
+## Agent Configuration
+
+### Providing API Keys
+
+Drop keys in your `.env` file in the project root:
 
 ```env
-ANTHROPIC_API_KEY=your-key   # Claude (recommended)
-OPENAI_API_KEY=your-key      # GPT-4o
-GEMINI_API_KEY=your-key      # Google Gemini
-GROQ_API_KEY=your-key        # Llama 3 (free tier)
-GITHUB_TOKEN=your-token      # GitHub Copilot
+ANTHROPIC_API_KEY=your-key     # Claude (recommended)
+OPENAI_API_KEY=your-key        # GPT-4o
+GEMINI_API_KEY=your-key        # Google Gemini
+GROQ_API_KEY=your-key          # Llama 3 (free tier)
+GITHUB_TOKEN=your-token        # GitHub Copilot
+
 ```
 
----
+The kernel auto-detects which key is set. See `.env.example` for all supported variables.
 
-## 🖥️ Terminal Web Dashboard
+### Budget Controls
+
+Every session and task supports configurable limits:
 
 ```bash
-sovereign dashboard              # Opens at http://localhost:8080
-sovereign dashboard --port 9090  # Custom port
-sovereign dashboard --no-open    # Don't auto-open browser
+
+# Per-session budget
+
+sovereign chat --budget-usd 2.00 --max-tokens 50000 --max-iterations 50
+
+# Per-task budget
+
+sovereign run "task" --budget-usd 1.00 --max-iterations 30
+
 ```
 
-The dashboard is **fully embedded in the binary** — no Node.js, no npm.
-
-Features:
-- Live agent and hand status panel
-- Real-time log stream (every tool call and result)
-- Approval queue for risky actions
-- REST API at `/api/status`, `/api/hands`, `/api/agents`
+- `--budget-usd` — Hard spending cap in USD
+- `--max-tokens` — Maximum LLM tokens consumed
+- `--max-iterations` — Maximum tool-call loop iterations
 
 ---
 
-## ⏰ Autonomous Background Scheduling (Phase 16)
+## Memory Management
 
-Agents possess a `CronScheduler` that allows them to book tasks for the future in the background.
+### Architecture
 
-To use background scheduling, **you must have the daemon running**:
-```bash
-sovereign start
-```
+The Archive provides four memory stores, all backed by a single SQLite database with WAL mode:
 
-Once running, you can connect via `sovereign chat` and tell your agent to:
-> "Schedule a task to check the weather every 1 hour and email me a summary at 8 AM."
+| Store | Engine | Description |
+| --- | --- | --- |
+| **Structured** | SQLite KV | Persistent key-value pairs (preferences, state) |
+| **Semantic** | Vector cosine | Similarity-based memory recall with embeddings |
+| **Full-Text** | FTS5 BM25 | Keyword search with ranking |
+| **Knowledge** | Entity-Relation | Typed entities and relationships |
 
-The agent will use the `schedule_create` tool. The daemon will monitor the time in the background and automatically wake the agent up precisely when the task is due, completely seamlessly.
-
----
-
-## 🖐️ Managing Hands
-
-Hands are autonomous capability agents you can activate:
+### CLI Operations
 
 ```bash
-sovereign hands list                  # Show all 30+ hands with requirements
-sovereign hands activate browser      # Start the browser automation hand
-sovereign hands activate web-search   # Start the web research hand
-sovereign hands activate email        # Start the email management hand
-sovereign hands status                # Show all running hand instances
-sovereign hands deactivate <uuid>     # Stop a specific hand
+
+# View current memory statistics
+
+sovereign memory stats
+
+# Export everything to JSON (full data retention)
+
+sovereign memory export --format json --output backup.json
+
+# Export as human-readable Markdown
+
+sovereign memory export --format markdown --output knowledge.md
+
+# Import/restore from a previous export
+
+sovereign memory import --input backup.json
+
 ```
 
-### Setting Up the Email Hand
-Add to your `.env`:
-```env
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=you@gmail.com
-SMTP_PASS=your-app-password
-IMAP_HOST=imap.gmail.com
-```
+> **Important:** JSON import provides full restoration of all data types. Markdown import only restores semantic memories (lossy).
 
-### Setting Up the Web Search Hand
-Add to your `.env`:
-```env
-BRAVE_API_KEY=your-key    # or TAVILY_API_KEY
-```
+### Agent Memory Tools
+
+Agents use these tools for runtime memory operations:
+
+| Tool | Description |
+| --- | --- |
+| `remember` | Store information in long-term memory |
+| `recall` | Search memory by keyword (BM25) or similarity (vector) |
+| `forget` | Delete a specific memory by ID |
+| `memory_store` | Persistent key-value set |
+| `memory_recall` | Persistent key-value get |
+| `knowledge_add_entity` | Add entity to the knowledge graph |
+| `shared_memory_store` | Store in cross-agent shared memory |
+| `shared_memory_recall` | Search the global knowledge pool |
 
 ---
 
-## 🛡️ Execution Modes
+## Tool Reference
 
-### Sandbox Mode *(Default — Recommended)*
-- All file/shell actions require approval (`config.toml`: `mode = "Sandbox"`)
-- File access restricted to workspace directory
-- Shell commands must be on the allowlist (`exec_policy.allowed_commands`)
+### Standard Tools (Available in Both Modes)
 
-### Unrestricted Mode
-- No approval gates — agent acts autonomously
-- Full filesystem and shell access
-- Use `config.unrestricted.toml` for trusted local automation:
-```bash
-sovereign --config config.unrestricted.toml chat
-```
-
----
-
-## 🧰 The Laboratory: Built-In Tools Available to Agents
-
-| Laboratory Tool | Description |
-|------|-------------|
-| `shell_exec` | Run terminal commands (ExecPolicy enforced in Sandbox). Supports `use_sandbox` flag for Docker. |
-| `file_read` / `file_write` | Read/write files (path-sanitized) |
+| Tool | Description |
+| --- | --- |
+| `shell_exec` | Run terminal commands (ExecPolicy enforced in Sandbox) |
+| `file_read` / `file_write` | Read/write files (path-sandboxed) |
 | `file_list` / `file_delete` | Browse and manage filesystem |
 | `web_fetch` | Fetch and extract text from URLs |
-| `web_search` | Search the web (requires BRAVE_API_KEY or TAVILY_API_KEY) |
-| `code_exec` | Run scripts natively or in Docker (supports `use_sandbox` flag). |
+| `web_search` | Search the web (requires `BRAVE_API_KEY` or `TAVILY_API_KEY`) |
+| `code_exec` | Run scripts natively or in Docker sandbox |
 | `browser_navigate` | Open URLs via native Chromium automation |
 | `browser_click` / `browser_type` | Interact with web pages |
 | `browser_screenshot` | Capture screenshots |
-| `memory_store` / `memory_recall` | Persistent key-value memory |
-| `knowledge_add_entity` | Add to knowledge graph |
 | `schedule_create` / `schedule_list` | Manage cron-based tasks |
-| `get_skill` / `list_skills` | Access 52 expert skill prompts |
-| `agent_message` | Send a direct message to another active agent |
-| `text_to_speech` | Convert text to speech audio (MP3) via OpenAI |
-| `speech_to_text` | Transcribe audio files to text via OpenAI Whisper |
-| `summon_skeleton` | The Witch dynamically summons sandboxed workers for parallel tasks |
-| `check_skeleton` | Check the status of a worker summoned by the Witch |
-| `shared_memory_store` | Store facts in global shared memory |
-| `shared_memory_recall` | Search the global shared knowledge pool |
-| `builder` | The Builder (Architect) forges a permanent Village member (Hand) |
-| `host_desktop_control` | Change wallpaper, toggle dark mode, OS notifications (Unrestricted) |
-| `host_system_config` | Read/edit system configs, manage services (Unrestricted) |
-| `host_install_app` | Install apps via winget/apt/brew (Unrestricted, Critical risk) |
-| `host_read_file` / `host_write_file` | Full filesystem access outside sandbox (Unrestricted) |
-| `host_list_dir` | List any directory on the host (Unrestricted) |
+| `get_skill` / `list_skills` | Access 106+ expert skill prompts |
+| `agent_message` | Send message to another active agent |
+| `text_to_speech` | Convert text to speech (OpenAI TTS-1) |
+| `speech_to_text` | Transcribe audio (OpenAI Whisper) |
+| `summon_skeleton` | Summon a sandboxed worker (The Witch) |
+| `check_skeleton` | Check worker status |
+| `builder` | Create a permanent Village member (Hand) |
+
+### Host Tools (Unrestricted Mode Only)
+
+| Tool | Risk Level | Description |
+| --- | --- | --- |
+| `host_desktop_control` | Medium | Wallpaper, dark mode, OS notifications |
+| `host_system_config` | High | Read/edit system configs, manage services |
+| `host_install_app` | Critical | Install apps via winget/apt/brew |
+| `host_read_file` / `host_write_file` | High | Full filesystem access outside sandbox |
+| `host_list_dir` | Low | List any directory on the host |
+
+All host tools have risk-tiered approval gates.
 
 ---
 
-## 📊 Audit Trail
+## Execution Modes
 
-Every agent action is cryptographically logged in a Merkle chain:
+### Sandbox Mode (Default)
+
+- All file/shell actions require user approval
+- File access restricted to workspace directory
+- Shell commands must be on the allowlist
+
+```bash
+sovereign chat                    # Sandbox by default
+
+```
+
+### Unrestricted Mode
+
+- No approval gates — agent acts autonomously
+- Full filesystem and shell access
+- Required for host tools
+
+```bash
+sovereign chat --mode unrestricted
+sovereign run "task" --mode unrestricted
+
+```
+
+---
+
+## Autonomous Scheduling
+
+The kernel includes a built-in `CronScheduler` for background task execution.
+
+### Requirements
+
+The daemon must be running:
+
+```bash
+sovereign start --detach
+
+```
+
+### Usage
+
+Tell your agent naturally:
+
+> "Schedule a task to check the weather every hour and email me a summary at 8 AM."
+
+Or via CLI:
+
+```bash
+sovereign run "Monitor disk usage" --schedule "*/30 * * * *"
+
+```
+
+The agent uses the `schedule_create` tool internally. The daemon monitors timing and wakes the agent automatically.
+
+---
+
+## Hands (Capability Agents)
+
+Hands are autonomous capability packages with their own tool access:
+
+```bash
+sovereign hands list                  # Show all 30+ hands
+sovereign hands activate browser      # Start browser automation
+sovereign hands activate web-search   # Start web research
+sovereign hands activate email        # Start email management
+sovereign hands status                # Show running instances
+sovereign hands deactivate <uuid>     # Stop a hand
+
+```
+
+### Bundled Hands
+
+| Hand | Category | Description |
+| --- | --- | --- |
+| **browser** | Automation | CDP-based web browser automation |
+| **researcher** | Research | Multi-source deep research with citations |
+| **web-search** | Research | Brave/Tavily web search + reports |
+| **clip** | Content | Clipboard-to-note capture |
+| **collector** | Data | Structured data collection and archival |
+| **lead** | Sales | Autonomous lead research |
+| **predictor** | Analytics | Trend analysis and forecasting |
+| **email** | Communication | SMTP/IMAP email management |
+| **twitter** | Social | Twitter/X monitoring |
+| **otto** | Builder | Docker-sandboxed code execution |
+| **mysql-reporter** | Data | MySQL reporting and dashboards |
+| **peka** | Terminal | The Terminal Master — shell expert |
+
+### Required Environment Variables
+
+| Hand | Required |
+| --- | --- |
+| **email** | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `IMAP_HOST` |
+| **web-search** | `BRAVE_API_KEY` or `TAVILY_API_KEY` |
+| **twitter** | `TWITTER_API_KEY`, `TWITTER_API_SECRET` |
+
+---
+
+## Web Dashboard
+
+The Watchtower is an embedded web dashboard — no Node.js, no npm, zero extra dependencies.
+
+```bash
+sovereign dashboard                   # Opens at http://localhost:8080
+sovereign dashboard --port 9090       # Custom port
+sovereign dashboard --no-open         # Don't auto-open browser
+
+```
+
+### Features
+
+- **Three-pane layout**: agent panel, live log stream, command bar
+- **Real-time monitoring**: uptime, active hands, approval queue
+- **The Gatekeeper**: approve/deny blocked actions and network requests
+- **WebChat**: embedded chat interface
+- **Usage analytics**: cost breakdown by agent/model
+- **REST API**: `/api/status`, `/api/hands`, `/api/agents`
+
+---
+
+## Audit Trail
+
+Every agent action is logged in a tamper-evident cryptographic Merkle chain:
+
 ```bash
 sovereign audit logs              # View recent audit entries
 sovereign audit verify            # Verify chain integrity (detects tampering)
+
 ```
 
-Audit entries include: agent ID, action type, timestamp, and SHA-256 chained hash.
+Each entry contains: agent ID, action type, timestamp, and SHA-256 chained hash.
 
 ---
 
-## 🏘️ The Village — Agent Ecosystem
-
-Sovereign Kernel is a living **Agent Village** — agents communicate, delegate, recover from crashes, and can be spawned from plain English.
-
-### Natural Language Builder
-Instead of writing agent manifests, just describe what you want:
-```bash
-sovereign run "Monitor my inbox and summarize new emails every hour"
-```
-The kernel auto-detects the right tools, mode, and scheduling. The **Witch (Summoner)** plans the mission, while the **Builder (Architect)** forges the Hand.
-
-### Crash Recovery (The Resurrector)
-Agents save checkpoints every 30 seconds. If an agent crashes, the Supervisor automatically restarts it from the last checkpoint with a `[Resurrector] Restarted from checkpoint` system message.
-
-### Host Tools (Unrestricted Mode)
-In unrestricted mode, agents gain full host access:
-- Desktop control (wallpaper, dark mode, notifications)
-- System configuration
-- App installation (`winget`/`apt`/`brew`)
-- Unrestricted filesystem access
-
-All host tools have **risk-tiered approval gates** (Low → Medium → High → Critical).
-
-### Agent Messaging & Spawning
-Agents send direct messages via the **Inter-Agent Bus**. Manager agents **summon** sandboxed workers (Skeletons) via the Witch's specialized tools. Shared Memory enables cross-agent knowledge sharing.
-
----
-
-## ⚕️ The Healer (Token Efficiency)
-
-Sovereign Kernel natively implements **The Healer**, a background mechanism designed to keep token usage low and prevent model hallucination during long tasks:
-- **Smart Truncation**: If a tool like `shell_exec` returns over 8,000 characters, The Healer injects a warning marker and preserves only the head and tail.
-- **Conversation Compaction**: When the context window fills up (80% budget), the agent automatically condenses older messages into a "Ground-Truth State Manifest" stored in memory, while keeping the most recent 10 messages raw for immediate context.
-
----
-
-## 🧬 Agent Identity
+## Agent Identity (Soul Files)
 
 Edit `soul/SOUL.md` to customize your agent's name, personality, and behavioral constraints. The kernel loads this at startup and injects it into every agent's system prompt.
 
+| File | Purpose |
+| --- | --- |
+| `soul/SOUL.md` | Agent personality, rules, available tools |
+| `soul/IDENTITY.md` | Communication style, behavioral boundaries |
+| `soul/AGENTS.md` | Village hierarchy and inter-agent roles |
+| `soul/MEMORY.md` | Memory management configuration |
+| `soul/USER.md` | Auto-populated user preferences |
+
 ---
 
-## ⚙️ Configuration Reference
+## Token Efficiency (The Healer)
 
-`config.toml` (default location: `~/.sovereign/config.toml`):
+The kernel automatically manages token usage to prevent context overflow:
+
+- **Smart Truncation**: Tool outputs exceeding 8,000 characters are trimmed to head + tail with a warning marker
+- **Context Compaction**: At 80% budget, older messages are condensed into a "Ground-Truth State Manifest" stored in memory, keeping the 10 most recent messages raw
+
+---
+
+## Configuration Reference
+
+### File: `~/.sovereign-kernel/config.toml`
 
 ```toml
 [kernel]
-mode = "Sandbox"          # or "Unrestricted"
+mode = "Sandbox"                # "Sandbox" or "Unrestricted"
+api_listen = "127.0.0.1:4200"   # API Bridge address
 
 [model]
 provider = "anthropic"
-model = "claude-3-5-sonnet-20241022"
+model = "claude-sonnet-4-20250514"
+
+[budget]
+max_iterations_per_task = 200
+max_tokens_per_task = 128000
+total_budget_usd = 5.00
 
 [exec_policy]
-allowed_commands = ["git", "cargo", "python", "node", "npm"]
+allowed_commands = ["git", "cargo", "python", "node", "npm", "docker"]
+
 ```

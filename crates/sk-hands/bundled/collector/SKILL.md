@@ -10,6 +10,7 @@ runtime: prompt_only
 ## OSINT Methodology
 
 ### Collection Cycle
+
 1. **Planning**: Define target, scope, and collection requirements
 2. **Collection**: Gather raw data from open sources
 3. **Processing**: Extract entities, relationships, and data points
@@ -18,8 +19,9 @@ runtime: prompt_only
 6. **Feedback**: Refine queries based on what worked and what didn't
 
 ### Source Categories (by reliability)
+
 | Tier | Source Type | Reliability | Examples |
-|------|-----------|-------------|---------|
+| --- | --- | --- | --- |
 | 1 | Official/Primary | Very High | Company filings, government data, press releases |
 | 2 | Institutional | High | News agencies (Reuters, AP), research institutions |
 | 3 | Professional | Medium-High | Industry publications, analyst reports, expert blogs |
@@ -29,52 +31,62 @@ runtime: prompt_only
 ### Search Query Construction by Focus Area
 
 **Market Intelligence**:
-```
+
+```text
 "[target] market share"
 "[target] industry report [year]"
 "[target] TAM SAM SOM"
 "[target] growth rate"
 "[target] market analysis"
 "[target industry] trends [year]"
+
 ```
 
 **Business Intelligence**:
-```
+
+```text
 "[company] revenue" OR "[company] earnings"
 "[company] CEO" OR "[company] leadership team"
 "[company] strategy" OR "[company] roadmap"
 "[company] partnerships" OR "[company] acquisition"
 "[company] annual report" OR "[company] 10-K"
 site:sec.gov "[company]"
+
 ```
 
 **Competitor Analysis**:
-```
+
+```text
 "[company] vs [competitor]"
 "[company] alternative"
 "[company] review" OR "[company] comparison"
 "[company] pricing" site:g2.com OR site:capterra.com
 "[company] customer reviews" site:trustpilot.com
 "switch from [company] to"
+
 ```
 
 **Person Tracking**:
-```
+
+```text
 "[person name]" "[company]"
 "[person name]" interview OR podcast OR keynote
 "[person name]" site:linkedin.com
 "[person name]" publication OR paper
 "[person name]" conference OR summit
+
 ```
 
 **Technology Monitoring**:
-```
+
+```text
 "[technology] release" OR "[technology] update"
 "[technology] benchmark [year]"
 "[technology] adoption" OR "[technology] usage statistics"
 "[technology] vs [alternative]"
 "[technology]" site:github.com
 "[technology] roadmap" OR "[technology] changelog"
+
 ```
 
 ---
@@ -82,6 +94,7 @@ site:sec.gov "[company]"
 ## Entity Extraction Patterns
 
 ### Named Entity Types
+
 1. **Person**: Name, title, organization, role
 2. **Organization**: Company name, type, industry, location, size
 3. **Product**: Product name, company, category, version
@@ -92,6 +105,7 @@ site:sec.gov "[company]"
 8. **Date/Time**: Specific dates, time ranges, deadlines
 
 ### Extraction Heuristics
+
 - **Person detection**: Title + Name pattern ("CEO John Smith"), bylines, quoted speakers
 - **Organization detection**: Legal suffixes (Inc, LLC), "at [Company]", domain names
 - **Financial detection**: Currency symbols, "raised $X", "valued at", "revenue of"
@@ -103,6 +117,7 @@ site:sec.gov "[company]"
 ## Knowledge Graph Best Practices
 
 ### Entity Schema
+
 ```json
 {
   "entity_id": "unique_id",
@@ -116,9 +131,11 @@ site:sec.gov "[company]"
   "last_seen": "timestamp",
   "confidence": "high|medium|low"
 }
+
 ```
 
 ### Relation Schema
+
 ```json
 {
   "source_entity": "entity_id_1",
@@ -131,11 +148,13 @@ site:sec.gov "[company]"
   "source": "url",
   "confidence": "high|medium|low"
 }
+
 ```
 
 ### Common Relations
+
 | Relation | Between | Example |
-|----------|---------|---------|
+| --- | --- | --- |
 | works_at | Person → Company | "Jane Smith works at Acme" |
 | founded | Person → Company | "John Doe founded StartupX" |
 | invested_in | Company → Company | "VC Fund invested in StartupX" |
@@ -151,12 +170,13 @@ site:sec.gov "[company]"
 ## Change Detection Methodology
 
 ### Snapshot Comparison
+
 1. Store the current state of all entities as a JSON snapshot
 2. On next collection cycle, compare new state against previous snapshot
 3. Classify changes:
 
 | Change Type | Significance | Example |
-|-------------|-------------|---------|
+| --- | --- | --- |
 | Entity appeared | Varies | New competitor enters market |
 | Entity disappeared | Important | Company goes quiet, product deprecated |
 | Attribute changed | Critical-Minor | CEO changed (critical), address changed (minor) |
@@ -165,7 +185,8 @@ site:sec.gov "[company]"
 | Sentiment shift | Important | Positive→Negative media coverage |
 
 ### Significance Scoring
-```
+
+```text
 CRITICAL (immediate alert):
   - Leadership change (CEO, CTO, board)
   - Acquisition or merger
@@ -187,6 +208,7 @@ MINOR (note in report):
   - Social media activity spike
   - Conference appearance
   - Job posting (individual)
+
 ```
 
 ---
@@ -196,17 +218,20 @@ MINOR (note in report):
 When `track_sentiment` is enabled, classify each source's tone:
 
 ### Classification Rules
+
 - **Positive indicators**: "growth", "innovation", "breakthrough", "success", "award", "expansion", "praise", "recommend"
 - **Negative indicators**: "lawsuit", "layoffs", "decline", "controversy", "failure", "breach", "criticism", "warning"
 - **Neutral indicators**: factual reporting without strong adjectives, data-only articles, announcements
 
 ### Sentiment Scoring
-```
+
+```text
 Strong positive: +2 (e.g., "Company wins major award")
 Mild positive:   +1 (e.g., "Steady growth continues")
 Neutral:          0 (e.g., "Company releases Q3 report")
 Mild negative:   -1 (e.g., "Faces increased competition")
 Strong negative: -2 (e.g., "Major data breach disclosed")
+
 ```
 
 Track rolling average over last 5 collection cycles to detect trends.
@@ -216,43 +241,54 @@ Track rolling average over last 5 collection cycles to detect trends.
 ## Report Templates
 
 ### Intelligence Brief (Markdown)
+
 ```markdown
+
 # Intelligence Report: [Target]
+
 **Date**: YYYY-MM-DD HH:MM UTC
 **Collection Cycle**: #N
 **Sources Processed**: X
 **New Data Points**: Y
 
 ## Priority Changes
+
 1. [CRITICAL] [Description + source]
 2. [IMPORTANT] [Description + source]
 
 ## Executive Summary
+
 [2-3 paragraph synthesis of new intelligence]
 
 ## Detailed Findings
 
 ### [Category 1]
+
 - Finding with [source](url)
 - Data point with confidence: high/medium/low
 
 ### [Category 2]
+
 - ...
 
 ## Entity Updates
+
 | Entity | Change | Previous | Current | Source |
-|--------|--------|----------|---------|--------|
+| --- | --- | --- | --- | --- |
 
 ## Sentiment Trend
+
 | Period | Score | Direction | Notable |
-|--------|-------|-----------|---------|
+| --- | --- | --- | --- |
 
 ## Collection Metadata
+
 - Queries executed: N
 - Sources fetched: N
 - New entities: N
 - Updated entities: N
 - Next scheduled collection: [datetime]
+
 ```
 
 ---

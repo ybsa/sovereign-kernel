@@ -14,6 +14,6 @@ This hand automates the process of querying a MySQL database for sales data and 
 ## Usage
 
 Describe your reporting needs to the Setup Wizard. For example:
-"Email me the top 10 sales every day at 5 PM to boss@example.com"
+"Email me the top 10 sales every day at 5 PM to `boss@example.com`"
 
 The wizard will wake this hand up on the defined schedule.

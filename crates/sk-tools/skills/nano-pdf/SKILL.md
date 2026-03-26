@@ -30,6 +30,7 @@ Use `nano-pdf` to apply edits to a specific page in a PDF using a natural-langua
 
 ```bash
 nano-pdf edit deck.pdf 1 "Change the title to 'Q3 Results' and fix the typo in the subtitle"
+
 ```
 
 Notes:

@@ -10,11 +10,14 @@ runtime: prompt_only
 ## Twitter API v2 Reference
 
 ### Authentication
+
 Twitter API v2 uses OAuth 2.0 Bearer Token for app-level access and OAuth 1.0a for user-level actions.
 
 **Bearer Token** (read-only access + tweet creation):
-```
+
+```text
 Authorization: Bearer $TWITTER_BEARER_TOKEN
+
 ```
 
 **Environment variable**: `TWITTER_BEARER_TOKEN`
@@ -22,27 +25,35 @@ Authorization: Bearer $TWITTER_BEARER_TOKEN
 ### Core Endpoints
 
 **Get authenticated user info**:
+
 ```bash
 curl -s -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
   "https://api.twitter.com/2/users/me"
+
 ```
+
 Response: `{"data": {"id": "123", "name": "User", "username": "user"}}`
 
 **Post a tweet**:
+
 ```bash
 curl -s -X POST "https://api.twitter.com/2/tweets" \
   -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"text": "Hello world!"}'
+
 ```
+
 Response: `{"data": {"id": "tweet_id", "text": "Hello world!"}}`
 
 **Post a reply**:
+
 ```bash
 curl -s -X POST "https://api.twitter.com/2/tweets" \
   -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"text": "Great point!", "reply": {"in_reply_to_tweet_id": "PARENT_TWEET_ID"}}'
+
 ```
 
 **Post a thread** (chain of replies to yourself):
@@ -51,41 +62,53 @@ curl -s -X POST "https://api.twitter.com/2/tweets" \
 3. Repeat for each tweet in thread
 
 **Delete a tweet**:
+
 ```bash
 curl -s -X DELETE "https://api.twitter.com/2/tweets/TWEET_ID" \
   -H "Authorization: Bearer $TWITTER_BEARER_TOKEN"
+
 ```
 
 **Like a tweet**:
+
 ```bash
 curl -s -X POST "https://api.twitter.com/2/users/USER_ID/likes" \
   -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"tweet_id": "TARGET_TWEET_ID"}'
+
 ```
 
 **Get mentions**:
+
 ```bash
 curl -s -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
   "https://api.twitter.com/2/users/USER_ID/mentions?max_results=10&tweet.fields=public_metrics,created_at,author_id"
+
 ```
 
 **Search recent tweets**:
+
 ```bash
 curl -s -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
   "https://api.twitter.com/2/tweets/search/recent?query=QUERY&max_results=10&tweet.fields=public_metrics"
+
 ```
 
 **Get tweet metrics**:
+
 ```bash
 curl -s -H "Authorization: Bearer $TWITTER_BEARER_TOKEN" \
   "https://api.twitter.com/2/tweets?ids=ID1,ID2,ID3&tweet.fields=public_metrics"
+
 ```
+
 Response includes: `retweet_count`, `reply_count`, `like_count`, `quote_count`, `bookmark_count`, `impression_count`
 
 ### Rate Limits
+
 | Endpoint | Limit | Window |
-|----------|-------|--------|
+| --- | --- | --- |
 | POST /tweets | 300 tweets | 3 hours |
 | DELETE /tweets | 50 deletes | 15 minutes |
 | POST /likes | 50 likes | 15 minutes |
@@ -102,18 +125,22 @@ Always check response headers:
 ## Content Strategy Framework
 
 ### Content Pillars
+
 Define 3-5 core topics ("pillars") that all content revolves around:
-```
+
+```text
 Example for a tech founder:
   Pillar 1: AI & Machine Learning (40% of content)
   Pillar 2: Startup Building (30% of content)
   Pillar 3: Engineering Culture (20% of content)
   Pillar 4: Personal Growth (10% of content)
+
 ```
 
 ### Content Mix (7 types)
+
 | Type | Frequency | Purpose | Template |
-|------|-----------|---------|----------|
+| --- | --- | --- | --- |
 | Hot take | 2-3/week | Engagement | "Unpopular opinion: [contrarian view]" |
 | Thread | 1-2/week | Authority | "I spent X hours researching Y. Here's what I found:" |
 | Tip/How-to | 2-3/week | Value | "How to [solve problem] in [N] steps:" |
@@ -123,8 +150,9 @@ Example for a tech founder:
 | Data/Stat | 1/week | Authority | "[Surprising statistic]. Here's why it matters:" |
 
 ### Optimal Posting Times (UTC-based, adjust to audience timezone)
+
 | Day | Best Times | Why |
-|-----|-----------|-----|
+| --- | --- | --- |
 | Monday | 8-10 AM | Start of work week, checking feeds |
 | Tuesday | 10 AM, 1 PM | Peak engagement day |
 | Wednesday | 9 AM, 12 PM | Mid-week focus |
@@ -138,6 +166,7 @@ Example for a tech founder:
 ## Tweet Writing Best Practices
 
 ### The Hook (first line is everything)
+
 Hooks that work:
 - **Contrarian**: "Most people think X. They're wrong."
 - **Number**: "I analyzed 500 [things]. Here's what I found:"
@@ -148,6 +177,7 @@ Hooks that work:
 - **Confession**: "I used to believe [common thing]. Then I learned..."
 
 ### Writing Rules
+
 1. **One idea per tweet** — don't try to cover everything
 2. **Front-load value** — the hook must deliver or promise value
 3. **Use line breaks** — no wall of text, 1-2 sentences per line
@@ -157,7 +187,8 @@ Hooks that work:
 7. **End with a call to action** — "Agree? RT" or "What would you add?"
 
 ### Thread Structure
-```
+
+```text
 Tweet 1 (HOOK): Compelling opening that makes people click "Show this thread"
   - Must stand alone as a great tweet
   - End with "A thread:" or "Here's what I found:"
@@ -171,9 +202,11 @@ Tweet N+1 (CLOSING): Summary + call to action
   - Restate the key takeaway
   - Ask for engagement: "Which resonated most?"
   - Self-reference: "If this was useful, follow @handle for more"
+
 ```
 
 ### Hashtag Strategy
+
 - **0-2 hashtags** per tweet (more looks spammy)
 - Use hashtags for discovery, not decoration
 - Mix broad (#AI) and specific (#LangChain)
@@ -185,6 +218,7 @@ Tweet N+1 (CLOSING): Summary + call to action
 ## Engagement Playbook
 
 ### Replying to Mentions
+
 Rules:
 1. **Respond within 2 hours** during engagement_hours
 2. **Add value** — don't just say "thanks!" — expand on their point
@@ -199,6 +233,7 @@ Reply templates:
 - Gratitude: "Appreciate you sharing this! [Specific thing you liked about their tweet]"
 
 ### When NOT to Engage
+
 - Trolls or obviously bad-faith arguments
 - Political flame wars (unless that's your content pillar)
 - Personal attacks (block immediately)
@@ -206,6 +241,7 @@ Reply templates:
 - Tweets that could create legal liability
 
 ### Auto-Like Strategy
+
 Like tweets from:
 1. People who regularly engage with your content (reciprocity)
 2. Influencers in your niche (visibility)
@@ -222,7 +258,7 @@ Do NOT auto-like:
 
 ## Content Calendar Template
 
-```
+```text
 WEEK OF [DATE]
 
 Monday:
@@ -244,6 +280,7 @@ Thursday:
 Friday:
   - 9 AM: [Hot take] about [week's trending topic]
   - 11 AM: [Curated share] — best thing I read this week
+
 ```
 
 ---
@@ -251,8 +288,9 @@ Friday:
 ## Performance Metrics
 
 ### Key Metrics
+
 | Metric | What It Measures | Good Benchmark |
-|--------|-----------------|----------------|
+| --- | --- | --- |
 | Impressions | How many people saw the tweet | Varies by follower count |
 | Engagement rate | (likes+RTs+replies)/impressions | >2% is good, >5% is great |
 | Reply rate | replies/impressions | >0.5% is good |
@@ -261,22 +299,27 @@ Friday:
 | Follower growth | Net new followers per period | Track trend |
 
 ### Engagement Rate Formula
-```
+
+```text
 engagement_rate = (likes + retweets + replies + quotes) / impressions * 100
 
 Example:
   50 likes + 10 RTs + 5 replies + 2 quotes = 67 engagements
   67 / 2000 impressions = 3.35% engagement rate
+
 ```
 
 ### Content Performance Analysis
+
 Track which content types and topics perform best:
-```
+
+```text
 | Content Type | Avg Impressions | Avg Engagement Rate | Best Performing |
-|-------------|-----------------|--------------------|--------------------|
+| --- | --- | --- | --- |
 | Hot take | 2500 | 4.2% | "Unpopular opinion: ..." |
 | Thread | 5000 | 3.1% | "I analyzed 500 ..." |
 | Tip | 1800 | 5.5% | "How to ... in 3 steps" |
+
 ```
 
 Use this data to optimize future content mix.
@@ -286,14 +329,16 @@ Use this data to optimize future content mix.
 ## Brand Voice Guide
 
 ### Voice Dimensions
+
 | Dimension | Range | Description |
-|-----------|-------|-------------|
+| --- | --- | --- |
 | Formal ↔ Casual | 1-5 | 1=corporate, 5=texting a friend |
 | Serious ↔ Humorous | 1-5 | 1=all business, 5=comedy account |
 | Reserved ↔ Bold | 1-5 | 1=diplomatic, 5=no-filter |
 | General ↔ Technical | 1-5 | 1=anyone can understand, 5=deep expert |
 
 ### Consistency Rules
+
 - Use the same voice across ALL tweets (hot takes and how-tos)
 - Develop 3-5 "signature phrases" you reuse naturally
 - If the brand voice says "casual," don't suddenly write a formal thread
@@ -304,6 +349,7 @@ Use this data to optimize future content mix.
 ## Safety & Compliance
 
 ### Content Guidelines
+
 NEVER post:
 - Discriminatory content (race, gender, religion, sexuality, disability)
 - Defamatory claims about real people or companies
@@ -314,6 +360,7 @@ NEVER post:
 - Content that violates Twitter Terms of Service
 
 ### Approval Mode Queue Format
+
 ```json
 [
   {
@@ -327,16 +374,21 @@ NEVER post:
     "notes": "Based on trending discussion about LLM pricing"
   }
 ]
+
 ```
 
 Preview file for human review:
+
 ```markdown
+
 # Tweet Queue Preview
+
 Generated: YYYY-MM-DD
 
 ## Pending Tweets (N total)
 
 ### 1. [Hot Take] — Scheduled: Mon 10 AM
+
 > Tweet text here
 
 **Notes**: Based on trending discussion about LLM pricing
@@ -345,15 +397,18 @@ Generated: YYYY-MM-DD
 ---
 
 ### 2. [Thread] — Scheduled: Tue 10 AM
+
 > Tweet 1/5: Hook text here
 > Tweet 2/5: Point one
 > ...
 
 **Notes**: Deep dive on new benchmark results
 **Pillar**: AI | **Status**: Pending approval
+
 ```
 
 ### Risk Assessment
+
 Before posting, evaluate each tweet:
 - Could this be misinterpreted? → Rephrase for clarity
 - Does this punch down? → Don't post

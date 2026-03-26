@@ -46,15 +46,16 @@ Common commands
 
 Example output
 
-```
+```text
 $ blogwatcher blogs
 Tracked blogs (1):
 
   xkcd
     URL: https://xkcd.com
-```
 
 ```
+
+```text
 $ blogwatcher scan
 Scanning 1 blog(s)...
 
@@ -62,6 +63,7 @@ Scanning 1 blog(s)...
     Source: RSS | Found: 4 | New: 4
 
 Found 4 new article(s) total!
+
 ```
 
 Notes

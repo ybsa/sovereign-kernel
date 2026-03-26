@@ -27,8 +27,9 @@ Based on research by Philip Tetlock and the Good Judgment Project:
 ## Signal Taxonomy
 
 ### Signal Types
+
 | Type | Description | Weight | Example |
-|------|-----------|--------|---------|
+| --- | --- | --- | --- |
 | Leading indicator | Predicts future movement | High | Job postings surge → company expanding |
 | Lagging indicator | Confirms past movement | Medium | Quarterly earnings → business health |
 | Base rate | Historical frequency | High | "80% of startups fail within 5 years" |
@@ -39,7 +40,8 @@ Based on research by Philip Tetlock and the Good Judgment Project:
 | Sentiment shift | Collective mood change | Medium | Media tone change, social media trend |
 
 ### Signal Strength Assessment
-```
+
+```text
 STRONG signal (high predictive value):
   - Multiple independent sources confirm
   - Quantitative data (not just opinions)
@@ -57,6 +59,7 @@ WEAK signal (limited predictive value):
   - Single anecdote or case study
   - Rumor or unconfirmed report
   - Opinion from non-specialist
+
 ```
 
 ---
@@ -64,7 +67,8 @@ WEAK signal (limited predictive value):
 ## Confidence Calibration
 
 ### Probability Scale
-```
+
+```text
 95% — Almost certain (would bet 19:1)
 90% — Very likely (would bet 9:1)
 80% — Likely (would bet 4:1)
@@ -76,9 +80,11 @@ WEAK signal (limited predictive value):
 20% — Very unlikely (but possible)
 10% — Extremely unlikely
 5%  — Almost impossible (but not zero)
+
 ```
 
 ### Calibration Rules
+
 1. NEVER use 0% or 100% — nothing is absolutely certain
 2. If you haven't done research, default to the base rate (outside view)
 3. Your first estimate should be the reference class base rate
@@ -87,8 +93,10 @@ WEAK signal (limited predictive value):
 6. If your gut says 80% but your analysis says 55%, trust the analysis
 
 ### Brier Score
+
 The gold standard for measuring prediction accuracy:
-```
+
+```text
 Brier Score = (predicted_probability - actual_outcome)^2
 
 actual_outcome = 1 if prediction came true, 0 if not
@@ -100,6 +108,7 @@ Terrible: 1.0 (100% confident, always wrong)
 Good forecaster: < 0.15
 Average forecaster: 0.20-0.30
 Bad forecaster: > 0.35
+
 ```
 
 ---
@@ -107,8 +116,9 @@ Bad forecaster: > 0.35
 ## Domain-Specific Source Guide
 
 ### Technology Predictions
+
 | Source Type | Examples | Use For |
-|-------------|---------|---------|
+| --- | --- | --- |
 | Product roadmaps | GitHub issues, release notes, blog posts | Feature predictions |
 | Adoption data | Stack Overflow surveys, NPM downloads, DB-Engines | Technology trends |
 | Funding data | Crunchbase, PitchBook, TechCrunch | Startup success/failure |
@@ -117,8 +127,9 @@ Bad forecaster: > 0.35
 | Benchmark data | TechEmpower, MLPerf, Geekbench | Performance trends |
 
 ### Finance Predictions
+
 | Source Type | Examples | Use For |
-|-------------|---------|---------|
+| --- | --- | --- |
 | Economic data | FRED, BLS, Census | Macro trends |
 | Earnings | SEC filings, earnings calls | Company performance |
 | Analyst reports | Bloomberg, Reuters, S&P | Market consensus |
@@ -127,8 +138,9 @@ Bad forecaster: > 0.35
 | Sentiment | VIX, put/call ratio, AAII survey | Market mood |
 
 ### Geopolitics Predictions
+
 | Source Type | Examples | Use For |
-|-------------|---------|---------|
+| --- | --- | --- |
 | Official sources | Government statements, UN reports | Policy direction |
 | Think tanks | RAND, Brookings, Chatham House | Analysis |
 | Election data | Polls, voter registration, 538 | Election outcomes |
@@ -137,8 +149,9 @@ Bad forecaster: > 0.35
 | Diplomatic signals | Ambassador recalls, sanctions, treaties | Relations |
 
 ### Climate Predictions
+
 | Source Type | Examples | Use For |
-|-------------|---------|---------|
+| --- | --- | --- |
 | Scientific data | IPCC, NASA, NOAA | Climate trends |
 | Energy data | IEA, EIA, IRENA | Energy transition |
 | Policy data | COP agreements, national plans | Regulation |
@@ -151,7 +164,8 @@ Bad forecaster: > 0.35
 ## Reasoning Chain Construction
 
 ### Template
-```
+
+```text
 PREDICTION: [Specific, falsifiable claim]
 
 1. REFERENCE CLASS (Outside View)
@@ -180,6 +194,7 @@ PREDICTION: [Specific, falsifiable claim]
    Date: [When can this be resolved?]
    Criteria: [Exactly how to determine if correct]
    Data source: [Where to check the outcome]
+
 ```
 
 ---
@@ -187,6 +202,7 @@ PREDICTION: [Specific, falsifiable claim]
 ## Prediction Tracking & Scoring
 
 ### Prediction Ledger Format
+
 ```json
 {
   "id": "pred_001",
@@ -208,10 +224,12 @@ PREDICTION: [Specific, falsifiable claim]
     {"date": "2025-03-01", "new_confidence": 0.75, "reason": "New evidence: leaked demo"}
   ]
 }
+
 ```
 
 ### Accuracy Report Template
-```
+
+```text
 ACCURACY DASHBOARD
 ==================
 Total predictions:     N
@@ -231,6 +249,7 @@ Calibration:
 
 Strengths: [domains/types where you perform well]
 Weaknesses: [domains/types where you perform poorly]
+
 ```
 
 ---
@@ -264,6 +283,7 @@ Before finalizing any prediction, check for these biases:
    - Fix: Consider structural changes that could break the status quo
 
 ### Contrarian Mode
+
 When enabled, for each consensus prediction:
 1. Identify what the consensus view is
 2. Search for evidence the consensus is wrong

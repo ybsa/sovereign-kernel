@@ -13,8 +13,9 @@ runtime: prompt_only
 ## Playwright CSS Selector Reference
 
 ### Basic Selectors
+
 | Selector | Description | Example |
-|----------|-------------|---------|
+| --- | --- | --- |
 | `#id` | By ID | `#checkout-btn` |
 | `.class` | By class | `.add-to-cart` |
 | `tag` | By element | `button`, `input` |
@@ -22,8 +23,9 @@ runtime: prompt_only
 | `tag.class` | Combined | `button.primary` |
 
 ### Form Selectors
+
 | Selector | Use Case |
-|----------|----------|
+| --- | --- |
 | `input[type="email"]` | Email fields |
 | `input[type="password"]` | Password fields |
 | `input[type="search"]` | Search boxes |
@@ -35,8 +37,9 @@ runtime: prompt_only
 | `button[type="submit"]` | Submit buttons |
 
 ### Navigation Selectors
+
 | Selector | Use Case |
-|----------|----------|
+| --- | --- |
 | `a[href*="cart"]` | Cart links |
 | `a[href*="checkout"]` | Checkout links |
 | `a[href*="login"]` | Login links |
@@ -45,8 +48,9 @@ runtime: prompt_only
 | `[role="navigation"] a` | ARIA nav links |
 
 ### E-commerce Selectors
+
 | Selector | Use Case |
-|----------|----------|
+| --- | --- |
 | `.product-price`, `[data-price]` | Product prices |
 | `.add-to-cart`, `#add-to-cart` | Add to cart buttons |
 | `.cart-total`, `.order-total` | Cart total |
@@ -56,7 +60,8 @@ runtime: prompt_only
 ## Common Workflows
 
 ### Product Search & Purchase
-```
+
+```text
 1. browser_navigate → store homepage
 2. browser_type → search box with product name
 3. browser_click → search button or press Enter
@@ -68,19 +73,23 @@ runtime: prompt_only
 9. browser_read_page → verify cart contents & total
 10. STOP → Report to user, wait for approval
 11. browser_click → "Proceed to Checkout" (only after approval)
+
 ```
 
 ### Account Login
-```
+
+```text
 1. browser_navigate → login page
 2. browser_type → email/username field
 3. browser_type → password field
 4. browser_click → login/submit button
 5. browser_read_page → verify successful login
+
 ```
 
 ### Form Submission
-```
+
+```text
 1. browser_navigate → form page
 2. browser_read_page → understand form structure
 3. browser_type → fill each field sequentially
@@ -88,10 +97,12 @@ runtime: prompt_only
 5. browser_screenshot → visual verification before submit
 6. browser_click → submit button
 7. browser_read_page → verify confirmation
+
 ```
 
 ### Price Comparison
-```
+
+```text
 1. For each store:
    a. browser_navigate → store URL
    b. browser_type → search query
@@ -99,12 +110,13 @@ runtime: prompt_only
    d. memory_store → save price data
 2. memory_recall → compare all prices
 3. Report findings to user
+
 ```
 
 ## Error Recovery Strategies
 
 | Error | Recovery |
-|-------|----------|
+| --- | --- |
 | Element not found | Try alternative selector, use visible text, scroll page |
 | Page timeout | Retry navigation, check URL |
 | Login required | Inform user, ask for credentials |

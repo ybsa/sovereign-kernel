@@ -12,18 +12,21 @@ Never state facts without sources. Every claim in your reports must be traceable
 
 ## Query Construction
 
-### Good queries (specific, targeted):
+### Good Queries (Specific, Targeted)
+
 - `"climate change Arctic ice 2024 peer reviewed study"`
 - `"Python asyncio performance benchmark 2024"`
 - `site:arxiv.org transformer architecture efficiency`
 
-### Bad queries (too vague):
+### Bad Queries (Too Vague)
+
 - `climate`
 - `python`
 
-### Query patterns by task type:
+### Query Patterns by Task Type
+
 | Task | Pattern |
-|------|---------|
+| --- | --- |
 | Current events | `[topic] [year] news` |
 | Technical facts | `[technology] [specific aspect] documentation` |
 | Comparisons | `[A] vs [B] comparison [year]` |
@@ -41,6 +44,7 @@ Always prefer primary sources. When citing tertiary sources, note the limitation
 ## Synthesis Rules
 
 After fetching multiple sources:
+
 1. **Corroborate**: A fact stated by 3+ independent sources is likely reliable
 2. **Contradiction**: When sources disagree, present both sides with their evidence
 3. **Recency**: For fast-moving topics, prefer sources from the last 6 months
@@ -49,6 +53,7 @@ After fetching multiple sources:
 ## Anti-Hallucination Protocol
 
 Before writing any fact in your report:
+
 - [ ] Can you cite a fetched URL for this claim?
 - [ ] Is this verifiably true? If not, add hedging language
 - [ ] Are you inferring beyond what the source actually states?
@@ -57,38 +62,50 @@ Before writing any fact in your report:
 ## Report Templates
 
 ### Quick Answer
-```
+
+```text
 **Answer**: [1-2 sentence direct answer]
 **Source**: [url]
 **Confidence**: High/Medium/Low
+
 ```
 
 ### Full Research Report
-```
+
+```text
+
 ## [Topic] Research Report
+
 *Generated: YYYY-MM-DD | Queries: N | Sources: N*
 
 ### Executive Summary
+
 ...
 
 ### Key Findings
+
 - [Finding] ([source](url))
 - [Finding] ([source](url))
 
 ### Detailed Analysis
+
 ...
 
 ### Limitations
+
 - Areas not covered
 - Conflicting information found
 
 ### Sources
+
 1. [Title](url) — [credibility tier]
+
 ```
 
 ## Scheduling Research Tasks
 
 For recurring research (e.g. "monitor AI news weekly"):
+
 - Use `schedule_create` with appropriate cron expression
 - Store results summary in memory with `memory_store`
 - Publish completion event with `event_publish`

@@ -26,6 +26,7 @@ Install
 
 ```bash
 npm i -g clawhub
+
 ```
 
 Auth (publish)
@@ -33,12 +34,14 @@ Auth (publish)
 ```bash
 clawhub login
 clawhub whoami
+
 ```
 
 Search
 
 ```bash
 clawhub search "postgres backups"
+
 ```
 
 Install
@@ -46,6 +49,7 @@ Install
 ```bash
 clawhub install my-skill
 clawhub install my-skill --version 1.2.3
+
 ```
 
 Update (hash-based match + upgrade)
@@ -56,18 +60,21 @@ clawhub update my-skill --version 1.2.3
 clawhub update --all
 clawhub update my-skill --force
 clawhub update --all --no-input --force
+
 ```
 
 List
 
 ```bash
 clawhub list
+
 ```
 
 Publish
 
 ```bash
 clawhub publish ./my-skill --slug my-skill --name "My Skill" --version 1.2.0 --changelog "Fixes + docs"
+
 ```
 
 Notes

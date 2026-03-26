@@ -22,6 +22,7 @@ Use the Notion API to create/read/update pages, data sources (databases), and bl
 ```bash
 mkdir -p ~/.config/notion
 echo "ntn_your_key_here" > ~/.config/notion/api_key
+
 ```
 
 4. Share target pages/databases with your integration (click "..." → "Connect to" → your integration name)
@@ -36,6 +37,7 @@ curl -X GET "https://api.notion.com/v1/..." \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03" \
   -H "Content-Type: application/json"
+
 ```
 
 > **Note:** The `Notion-Version` header is required. This skill uses `2025-09-03` (latest). In this version, databases are called "data sources" in the API.
@@ -50,6 +52,7 @@ curl -X POST "https://api.notion.com/v1/search" \
   -H "Notion-Version: 2025-09-03" \
   -H "Content-Type: application/json" \
   -d '{"query": "page title"}'
+
 ```
 
 **Get page:**
@@ -58,6 +61,7 @@ curl -X POST "https://api.notion.com/v1/search" \
 curl "https://api.notion.com/v1/pages/{page_id}" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03"
+
 ```
 
 **Get page content (blocks):**
@@ -66,6 +70,7 @@ curl "https://api.notion.com/v1/pages/{page_id}" \
 curl "https://api.notion.com/v1/blocks/{page_id}/children" \
   -H "Authorization: Bearer $NOTION_KEY" \
   -H "Notion-Version: 2025-09-03"
+
 ```
 
 **Create page in a data source:**
@@ -82,6 +87,7 @@ curl -X POST "https://api.notion.com/v1/pages" \
       "Status": {"select": {"name": "Todo"}}
     }
   }'
+
 ```
 
 **Query a data source (database):**
@@ -95,6 +101,7 @@ curl -X POST "https://api.notion.com/v1/data_sources/{data_source_id}/query" \
     "filter": {"property": "Status", "select": {"equals": "Active"}},
     "sorts": [{"property": "Date", "direction": "descending"}]
   }'
+
 ```
 
 **Create a data source (database):**
@@ -113,6 +120,7 @@ curl -X POST "https://api.notion.com/v1/data_sources" \
       "Date": {"date": {}}
     }
   }'
+
 ```
 
 **Update page properties:**
@@ -123,6 +131,7 @@ curl -X PATCH "https://api.notion.com/v1/pages/{page_id}" \
   -H "Notion-Version: 2025-09-03" \
   -H "Content-Type: application/json" \
   -d '{"properties": {"Status": {"select": {"name": "Done"}}}}'
+
 ```
 
 **Add blocks to page:**
@@ -137,6 +146,7 @@ curl -X PATCH "https://api.notion.com/v1/blocks/{page_id}/children" \
       {"object": "block", "type": "paragraph", "paragraph": {"rich_text": [{"text": {"content": "Hello"}}]}}
     ]
   }'
+
 ```
 
 ## Property Types

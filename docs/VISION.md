@@ -24,6 +24,7 @@ No apps. No Electron. No browser dependency.
 Sovereign Kernel runs from your terminal — like `git`, like `docker`, like `claude`. The Watchtower (web dashboard) is embedded in the binary and served at `localhost:8080`, but the CLI is always the primary interface.
 
 This is deliberate. Terminal tools:
+
 - Work over SSH
 - Work in containers
 - Work on headless servers

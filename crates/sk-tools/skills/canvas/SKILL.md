@@ -14,12 +14,13 @@ The canvas tool lets you present web content on any connected node's canvas view
 
 ### Architecture
 
-```
+```text
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────┐
 │  Canvas Host    │────▶│   Node Bridge    │────▶│  Node App   │
 │  (HTTP Server)  │     │  (TCP Server)    │     │ (Mac/iOS/   │
 │  Port 18793     │     │  Port 18790      │     │  Android)   │
 └─────────────────┘     └──────────────────┘     └─────────────┘
+
 ```
 
 1. **Canvas Host Server**: Serves static HTML/CSS/JS files from `canvasHost.root` directory
@@ -31,7 +32,7 @@ The canvas tool lets you present web content on any connected node's canvas view
 The canvas host server binds based on `gateway.bind` setting:
 
 | Bind Mode  | Server Binds To     | Canvas URL Uses            |
-| ---------- | ------------------- | -------------------------- |
+| --- | --- | --- |
 | `loopback` | 127.0.0.1           | localhost (local only)     |
 | `lan`      | LAN interface       | LAN IP address             |
 | `tailnet`  | Tailscale interface | Tailscale hostname         |
@@ -39,8 +40,9 @@ The canvas host server binds based on `gateway.bind` setting:
 
 **Key insight:** The `canvasHostHostForBridge` is derived from `bridgeHost`. When bound to Tailscale, nodes receive URLs like:
 
-```
+```text
 http://<tailscale-hostname>:18793/__openclaw__/canvas/<file>.html
+
 ```
 
 This is why localhost URLs don't work - the node receives the Tailscale hostname from the bridge!
@@ -48,7 +50,7 @@ This is why localhost URLs don't work - the node receives the Tailscale hostname
 ## Actions
 
 | Action     | Description                          |
-| ---------- | ------------------------------------ |
+| --- | --- |
 | `present`  | Show canvas with optional target URL |
 | `hide`     | Hide the canvas                      |
 | `navigate` | Navigate to a new URL                |
@@ -71,6 +73,7 @@ In `~/.openclaw/openclaw.json`:
     "bind": "auto"
   }
 }
+
 ```
 
 ### Live Reload
@@ -99,6 +102,7 @@ cat > ~/clawd/canvas/my-game.html << 'HTML'
 </body>
 </html>
 HTML
+
 ```
 
 ### 2. Find your canvas host URL
@@ -107,6 +111,7 @@ Check how your gateway is bound:
 
 ```bash
 cat ~/.openclaw/openclaw.json | jq '.gateway.bind'
+
 ```
 
 Then construct the URL:
@@ -118,34 +123,39 @@ Find your Tailscale hostname:
 
 ```bash
 tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//'
+
 ```
 
 ### 3. Find connected nodes
 
 ```bash
 openclaw nodes list
+
 ```
 
 Look for Mac/iOS/Android nodes with canvas capability.
 
 ### 4. Present content
 
-```
+```text
 canvas action:present node:<node-id> target:<full-url>
+
 ```
 
 **Example:**
 
-```
+```text
 canvas action:present node:mac-63599bc4-b54d-4392-9048-b97abd58343a target:http://peters-mac-studio-1.sheep-coho.ts.net:18793/__openclaw__/canvas/snake.html
+
 ```
 
 ### 5. Navigate, snapshot, or hide
 
-```
+```text
 canvas action:navigate node:<node-id> url:<new-url>
 canvas action:snapshot node:<node-id>
 canvas action:hide node:<node-id>
+
 ```
 
 ## Debugging
@@ -182,9 +192,10 @@ If live reload isn't working:
 
 The canvas host serves from `/__openclaw__/canvas/` prefix:
 
-```
+```text
 http://<host>:18793/__openclaw__/canvas/index.html  → ~/clawd/canvas/index.html
 http://<host>:18793/__openclaw__/canvas/games/snake.html → ~/clawd/canvas/games/snake.html
+
 ```
 
 The `/__openclaw__/canvas/` prefix is defined by `CANVAS_HOST_PATH` constant.

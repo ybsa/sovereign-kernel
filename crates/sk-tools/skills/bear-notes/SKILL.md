@@ -46,30 +46,35 @@ Create a note
 ```bash
 echo "Note content here" | grizzly create --title "My Note" --tag work
 grizzly create --title "Quick Note" --tag inbox < /dev/null
+
 ```
 
 Open/read a note by ID
 
 ```bash
 grizzly open-note --id "NOTE_ID" --enable-callback --json
+
 ```
 
 Append text to a note
 
 ```bash
 echo "Additional content" | grizzly add-text --id "NOTE_ID" --mode append --token-file ~/.config/grizzly/token
+
 ```
 
 List all tags
 
 ```bash
 grizzly tags --enable-callback --json --token-file ~/.config/grizzly/token
+
 ```
 
 Search notes (via open-tag)
 
 ```bash
 grizzly open-tag --name "work" --enable-callback --json
+
 ```
 
 ## Options
@@ -97,6 +102,7 @@ Example `~/.config/grizzly/config.toml`:
 token_file = "~/.config/grizzly/token"
 callback_url = "http://127.0.0.1:42123/success"
 timeout = "5s"
+
 ```
 
 ## Notes

@@ -32,23 +32,29 @@ Generate a handful of “random but structured” prompts and render them via th
 ```bash
 python3 {baseDir}/scripts/gen.py
 open ~/Projects/tmp/openai-image-gen-*/index.html  # if ~/Projects/tmp exists; else ./tmp/...
+
 ```
 
 Useful flags:
 
 ```bash
+
 # GPT image models with various options
+
 python3 {baseDir}/scripts/gen.py --count 16 --model gpt-image-1
 python3 {baseDir}/scripts/gen.py --prompt "ultra-detailed studio photo of a lobster astronaut" --count 4
 python3 {baseDir}/scripts/gen.py --size 1536x1024 --quality high --out-dir ./out/images
 python3 {baseDir}/scripts/gen.py --model gpt-image-1.5 --background transparent --output-format webp
 
 # DALL-E 3 (note: count is automatically limited to 1)
+
 python3 {baseDir}/scripts/gen.py --model dall-e-3 --quality hd --size 1792x1024 --style vivid
 python3 {baseDir}/scripts/gen.py --model dall-e-3 --style natural --prompt "serene mountain landscape"
 
 # DALL-E 2
+
 python3 {baseDir}/scripts/gen.py --model dall-e-2 --size 512x512 --count 4
+
 ```
 
 ## Model-Specific Parameters

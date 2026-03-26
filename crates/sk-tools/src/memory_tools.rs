@@ -65,7 +65,7 @@ pub fn handle_recall(
     query: &str,
     limit: usize,
 ) -> SovereignResult<String> {
-    let results = substrate.bm25.search(agent_id, query, limit)?;
+    let results = substrate.bm25.search(Some(agent_id), query, limit)?;
     if results.is_empty() {
         return Ok("No relevant memories found.".into());
     }

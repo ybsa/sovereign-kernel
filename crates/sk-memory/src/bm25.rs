@@ -45,7 +45,7 @@ impl Bm25Index {
     /// Search using BM25 ranking.
     pub fn search(
         &self,
-        agent_id: AgentId,
+        agent_id: Option<AgentId>,
         query: &str,
         limit: usize,
     ) -> SovereignResult<Vec<Bm25Result>> {
@@ -60,27 +60,38 @@ impl Bm25Index {
             return Ok(Vec::new());
         }
 
-        let mut stmt = conn
-            .prepare(
+        let (sql, params) = if let Some(aid) = agent_id {
+            (
                 "SELECT memory_id, content, rank
                  FROM fts_memories
                  WHERE fts_memories MATCH ?1 AND agent_id = ?2
                  ORDER BY rank
                  LIMIT ?3",
+                rusqlite::params![sanitized, aid.to_string(), limit as i64],
             )
+        } else {
+            (
+                "SELECT memory_id, content, rank
+                 FROM fts_memories
+                 WHERE fts_memories MATCH ?1
+                 ORDER BY rank
+                 LIMIT ?2",
+                rusqlite::params![sanitized, limit as i64],
+            )
+        };
+
+        let mut stmt = conn
+            .prepare(sql)
             .map_err(|e| SovereignError::Memory(e.to_string()))?;
 
         let rows = stmt
-            .query_map(
-                rusqlite::params![sanitized, agent_id.to_string(), limit as i64],
-                |row| {
-                    Ok(Bm25Result {
-                        memory_id: row.get(0)?,
-                        content: row.get(1)?,
-                        rank: row.get(2)?,
-                    })
-                },
-            )
+            .query_map(params, |row| {
+                Ok(Bm25Result {
+                    memory_id: row.get(0)?,
+                    content: row.get(1)?,
+                    rank: row.get(2)?,
+                })
+            })
             .map_err(|e| SovereignError::Memory(e.to_string()))?;
 
         let mut results = Vec::new();

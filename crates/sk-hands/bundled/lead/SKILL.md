@@ -19,8 +19,9 @@ A good ICP answers these questions:
 7. **Pain points**: What problems does your product solve for them?
 
 ### Company Size Categories
+
 | Category | Employees | Typical Budget | Sales Cycle |
-|----------|-----------|---------------|-------------|
+| --- | --- | --- | --- |
 | Startup | 1-50 | $1K-$25K/yr | 1-4 weeks |
 | SMB | 50-500 | $25K-$250K/yr | 1-3 months |
 | Enterprise | 500+ | $250K+/yr | 3-12 months |
@@ -30,29 +31,37 @@ A good ICP answers these questions:
 ## Web Research Techniques for Lead Discovery
 
 ### Search Query Patterns
-```
+
+```text
+
 # Find companies in a vertical
+
 "[industry] companies" site:crunchbase.com
 "top [industry] startups [year]"
 "[industry] companies [city/region]"
 
 # Find decision-makers
+
 "[title]" "[company]" site:linkedin.com
 "[company] team" OR "[company] about us" OR "[company] leadership"
 
 # Growth signals (high-intent leads)
+
 "[company] hiring [role]" — indicates budget and growth
 "[company] series [A/B/C]" — recently funded
 "[company] expansion" OR "[company] new office"
 "[company] product launch [year]"
 
 # Technology signals
+
 "[company] uses [technology]" OR "[company] built with [technology]"
 site:stackshare.io "[company]"
 site:builtwith.com "[company]"
+
 ```
 
 ### Source Quality Ranking
+
 1. **Company website** (About/Team pages) — most reliable for personnel
 2. **Crunchbase** — funding, company details, leadership
 3. **LinkedIn** (public profiles) — titles, tenure, connections
@@ -67,12 +76,14 @@ site:builtwith.com "[company]"
 ## Lead Enrichment Patterns
 
 ### Basic Enrichment (always available)
+
 - Full name (first + last)
 - Job title
 - Company name
 - Company website URL
 
 ### Standard Enrichment
+
 - Company employee count (from About page, Crunchbase, or LinkedIn)
 - Company industry classification
 - Company founding year
@@ -81,6 +92,7 @@ site:builtwith.com "[company]"
 - Company description (from meta tags or About page)
 
 ### Deep Enrichment
+
 - Recent funding rounds (amount, investors, date)
 - Recent news mentions (last 90 days)
 - Key competitors
@@ -90,6 +102,7 @@ site:builtwith.com "[company]"
 - Executive team changes
 
 ### Email Pattern Discovery
+
 Common corporate email formats (try in order):
 1. `firstname@company.com` (most common for small companies)
 2. `firstname.lastname@company.com` (most common for larger companies)
@@ -103,7 +116,8 @@ Note: NEVER send unsolicited emails. Email patterns are for reference only.
 ## Lead Scoring Framework
 
 ### Scoring Rubric (0-100)
-```
+
+```text
 ICP Match (30 points max):
   Industry match:     +10
   Company size match: +5
@@ -133,11 +147,13 @@ Accessibility (15 points max):
   Company contact:    +10
   Social only:        +5
   No contact info:    +0
+
 ```
 
 ### Score Interpretation
+
 | Score | Grade | Action |
-|-------|-------|--------|
+| --- | --- | --- |
 | 80-100 | A | Hot lead — prioritize outreach |
 | 60-79 | B | Warm lead — nurture |
 | 40-59 | C | Cool lead — enrich further |
@@ -148,13 +164,15 @@ Accessibility (15 points max):
 ## Deduplication Strategies
 
 ### Matching Algorithm
+
 1. **Exact match**: Normalize company name (lowercase, strip Inc/LLC/Ltd) + person name
 2. **Fuzzy match**: Levenshtein distance < 2 on company name + same person
 3. **Domain match**: Same company website domain = same company
 4. **Cross-source merge**: Same person at same company from different sources → merge enrichment data
 
 ### Normalization Rules
-```
+
+```text
 Company name:
   - Strip legal suffixes: Inc, LLC, Ltd, Corp, Co, GmbH, AG, SA
   - Lowercase
@@ -165,6 +183,7 @@ Person name:
   - Lowercase
   - Remove middle names/initials
   - Handle "Bob" = "Robert", "Mike" = "Michael" (common nicknames)
+
 ```
 
 ---
@@ -172,12 +191,15 @@ Person name:
 ## Output Format Templates
 
 ### CSV Format
+
 ```csv
 Name,Title,Company,Company URL,LinkedIn,Industry,Size,Score,Discovered,Notes
 "Jane Smith","VP Engineering","Acme Corp","https://acme.com","https://linkedin.com/in/janesmith","SaaS","SMB (120 employees)",85,"2025-01-15","Series B funded, hiring 5 engineers"
+
 ```
 
 ### JSON Format
+
 ```json
 [
   {
@@ -200,14 +222,17 @@ Name,Title,Company,Company URL,LinkedIn,Industry,Size,Score,Discovered,Notes
     "notes": "Strong ICP match, actively growing"
   }
 ]
+
 ```
 
 ### Markdown Table Format
+
 ```markdown
 | # | Name | Title | Company | Score | Key Signal |
-|---|------|-------|---------|-------|------------|
+| --- | --- | --- | --- | --- | --- |
 | 1 | Jane Smith | VP Engineering | Acme Corp | 85 | Series B funded, hiring |
 | 2 | John Doe | CTO | Beta Inc | 72 | Product launch Q1 2025 |
+
 ```
 
 ---
@@ -215,6 +240,7 @@ Name,Title,Company,Company URL,LinkedIn,Industry,Size,Score,Discovered,Notes
 ## Compliance & Ethics
 
 ### DO
+
 - Use only publicly available information
 - Respect robots.txt and rate limits
 - Include data provenance (where each piece of info came from)
@@ -222,6 +248,7 @@ Name,Title,Company,Company URL,LinkedIn,Industry,Size,Score,Discovered,Notes
 - Clearly mark confidence levels on enriched data
 
 ### DO NOT
+
 - Scrape behind login walls or paywalls
 - Fabricate any lead data (even "likely" email addresses without evidence)
 - Store sensitive personal data (SSN, financial info, health data)
@@ -230,6 +257,7 @@ Name,Title,Company,Company URL,LinkedIn,Industry,Size,Score,Discovered,Notes
 - Collect data on individuals who have opted out of data collection
 
 ### Data Retention
+
 - Keep lead data in local files only — never exfiltrate
 - Mark stale leads (>90 days without activity) for review
 - Provide clear data export in all supported formats

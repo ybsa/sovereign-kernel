@@ -6,12 +6,13 @@ Himalaya uses MML for composing emails. MML is a simple XML-based syntax that co
 
 An email message is a list of **headers** followed by a **body**, separated by a blank line:
 
-```
+```text
 From: sender@example.com
 To: recipient@example.com
 Subject: Hello World
 
 This is the message body.
+
 ```
 
 ## Headers
@@ -28,18 +29,19 @@ Common headers:
 
 ### Address Formats
 
-```
+```text
 To: user@example.com
 To: John Doe <john@example.com>
 To: "John Doe" <john@example.com>
 To: user1@example.com, user2@example.com, "Jane" <jane@example.com>
+
 ```
 
 ## Plain Text Body
 
 Simple plain text email:
 
-```
+```text
 From: alice@localhost
 To: bob@localhost
 Subject: Plain Text Example
@@ -49,6 +51,7 @@ No special formatting needed.
 
 Best,
 Alice
+
 ```
 
 ## MML for Rich Emails
@@ -57,7 +60,7 @@ Alice
 
 Alternative text/html parts:
 
-```
+```text
 From: alice@localhost
 To: bob@localhost
 Subject: Multipart Example
@@ -67,13 +70,14 @@ This is the plain text version.
 <#part type=text/html>
 <html><body><h1>This is the HTML version</h1></body></html>
 <#/multipart>
+
 ```
 
 ### Attachments
 
 Attach a file:
 
-```
+```text
 From: alice@localhost
 To: bob@localhost
 Subject: With Attachment
@@ -81,26 +85,29 @@ Subject: With Attachment
 Here is the document you requested.
 
 <#part filename=/path/to/document.pdf><#/part>
+
 ```
 
 Attachment with custom name:
 
-```
+```text
 <#part filename=/path/to/file.pdf name=report.pdf><#/part>
+
 ```
 
 Multiple attachments:
 
-```
+```text
 <#part filename=/path/to/doc1.pdf><#/part>
 <#part filename=/path/to/doc2.pdf><#/part>
+
 ```
 
 ### Inline Images
 
 Embed an image inline:
 
-```
+```text
 From: alice@localhost
 To: bob@localhost
 Subject: Inline Image
@@ -113,11 +120,12 @@ Subject: Inline Image
 </body></html>
 <#part disposition=inline id=image1 filename=/path/to/image.png><#/part>
 <#/multipart>
+
 ```
 
 ### Mixed Content (Text + Attachments)
 
-```
+```text
 From: alice@localhost
 To: bob@localhost
 Subject: Mixed Content
@@ -131,6 +139,7 @@ Alice
 <#part filename=/path/to/file1.pdf><#/part>
 <#part filename=/path/to/file2.zip><#/part>
 <#/multipart>
+
 ```
 
 ## MML Tag Reference
@@ -161,6 +170,7 @@ Opens your `$EDITOR`:
 
 ```bash
 himalaya message write
+
 ```
 
 ### Reply (opens editor with quoted message)
@@ -168,18 +178,21 @@ himalaya message write
 ```bash
 himalaya message reply 42
 himalaya message reply 42 --all  # reply-all
+
 ```
 
 ### Forward
 
 ```bash
 himalaya message forward 42
+
 ```
 
 ### Send from stdin
 
 ```bash
 cat message.txt | himalaya template send
+
 ```
 
 ### Prefill headers from CLI
@@ -189,6 +202,7 @@ himalaya message write \
   -H "To:recipient@example.com" \
   -H "Subject:Quick Message" \
   "Message body here"
+
 ```
 
 ## Tips

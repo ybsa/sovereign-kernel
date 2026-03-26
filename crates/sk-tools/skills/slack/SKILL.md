@@ -23,7 +23,7 @@ Message context lines include `slack message id` and `channel` fields you can re
 ### Action groups
 
 | Action group | Default | Notes                  |
-| ------------ | ------- | ---------------------- |
+| --- | --- | --- |
 | reactions    | enabled | React + list reactions |
 | messages     | enabled | Read/send/edit/delete  |
 | pins         | enabled | Pin/unpin/list         |
@@ -39,6 +39,7 @@ Message context lines include `slack message id` and `channel` fields you can re
   "messageId": "1712023032.1234",
   "emoji": "✅"
 }
+
 ```
 
 ### List reactions
@@ -49,6 +50,7 @@ Message context lines include `slack message id` and `channel` fields you can re
   "channelId": "C123",
   "messageId": "1712023032.1234"
 }
+
 ```
 
 ### Send a message
@@ -59,6 +61,7 @@ Message context lines include `slack message id` and `channel` fields you can re
   "to": "channel:C123",
   "content": "Hello from OpenClaw"
 }
+
 ```
 
 ### Edit a message
@@ -70,6 +73,7 @@ Message context lines include `slack message id` and `channel` fields you can re
   "messageId": "1712023032.1234",
   "content": "Updated text"
 }
+
 ```
 
 ### Delete a message
@@ -80,6 +84,7 @@ Message context lines include `slack message id` and `channel` fields you can re
   "channelId": "C123",
   "messageId": "1712023032.1234"
 }
+
 ```
 
 ### Read recent messages
@@ -90,6 +95,7 @@ Message context lines include `slack message id` and `channel` fields you can re
   "channelId": "C123",
   "limit": 20
 }
+
 ```
 
 ### Pin a message
@@ -100,6 +106,7 @@ Message context lines include `slack message id` and `channel` fields you can re
   "channelId": "C123",
   "messageId": "1712023032.1234"
 }
+
 ```
 
 ### Unpin a message
@@ -110,6 +117,7 @@ Message context lines include `slack message id` and `channel` fields you can re
   "channelId": "C123",
   "messageId": "1712023032.1234"
 }
+
 ```
 
 ### List pinned items
@@ -119,6 +127,7 @@ Message context lines include `slack message id` and `channel` fields you can re
   "action": "listPins",
   "channelId": "C123"
 }
+
 ```
 
 ### Member info
@@ -128,6 +137,7 @@ Message context lines include `slack message id` and `channel` fields you can re
   "action": "memberInfo",
   "userId": "U123"
 }
+
 ```
 
 ### Emoji list
@@ -136,6 +146,7 @@ Message context lines include `slack message id` and `channel` fields you can re
 {
   "action": "emojiList"
 }
+
 ```
 
 ## Ideas to try

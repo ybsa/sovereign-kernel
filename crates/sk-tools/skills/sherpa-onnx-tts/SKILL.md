@@ -81,18 +81,21 @@ Update `~/.openclaw/openclaw.json`:
     },
   },
 }
+
 ```
 
 The wrapper lives in this skill folder. Run it directly, or add the wrapper to PATH:
 
 ```bash
 export PATH="{baseDir}/bin:$PATH"
+
 ```
 
 ## Usage
 
 ```bash
 {baseDir}/bin/sherpa-onnx-tts -o ./tts.wav "Hello from local TTS."
+
 ```
 
 Notes:

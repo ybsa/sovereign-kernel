@@ -10,11 +10,15 @@ use crate::semantic::SemanticStore;
 use crate::session::SessionStore;
 use crate::shared::SharedMemoryStore;
 use crate::structured::StructuredStore;
+use async_trait::async_trait;
 use rusqlite::Connection;
-use sk_types::{SovereignError, SovereignResult};
+use sk_types::memory::*;
+use sk_types::{AgentId, SovereignError, SovereignResult};
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tracing::info;
+use tracing::{info, warn};
+use uuid::Uuid;
 
 /// The unified memory substrate.
 ///
@@ -290,7 +294,7 @@ impl MemorySubstrate {
                 id,
                 name: manifest.name.clone(),
                 manifest: manifest.clone(),
-                state: sk_types::agent::AgentState::Created,
+                state: sk_types::AgentState::Created,
                 mode: sk_types::AgentMode::Full,
                 created_at: chrono::DateTime::parse_from_rfc3339(&created_at)
                     .map(|dt| dt.with_timezone(&chrono::Utc))
@@ -300,7 +304,7 @@ impl MemorySubstrate {
                     .unwrap_or_else(|_| chrono::Utc::now()),
                 parent: None,
                 children: vec![],
-                session_id: sk_types::agent::SessionId::new(), // Transient for status
+                session_id: sk_types::agent::SessionId::new(),
                 tags: manifest.tags.clone(),
                 identity: Default::default(),
                 onboarding_completed: true,
@@ -309,6 +313,421 @@ impl MemorySubstrate {
         }
         Ok(agents)
     }
+
+    async fn export_raw(&self) -> SovereignResult<MemoryRawData> {
+        let (structured, semantic, knowledge_entities, knowledge_relations) = {
+            let conn = self
+                .conn
+                .lock()
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
+
+            // 1. Structured
+            let mut structured = HashMap::new();
+            let mut stmt = conn
+                .prepare("SELECT agent_id, key, value FROM kv_store")
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
+            let mut rows = stmt
+                .query([])
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
+            while let Some(row) = rows
+                .next()
+                .map_err(|e| SovereignError::Memory(e.to_string()))?
+            {
+                let agent_id: String = row
+                    .get(0)
+                    .map_err(|e| SovereignError::Memory(e.to_string()))?;
+                let key: String = row
+                    .get(1)
+                    .map_err(|e| SovereignError::Memory(e.to_string()))?;
+                let val_str: String = row
+                    .get(2)
+                    .map_err(|e| SovereignError::Memory(e.to_string()))?;
+                let value: serde_json::Value = serde_json::from_str(&val_str)
+                    .map_err(|e| SovereignError::Memory(e.to_string()))?;
+
+                structured
+                    .entry(agent_id)
+                    .or_insert_with(HashMap::new)
+                    .insert(key, value);
+            }
+
+            // 2. Semantic
+            let mut semantic = Vec::new();
+            let mut stmt = conn.prepare("SELECT id, agent_id, content, source, created_at, accessed_at, access_count FROM semantic_memories")
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
+            let mut rows = stmt
+                .query([])
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
+            while let Some(row) = rows
+                .next()
+                .map_err(|e| SovereignError::Memory(e.to_string()))?
+            {
+                let id_raw: String = row
+                    .get(0)
+                    .map_err(|e| SovereignError::Memory(e.to_string()))?;
+                let aid_raw: String = row
+                    .get(1)
+                    .map_err(|e| SovereignError::Memory(e.to_string()))?;
+                semantic.push(MemoryFragment {
+                    id: MemoryId(Uuid::parse_str(&id_raw).unwrap_or_else(|_| Uuid::new_v4())),
+                    agent_id: AgentId(Uuid::parse_str(&aid_raw).unwrap_or_else(|_| Uuid::new_v4())),
+                    content: row
+                        .get::<usize, String>(2)
+                        .map_err(|e| SovereignError::Memory(e.to_string()))?,
+                    embedding: None,
+                    metadata: HashMap::new(),
+                    source: MemorySource::Observation,
+                    confidence: 1.0,
+                    created_at: row
+                        .get::<usize, String>(4)
+                        .map_err(|e| SovereignError::Memory(e.to_string()))
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default(),
+                    accessed_at: row
+                        .get::<usize, String>(5)
+                        .map_err(|e| SovereignError::Memory(e.to_string()))
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default(),
+                    access_count: row
+                        .get::<usize, i64>(6)
+                        .map_err(|e| SovereignError::Memory(e.to_string()))?
+                        as u64,
+                    scope: "default".into(),
+                });
+            }
+
+            // 3. Knowledge
+            let mut knowledge_entities = Vec::new();
+            let mut stmt = conn
+                .prepare(
+                    "SELECT id, name, entity_type, properties, created_at FROM knowledge_entities",
+                )
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
+            let mut rows = stmt
+                .query([])
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
+            while let Some(row) = rows
+                .next()
+                .map_err(|e| SovereignError::Memory(e.to_string()))?
+            {
+                knowledge_entities.push(Entity {
+                    id: row
+                        .get(0)
+                        .map_err(|e| SovereignError::Memory(e.to_string()))?,
+                    name: row
+                        .get(1)
+                        .map_err(|e| SovereignError::Memory(e.to_string()))?,
+                    entity_type: EntityType::Concept,
+                    properties: serde_json::from_str(
+                        &row.get::<usize, String>(3)
+                            .unwrap_or_else(|_| "{}".to_string()),
+                    )
+                    .unwrap_or_default(),
+                    created_at: row
+                        .get::<usize, String>(4)
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default(),
+                    updated_at: row
+                        .get::<usize, String>(4)
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default(),
+                });
+            }
+
+            (structured, semantic, knowledge_entities, vec![])
+        };
+
+        Ok(MemoryRawData {
+            structured,
+            semantic,
+            knowledge_entities,
+            knowledge_relations,
+        })
+    }
+}
+
+#[async_trait]
+impl Memory for MemorySubstrate {
+    async fn get(
+        &self,
+        agent_id: AgentId,
+        key: &str,
+    ) -> SovereignResult<Option<serde_json::Value>> {
+        self.structured.get(agent_id, key)
+    }
+
+    async fn set(
+        &self,
+        agent_id: AgentId,
+        key: &str,
+        value: serde_json::Value,
+    ) -> SovereignResult<()> {
+        self.structured.set(agent_id, key, value)
+    }
+
+    async fn delete(&self, agent_id: AgentId, key: &str) -> SovereignResult<()> {
+        self.structured.delete(agent_id, key)
+    }
+
+    async fn remember(
+        &self,
+        agent_id: AgentId,
+        content: &str,
+        source: MemorySource,
+        _scope: &str,
+        _metadata: HashMap<String, serde_json::Value>,
+    ) -> SovereignResult<MemoryId> {
+        let mem_id = self
+            .semantic
+            .store(agent_id, content, &[], &format!("{:?}", source))?;
+        self.bm25.index(agent_id, &mem_id, content)?;
+        Ok(MemoryId(
+            Uuid::parse_str(&mem_id).unwrap_or_else(|_| Uuid::new_v4()),
+        ))
+    }
+
+    async fn recall(
+        &self,
+        query: &str,
+        limit: usize,
+        filter: Option<MemoryFilter>,
+    ) -> SovereignResult<Vec<MemoryFragment>> {
+        let agent_id = filter.as_ref().and_then(|f| f.agent_id);
+        let results = self.bm25.search(agent_id, query, limit)?;
+
+        let mut fragments = Vec::new();
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| SovereignError::Memory(e.to_string()))?;
+
+        for res in results {
+            let mut stmt = conn.prepare("SELECT id, agent_id, content, source, created_at, accessed_at, access_count FROM semantic_memories WHERE id = ?1")
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
+            let mut rows = stmt
+                .query(rusqlite::params![res.memory_id])
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
+
+            if let Some(row) = rows
+                .next()
+                .map_err(|e| SovereignError::Memory(e.to_string()))?
+            {
+                let id_raw: String = row
+                    .get(0)
+                    .map_err(|e| SovereignError::Memory(e.to_string()))?;
+                let aid_raw: String = row
+                    .get(1)
+                    .map_err(|e| SovereignError::Memory(e.to_string()))?;
+                fragments.push(MemoryFragment {
+                    id: MemoryId(Uuid::parse_str(&id_raw).unwrap_or_else(|_| Uuid::new_v4())),
+                    agent_id: AgentId(Uuid::parse_str(&aid_raw).unwrap_or_else(|_| Uuid::new_v4())),
+                    content: row
+                        .get::<usize, String>(2)
+                        .map_err(|e| SovereignError::Memory(e.to_string()))?,
+                    embedding: None,
+                    metadata: HashMap::new(),
+                    source: MemorySource::Observation,
+                    confidence: 1.0,
+                    created_at: row
+                        .get::<usize, String>(4)
+                        .map_err(|e| SovereignError::Memory(e.to_string()))
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default(),
+                    accessed_at: row
+                        .get::<usize, String>(5)
+                        .map_err(|e| SovereignError::Memory(e.to_string()))
+                        .unwrap_or_default()
+                        .parse()
+                        .unwrap_or_default(),
+                    access_count: row
+                        .get::<usize, i64>(6)
+                        .map_err(|e| SovereignError::Memory(e.to_string()))?
+                        as u64,
+                    scope: "default".into(),
+                });
+            }
+        }
+
+        Ok(fragments)
+    }
+
+    async fn forget(&self, id: MemoryId) -> SovereignResult<()> {
+        let id_str = id.to_string();
+        self.semantic.delete(&id_str)?;
+        self.bm25.remove(&id_str)?;
+        Ok(())
+    }
+
+    async fn add_entity(&self, entity: Entity) -> SovereignResult<String> {
+        let agent_id = AgentId::new();
+        let properties = serde_json::to_value(&entity.properties)
+            .unwrap_or(serde_json::Value::Object(Default::default()));
+        self.knowledge.add_entity(
+            agent_id,
+            &entity.name,
+            &format!("{:?}", entity.entity_type),
+            properties,
+        )
+    }
+
+    async fn add_relation(&self, relation: Relation) -> SovereignResult<String> {
+        let agent_id = AgentId::new();
+        self.knowledge.add_relation(
+            agent_id,
+            &relation.source,
+            &format!("{:?}", relation.relation),
+            &relation.target,
+            1.0,
+        )
+    }
+
+    async fn query_graph(&self, _pattern: GraphPattern) -> SovereignResult<Vec<GraphMatch>> {
+        Ok(vec![])
+    }
+
+    async fn consolidate(&self) -> SovereignResult<ConsolidationReport> {
+        Ok(ConsolidationReport {
+            memories_merged: 0,
+            memories_decayed: 0,
+            duration_ms: 0,
+        })
+    }
+
+    async fn export(&self, format: ExportFormat) -> SovereignResult<Vec<u8>> {
+        match format {
+            ExportFormat::Json => {
+                let data = self.export_raw().await?;
+                serde_json::to_vec_pretty(&data)
+                    .map_err(|e| SovereignError::Memory(format!("JSON export failed: {e}")))
+            }
+            ExportFormat::Markdown => {
+                let data = self.export_raw().await?;
+                let mut md = String::new();
+                md.push_str("# Sovereign Kernel Memory Export\n\n");
+
+                md.push_str("## Structured Memory (Key-Value)\n");
+                for (agent_id, kv) in data.structured {
+                    md.push_str(&format!("### Agent: {}\n", agent_id));
+                    for (key, value) in kv {
+                        md.push_str(&format!("- **{}**: {}\n", key, value));
+                    }
+                }
+
+                md.push_str("\n## Semantic Memories\n");
+                for mem in data.semantic {
+                    md.push_str(&format!(
+                        "### [{}] - Agent: {}\n",
+                        mem.created_at, mem.agent_id
+                    ));
+                    md.push_str(&format!("> {}\n\n", mem.content));
+                }
+
+                md.push_str("\n## Knowledge Entities\n");
+                for entity in data.knowledge_entities {
+                    md.push_str(&format!("- **{}** ({})\n", entity.name, entity.id));
+                }
+
+                Ok(md.into_bytes())
+            }
+            ExportFormat::MessagePack => Err(SovereignError::Memory(
+                "MessagePack export not implemented yet".into(),
+            )),
+        }
+    }
+
+    async fn import(&self, data: &[u8], format: ExportFormat) -> SovereignResult<ImportReport> {
+        match format {
+            ExportFormat::Json => {
+                let raw: MemoryRawData = serde_json::from_slice(data)
+                    .map_err(|e| SovereignError::Memory(format!("JSON import failed: {e}")))?;
+
+                let mut report = ImportReport::default();
+
+                for (agent_id_str, kv) in raw.structured {
+                    let agent_id = AgentId::parse(&agent_id_str).unwrap_or_default();
+                    for (key, value) in kv {
+                        if let Err(e) = self.structured.set(agent_id, &key, value) {
+                            report
+                                .errors
+                                .push(format!("KV import failed for {key}: {e}"));
+                        } else {
+                            report.kv_imported += 1;
+                        }
+                    }
+                }
+
+                for mem in raw.semantic {
+                    if let Err(e) = self
+                        .remember(
+                            mem.agent_id,
+                            &mem.content,
+                            mem.source,
+                            &mem.scope,
+                            mem.metadata,
+                        )
+                        .await
+                    {
+                        report.errors.push(format!("Memory import failed: {e}"));
+                    } else {
+                        report.memories_imported += 1;
+                    }
+                }
+
+                for entity in raw.knowledge_entities {
+                    if let Err(e) = self.add_entity(entity).await {
+                        report.errors.push(format!("Entity import failed: {e}"));
+                    } else {
+                        report.entities_imported += 1;
+                    }
+                }
+
+                Ok(report)
+            }
+            ExportFormat::Markdown => {
+                warn!("Markdown import is lossy and only supports semantic memories currently");
+                let content = String::from_utf8_lossy(data);
+                let mut report = ImportReport::default();
+
+                // Very simple regex-based parser for our export format
+                let mut current_agent = AgentId::new();
+                for line in content.lines() {
+                    if line.starts_with("### [") && line.contains("] - Agent: ") {
+                        if let Some(aid_part) = line.split("Agent: ").nth(1) {
+                            current_agent =
+                                AgentId::parse(aid_part.trim()).unwrap_or(current_agent);
+                        }
+                    } else if let Some(text) = line.strip_prefix("> ") {
+                        self.remember(
+                            current_agent,
+                            text,
+                            MemorySource::Observation,
+                            "imported",
+                            HashMap::new(),
+                        )
+                        .await?;
+                        report.memories_imported += 1;
+                    }
+                }
+
+                Ok(report)
+            }
+            _ => Err(SovereignError::Memory("Import format not supported".into())),
+        }
+    }
+}
+
+/// Raw data structure for memory export/import
+#[derive(serde::Serialize, serde::Deserialize)]
+struct MemoryRawData {
+    structured: HashMap<String, HashMap<String, serde_json::Value>>,
+    semantic: Vec<MemoryFragment>,
+    knowledge_entities: Vec<Entity>,
+    knowledge_relations: Vec<Relation>,
 }
 
 #[cfg(test)]

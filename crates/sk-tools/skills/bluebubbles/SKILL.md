@@ -30,6 +30,7 @@ If the user is vague ("text my mom"), ask for the recipient handle or chat guid 
   "target": "+15551234567",
   "message": "hello from OpenClaw"
 }
+
 ```
 
 ### React (tapback)
@@ -42,6 +43,7 @@ If the user is vague ("text my mom"), ask for the recipient handle or chat guid 
   "messageId": "<message-guid>",
   "emoji": "❤️"
 }
+
 ```
 
 ### Remove a reaction
@@ -55,6 +57,7 @@ If the user is vague ("text my mom"), ask for the recipient handle or chat guid 
   "emoji": "❤️",
   "remove": true
 }
+
 ```
 
 ### Edit a previously sent message
@@ -67,6 +70,7 @@ If the user is vague ("text my mom"), ask for the recipient handle or chat guid 
   "messageId": "<message-guid>",
   "message": "updated text"
 }
+
 ```
 
 ### Unsend a message
@@ -78,6 +82,7 @@ If the user is vague ("text my mom"), ask for the recipient handle or chat guid 
   "target": "+15551234567",
   "messageId": "<message-guid>"
 }
+
 ```
 
 ### Reply to a specific message
@@ -90,6 +95,7 @@ If the user is vague ("text my mom"), ask for the recipient handle or chat guid 
   "replyTo": "<message-guid>",
   "message": "replying to that"
 }
+
 ```
 
 ### Send an attachment
@@ -102,6 +108,7 @@ If the user is vague ("text my mom"), ask for the recipient handle or chat guid 
   "path": "/tmp/photo.jpg",
   "caption": "here you go"
 }
+
 ```
 
 ### Send with an iMessage effect
@@ -114,6 +121,7 @@ If the user is vague ("text my mom"), ask for the recipient handle or chat guid 
   "message": "big news",
   "effect": "balloons"
 }
+
 ```
 
 ## Notes
