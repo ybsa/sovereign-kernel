@@ -22,10 +22,12 @@ This guide is for developers and maintainers who want to contribute to the Sover
 1. **Update CHANGELOG.md**: Record all notable changes in the `[Unreleased]` or new version section.
 2. **Bump Version**: Update `version` in the root `Cargo.toml` and potentially individual crates.
 3. **Tagging**:
+
    ```bash
    git tag -a v1.x.x -m "Release v1.x.x"
    git push origin v1.x.x
    ```
+
 4. **Binary Assets**: The CI pipeline automatically builds and attaches binaries to GitHub Releases (once configured).
 
 ## 🛡️ Security Policy

@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-03-27
 
-### Added
+### Added in 1.1.0
+
 - **50+ New Expert Skills**: Comprehensive SKILL.md guides across Backend, Frontend, Cloud (AWS/Azure/GCP), DevOps, Security, Data Science, and Mobile development.
 - **Memory Migration CLI**: Added `sovereign memory export`, `import`, and `stats` to the core CLI.
 - **Unified Village Integration**: Improved multi-agent coordination and cross-agent shared memory.
@@ -15,17 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Getting Started Guide**: New concise `GETTING_STARTED.md` for both pre-built binary users and developers.
 - **Integration Tests**: New workspace-wide memory consistency and tool tests.
 
-### Fixed
+### Fixed in 1.1.0
+
 - **Markdown Linting**: Resolved 344+ warnings across 139 files for 100% standards compliance.
 - **Build Quality**: Fixed all `cargo clippy` and `rustfmt` issues in `sk-memory` and `sk-kernel`.
 - **Formatting**: Unified whitespace and trailing character standards across the Rust crates.
 
-### Changed
+### Changed in 1.1.0
+
 - **CLI Ergonomics**: Flattened memory commands for better usability.
 
 ## [1.0.0] - 2026-03-25
 
-### Added
+### Added in 1.0.0
+
 - **Core Village Engine**: The initial release of the Sovereign Kernel.
 - **Security Sandbox**: Landlock LSM and seccomp-bpf integration.
 - **Channel Bridge**: Support for Telegram, Discord, and Slack adapters.
