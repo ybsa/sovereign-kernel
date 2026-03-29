@@ -11,7 +11,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use sk_types::{AgentId, SovereignError, SovereignResult};
+use sk_types::{AgentId, SovereignError, SovereignResult, KernelConfig};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -22,6 +22,11 @@ use crate::SovereignKernel;
 /// Shared state for the API server.
 pub struct ApiState {
     pub kernel: Arc<SovereignKernel>,
+}
+
+fn _check_traits() {
+    fn is_send<T: Send>() {}
+    is_send::<KernelConfig>();
 }
 
 /// Request for a chat message via API.
@@ -112,8 +117,9 @@ pub async fn start_server(kernel: Arc<SovereignKernel>, addr: &str) -> Sovereign
         .route("/v1/triggers/webhook", post(webhook_handler))
         .route(
             "/v1/config",
-            get(get_config_handler).post(update_config_handler),
+            get(get_config_handler),
         )
+        .route("/v1/config/update", post(update_config_handler))
         .route("/v1/tools", get(list_tools_handler))
         .route("/v1/treasury/status", get(treasury_status_handler))
         .route("/v1/treasury/reset", post(treasury_reset_handler))
@@ -338,7 +344,7 @@ async fn thinking_handler(
         .kernel
         .config
         .read()
-        .await
+        .unwrap()
         .data_dir
         .join(".steps")
         .join(agent.session_id.to_string());
@@ -376,16 +382,16 @@ async fn thinking_handler(
 
 /// GET /v1/config
 async fn get_config_handler(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
-    let cfg = state.kernel.config.read().await.clone();
+    let cfg = state.kernel.config.read().unwrap().clone();
     (StatusCode::OK, Json(cfg))
 }
 
-/// POST /v1/config
+/// POST /v1/config/update
 async fn update_config_handler(
     State(state): State<Arc<ApiState>>,
-    Json(payload): Json<sk_types::config::KernelConfig>,
+    Json(payload): Json<KernelConfig>,
 ) -> impl IntoResponse {
-    let old_config = state.kernel.config.read().await.clone();
+    let old_config = state.kernel.config.read().unwrap().clone();
 
     // Validate new config
     if let Err(errors) = crate::config_reload::validate_config_for_reload(&payload) {
@@ -418,29 +424,30 @@ async fn update_config_handler(
 
     // Apply hot actions
     {
-        let mut lock = state.kernel.config.write().await;
+        let mut lock = state.kernel.config.write().unwrap();
         *lock = payload;
     }
 
-    if let Err(e) = state.kernel.apply_hot_actions(&plan.hot_actions).await {
-        return (
+    let actions = plan.hot_actions.clone();
+
+    match state.kernel.apply_hot_actions(&actions).await {
+        Ok(_) => (
+            StatusCode::OK,
+            Json(ActionResponse {
+                success: true,
+                message: "Config hot-reloaded successfully.".to_string(),
+            }),
+        )
+            .into_response(),
+        Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ActionResponse {
                 success: false,
                 message: format!("Failed to apply hot-reload: {}", e),
             }),
         )
-            .into_response();
+            .into_response(),
     }
-
-    (
-        StatusCode::OK,
-        Json(ActionResponse {
-            success: true,
-            message: "Config hot-reloaded successfully.".to_string(),
-        }),
-    )
-        .into_response()
 }
 
 /// GET /v1/tools
@@ -478,8 +485,8 @@ async fn webhook_handler(
 }
 /// GET /v1/treasury/status
 async fn treasury_status_handler(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
-    let config = state.kernel.config.read().await;
-    let status = state.kernel.metering.budget_status(&config.budget).await;
+    let budget = state.kernel.config.read().unwrap().budget.clone();
+    let status = state.kernel.metering.budget_status(&budget).await;
     (StatusCode::OK, Json(status))
 }
 

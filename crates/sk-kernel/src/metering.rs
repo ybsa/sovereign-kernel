@@ -15,9 +15,8 @@ use tracing::info;
 pub struct MeteringEngine {
     /// Per-agent accumulated cost in the current session.
     costs: dashmap::DashMap<AgentId, f64>,
-    /// Global aggregates (protected by internal Mutex or just tracked in costs).
-    /// Actually, for global quotas we need time-windowed tracking.
-    state: tokio::sync::RwLock<MeteringState>,
+    /// Global aggregates.
+    state: std::sync::RwLock<MeteringState>,
     /// Path to persist state to.
     persist_path: Option<std::path::PathBuf>,
 }
@@ -50,7 +49,7 @@ impl Default for MeteringEngine {
     fn default() -> Self {
         Self {
             costs: dashmap::DashMap::new(),
-            state: tokio::sync::RwLock::new(MeteringState::default()),
+            state: std::sync::RwLock::new(MeteringState::default()),
             persist_path: None,
         }
     }
@@ -73,7 +72,9 @@ impl MeteringEngine {
                 let data = fs_err::read_to_string(path).map_err(sk_types::SovereignError::Io)?;
                 let state: MeteringState = serde_json::from_str(&data)
                     .map_err(|e| sk_types::SovereignError::Internal(e.to_string()))?;
-                let mut lock = self.state.write().await;
+                let mut lock = self.state.write().map_err(|_| {
+                    sk_types::SovereignError::Internal("Metering lock poisoned".to_string())
+                })?;
                 *lock = state;
                 // Also populate the dashmap for runtime access
                 for (id, cost) in &lock.agent_costs {
@@ -88,7 +89,13 @@ impl MeteringEngine {
     /// Save state to disk.
     pub async fn save(&self) -> sk_types::SovereignResult<()> {
         if let Some(ref path) = self.persist_path {
-            let mut state = self.state.read().await.clone();
+            let mut state = self
+                .state
+                .read()
+                .map_err(|_| {
+                    sk_types::SovereignError::Internal("Metering lock poisoned".to_string())
+                })?
+                .clone();
             // Sync agent costs from dashmap
             state.agent_costs.clear();
             for r in self.costs.iter() {
@@ -111,7 +118,10 @@ impl MeteringEngine {
         *entry += cost_usd;
 
         // 2. Update global windowed costs
-        let mut state = self.state.blocking_write();
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return, // Poisoned, ignore but don't panic
+        };
         let now = Utc::now();
 
         // Check for window resets
@@ -137,7 +147,7 @@ impl MeteringEngine {
         &self,
         budget: &sk_types::config::BudgetConfig,
     ) -> Result<(), String> {
-        let state = self.state.read().await;
+        let state = self.state.read().map_err(|_| "Metering lock poisoned")?;
 
         if budget.max_hourly_usd > 0.0 && state.hourly_cost >= budget.max_hourly_usd {
             return Err(format!(
@@ -168,12 +178,15 @@ impl MeteringEngine {
 
     /// Get total cost across all agents.
     pub fn total_cost(&self) -> f64 {
-        self.state.blocking_read().total_cost
+        self.state
+            .read()
+            .map(|s| s.total_cost)
+            .unwrap_or(0.0)
     }
 
     /// Get a budget status snapshot.
     pub async fn budget_status(&self, budget: &sk_types::config::BudgetConfig) -> BudgetStatus {
-        let state = self.state.read().await;
+        let state = self.state.read().unwrap_or_else(|e| e.into_inner());
         BudgetStatus {
             current_spend: state.total_cost,
             hourly_spend: state.hourly_cost,

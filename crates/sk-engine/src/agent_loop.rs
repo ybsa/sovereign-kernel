@@ -337,9 +337,20 @@ pub async fn run_agent_loop(
                     session.push_message(tool_msg);
 
                     // 3. Circuit Breaker
-                    if consecutive_errors >= 5 {
-                        warn!("Circuit breaker tripped: 5 consecutive tool execution errors.");
-                        final_response = "System Error: Circuit breaker tripped due to 5 consecutive tool failures. The system has automatically halted to prevent infinite error loops.".to_string();
+                    if (3..8).contains(&consecutive_errors) {
+                        // Add a nudge to help the model correct course
+                        let nudge_msg = sk_types::message::Message {
+                            role: sk_types::message::Role::User,
+                            content: sk_types::message::MessageContent::Text(
+                                "System Notice: You have made multiple tool errors. Please respond with plain text or carefully use one of your registered tools with correct arguments.".to_string()
+                            ),
+                        };
+                        messages.push(nudge_msg.clone());
+                        session.push_message(nudge_msg);
+                    }
+                    if consecutive_errors >= 8 {
+                        warn!("Circuit breaker tripped: 8 consecutive tool execution errors.");
+                        final_response = "System Error: Circuit breaker tripped due to 8 consecutive tool failures. The system has automatically halted to prevent infinite error loops.".to_string();
                         return Ok(AgentLoopResult {
                             response: final_response,
                             session: session.clone(),

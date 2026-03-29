@@ -218,7 +218,7 @@ async fn api_version() -> axum::Json<VersionInfo> {
 }
 
 async fn api_status(state: axum::extract::State<Arc<AppState>>) -> axum::Json<StatusResponse> {
-    let reg = state.kernel.hands.read().await;
+    let reg = state.kernel.hands.read().unwrap();
     let defs = reg.list_definitions();
     let instances = reg.list_instances();
 
@@ -246,7 +246,7 @@ async fn api_list_agents(state: axum::extract::State<Arc<AppState>>) -> axum::Js
 }
 
 async fn api_list_hands(state: axum::extract::State<Arc<AppState>>) -> axum::Json<Vec<HandInfo>> {
-    let reg = state.kernel.hands.read().await;
+    let reg = state.kernel.hands.read().unwrap();
     let defs = reg.list_definitions();
     axum::Json(
         defs.iter()
@@ -265,7 +265,7 @@ async fn api_list_hands(state: axum::extract::State<Arc<AppState>>) -> axum::Jso
 async fn api_list_hand_instances(
     state: axum::extract::State<Arc<AppState>>,
 ) -> axum::Json<Vec<HandInstanceInfo>> {
-    let reg = state.kernel.hands.read().await;
+    let reg = state.kernel.hands.read().unwrap();
     let instances = reg.list_instances();
     axum::Json(
         instances

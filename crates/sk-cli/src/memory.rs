@@ -5,7 +5,7 @@ use sk_memory::MemorySubstrate;
 use sk_types::memory::{ExportFormat, Memory};
 use std::path::PathBuf;
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum MemoryCommands {
     /// Export agent memory to a file
     Export {

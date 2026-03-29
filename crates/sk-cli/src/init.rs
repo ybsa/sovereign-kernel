@@ -1,74 +1,108 @@
 //! First-run setup wizard.
 
+use colored::*;
 use std::fs;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub async fn run() -> anyhow::Result<()> {
-    println!("═══════════════════════════════════════════════════════");
-    println!("  ⚡ Sovereign Kernel — First Run Wizard");
-    println!("═══════════════════════════════════════════════════════\n");
+    println!("{}", "═══════════════════════════════════════════════════════".bright_cyan());
+    println!("  ⚡ {}", "Sovereign Kernel — Advanced Setup Wizard".bright_white().bold());
+    println!("{}", "═══════════════════════════════════════════════════════\n".bright_cyan());
 
-    let env_path = PathBuf::from(".env");
-    let soul_dir = PathBuf::from("soul");
-    let soul_path = soul_dir.join("SOUL.md");
+    let soul_path = PathBuf::from("soul/SOUL.md");
 
-    if !env_path.exists() || !soul_path.exists() {
-        println!("We noticed you are starting fresh. Let's configure your Agent!");
+    println!("Welcome! Let's get your Sovereign Agent running with your preferred AI model.");
 
-        let mut name = String::new();
-        print!("What is your name? : ");
-        io::stdout().flush()?;
-        io::stdin().read_line(&mut name)?;
-        let name = name.trim();
+    // 1. Identity Setup
+    let mut name_input = String::new();
+    print!("What is your name? : ");
+    io::stdout().flush()?;
+    io::stdin().read_line(&mut name_input)?;
+    let name = name_input.trim().to_string();
 
-        let mut goal = String::new();
-        print!("What is your agent's primary goal? : ");
-        io::stdout().flush()?;
-        io::stdin().read_line(&mut goal)?;
-        let goal = goal.trim();
+    let mut goal_input = String::new();
+    print!("What is your agent's primary goal? : ");
+    io::stdout().flush()?;
+    io::stdin().read_line(&mut goal_input)?;
+    let goal = goal_input.trim().to_string();
 
-        let mut gemini_key = String::new();
-        print!("Enter your Gemini API Key (or press Enter to skip): ");
-        io::stdout().flush()?;
-        io::stdin().read_line(&mut gemini_key)?;
-        let gemini_key = gemini_key.trim();
+    // 2. Provider Selection
+    println!("\n── Choose your AI Provider ────────────────────────────");
+    println!("  1. {} (Google) - Best for free/flash access", "Gemini".bright_green());
+    println!("  2. {} (Anthropic) - Best for complex coding", "Claude".bright_yellow());
+    println!("  3. {} (OpenAI) - The industry standard", "OpenAI".bright_blue());
+    println!("  4. {} (Local) - Run on your own hardware", "Ollama".bright_magenta());
+    println!("  5. {} - Define your own API endpoint", "Custom".bright_white());
+    
+    let mut choice_input = String::new();
+    print!("\nSelection (1-5) [1]: ");
+    io::stdout().flush()?;
+    io::stdin().read_line(&mut choice_input)?;
+    let choice = choice_input.trim().parse::<u32>().unwrap_or(1);
 
-        let mut anthropic_key = String::new();
-        print!("Enter your Anthropic API Key (or press Enter to skip): ");
-        io::stdout().flush()?;
-        io::stdin().read_line(&mut anthropic_key)?;
-        let anthropic_key = anthropic_key.trim();
-
-        // Channel setup — Telegram
-        println!("\n── Channel Setup ──────────────────────────────────────");
-        let mut telegram_token = String::new();
-        print!("Enter your Telegram Bot Token (or press Enter to skip): ");
-        io::stdout().flush()?;
-        io::stdin().read_line(&mut telegram_token)?;
-        let telegram_token = telegram_token.trim();
-
-        if !env_path.exists()
-            && (!gemini_key.is_empty() || !anthropic_key.is_empty() || !telegram_token.is_empty())
-        {
-            let mut env_content = String::new();
-            if !gemini_key.is_empty() {
-                env_content.push_str(&format!("GEMINI_API_KEY={}\n", gemini_key));
-            }
-            if !anthropic_key.is_empty() {
-                env_content.push_str(&format!("ANTHROPIC_API_KEY={}\n", anthropic_key));
-            }
-            if !telegram_token.is_empty() {
-                env_content.push_str(&format!("TELEGRAM_BOT_TOKEN={}\n", telegram_token));
-            }
-            fs::write(&env_path, env_content)?;
-            println!("✓ Created .env file (excluded in .gitignore to protect privacy)");
+    let (provider, model, env_var, base_url) = match choice {
+        1 => {
+            let mut key = String::new();
+            print!("Enter your Gemini API Key: ");
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut key)?;
+            let key = key.trim();
+            save_key_to_env("GEMINI_API_KEY", key)?;
+            ("gemini".to_string(), "gemini-2.0-flash".to_string(), "GEMINI_API_KEY".to_string(), None)
         }
+        2 => {
+            let mut key = String::new();
+            print!("Enter your Anthropic API Key: ");
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut key)?;
+            let key = key.trim();
+            save_key_to_env("ANTHROPIC_API_KEY", key)?;
+            ("anthropic".to_string(), "claude-3-5-sonnet-20241022".to_string(), "ANTHROPIC_API_KEY".to_string(), None)
+        }
+        3 => {
+            let mut key = String::new();
+            print!("Enter your OpenAI API Key: ");
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut key)?;
+            let key = key.trim();
+            save_key_to_env("OPENAI_API_KEY", key)?;
+            ("openai".to_string(), "gpt-4o".to_string(), "OPENAI_API_KEY".to_string(), None)
+        }
+        4 => {
+            let mut model_name_input = String::new();
+            print!("Enter Ollama model name [llama3]: ");
+            io::stdout().flush()?;
+            io::stdin().read_line(&mut model_name_input)?;
+            let model_name = model_name_input.trim();
+            let model = if model_name.is_empty() { "llama3" } else { model_name };
+            ("ollama".to_string(), model.to_string(), "OLLAMA_API_KEY".to_string(), Some("http://localhost:11434/v1".to_string()))
+        }
+        _ => {
+            let mut p_name_input = String::new();
+            print!("Provider name: "); io::stdout().flush()?; io::stdin().read_line(&mut p_name_input)?;
+            let mut m_name_input = String::new();
+            print!("Model name: "); io::stdout().flush()?; io::stdin().read_line(&mut m_name_input)?;
+            let mut url_input = String::new();
+            print!("Base URL: "); io::stdout().flush()?; io::stdin().read_line(&mut url_input)?;
+            let mut key_input = String::new();
+            print!("API Key (optional): "); io::stdout().flush()?; io::stdin().read_line(&mut key_input)?;
+            
+            let p_name = p_name_input.trim().to_string();
+            let env_var = format!("{}_API_KEY", p_name.to_uppercase());
+            if !key_input.trim().is_empty() {
+                save_key_to_env(&env_var, key_input.trim())?;
+            }
+            
+            (p_name, m_name_input.trim().to_string(), env_var, Some(url_input.trim().to_string()))
+        }
+    };
 
-        if !soul_path.exists() {
-            fs::create_dir_all(&soul_dir)?;
-            let soul_content = format!(
-                r#"# SOUL.md
+    // 3. Create Identity
+    if !soul_path.exists() {
+        fs::create_dir_all("soul")?;
+        let soul_content = format!(
+            r#"# SOUL.md
 
 [AGENT_NAME]: Sovereign Agent
 [USER_NAME]: {name}
@@ -85,81 +119,77 @@ You are the Sovereign Agent. Your user is {name}. You are concise, highly hyper-
 - Never delete files without explicitly asking for confirmation first.
 - Be extremely brief and direct in your answers. Do not use filler words.
 "#
-            );
-            fs::write(&soul_path, soul_content)?;
-            println!("✓ Created soul/SOUL.md custom identity template");
-        }
-
-        // Show available hands
-        println!("\n── Available Autonomous Hands ─────────────────────────");
-        let mut hand_registry = sk_hands::registry::HandRegistry::new();
-        let loaded = hand_registry.load_bundled();
-        if loaded > 0 {
-            let defs = hand_registry.list_definitions();
-            for def in &defs {
-                println!("  {} {} — {}", def.icon, def.name, def.description);
-            }
-            println!("\n  Run `sovereign hands list` for details or `sovereign hands activate <name>` to enable.");
-        } else {
-            println!("  No bundled hands found.");
-        }
-
-        // Connection summary
-        println!("\n── Setup Summary ──────────────────────────────────────");
-        if !gemini_key.is_empty() {
-            println!("  ✅ Gemini API configured");
-        }
-        if !anthropic_key.is_empty() {
-            println!("  ✅ Anthropic API configured");
-        }
-        if !telegram_token.is_empty() {
-            println!("  ✅ Telegram Bot configured");
-        }
-        if gemini_key.is_empty() && anthropic_key.is_empty() {
-            println!("  ⚠️  No LLM API key set — chat will not work until you add one to .env");
-        }
-        println!();
-    }
-
-    // Existing config dir creation
-    let config_dir = dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("sovereign-kernel");
-    fs::create_dir_all(&config_dir)?;
-    println!("✓ Config directory: {}", config_dir.display());
-
-    let data_dir = dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("sovereign-kernel");
-    fs::create_dir_all(&data_dir)?;
-    println!("✓ Data directory: {}", data_dir.display());
-
-    let config_path = config_dir.join("config.toml");
-    if !config_path.exists() {
-        let default_config = format!(
-            r#"# Sovereign Kernel Configuration
-# ==================================
-
-data_dir = "{}"
-default_provider = "anthropic"
-default_model = "claude-sonnet-4-20250514"
-
-[embedding]
-provider = "openai"
-model = "text-embedding-3-small"
-
-memory_decay_rate = 0.1
-context_window_tokens = 128000
-"#,
-            data_dir.display().to_string().replace('\\', "/")
         );
-        fs::write(&config_path, default_config)?;
-        println!("✓ Config file: {}", config_path.display());
-    } else {
-        println!("  Config file already exists: {}", config_path.display());
+        fs::write(&soul_path, soul_content)?;
+        println!("✓ Created {}", "soul/SOUL.md".green());
     }
 
-    println!("\nSetup complete! Run `cargo run -p sk-cli -- start` and `cargo run -p sk-cli -- chat` to begin.");
+    // 4. Update config.toml
+    let config_path = PathBuf::from("config.toml");
+    
+    // Very simple TOML update logic for the wizard
+    let new_config = format!(
+        r#"# Sovereign Kernel Configuration
+log_level = "info"
+execution_mode = "sandbox"
 
+[default_model]
+provider = "{provider}"
+model = "{model}"
+api_key_env = "{env_var}"
+{base_url}
+
+[memory]
+decay_rate = 0.1
+embedding_model = "all-MiniLM-L6-v2"
+"#,
+        provider = provider,
+        model = model,
+        env_var = env_var,
+        base_url = base_url.map(|u| format!("base_url = \"{}\"", u)).unwrap_or_default(),
+    );
+
+    fs::write(&config_path, new_config)?;
+    println!("✓ Updated {}", "config.toml".green());
+
+    println!("\n── Setup Complete! ────────────────────────────────────");
+    println!("  You are connected to: {} ({})", model.bright_cyan(), provider.bright_yellow());
+    println!("\nNext steps:");
+    println!("  1. Run {} to start as a background service.", "sovereign start".bold());
+    println!("  2. Run {} to begin chatting.", "sovereign chat".bold());
+    println!("\nHappy hacking, {}!", name.bright_white());
+
+    Ok(())
+}
+
+fn save_key_to_env(key_name: &str, key_value: &str) -> anyhow::Result<()> {
+    if key_value.is_empty() {
+        return Ok(());
+    }
+
+    let env_path = Path::new(".env");
+    let mut lines = if env_path.exists() {
+        fs::read_to_string(env_path)?
+            .lines()
+            .map(|l| l.to_string())
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+
+    let mut found = false;
+    for line in lines.iter_mut() {
+        if line.starts_with(&format!("{}=", key_name)) {
+            *line = format!("{}={}", key_name, key_value);
+            found = true;
+            break;
+        }
+    }
+
+    if !found {
+        lines.push(format!("{}={}", key_name, key_value));
+    }
+
+    fs::write(env_path, lines.join("\n") + "\n")?;
     Ok(())
 }

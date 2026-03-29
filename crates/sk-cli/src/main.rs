@@ -1,16 +1,6 @@
 //! Sovereign Kernel CLI — the single entry point.
-//!
-//! Commands:
-//! - `sovereign chat`      — interactive REPL
-//! - `sovereign init`      — first-run setup
-//! - `sovereign start`     — start as daemon
-//! - `sovereign status`    — check kernel status
-//! - `sovereign dashboard` — open the terminal web dashboard
-//! - `sovereign hands`     — manage autonomous hands
-//! - `sovereign audit`     — view audit logs
 
-use clap::{Parser, Subcommand};
-// Removed unused EnvFilter import
+use clap::{Args, Parser, Subcommand};
 
 mod agents;
 mod audit;
@@ -30,143 +20,201 @@ mod run;
 mod status;
 mod treasury;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(name = "sovereign", version, about = "Sovereign Kernel — Agentic OS")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
 
     /// Config file path
-    #[arg(short, long, global = true)]
+    #[arg(short, long)]
     config: Option<String>,
 
     /// Enable verbose logging (debug level)
-    #[arg(short, long, global = true)]
+    #[arg(short, long)]
     verbose: bool,
 
     /// Write structured logs to this file (JSON format)
-    #[arg(long, global = true)]
+    #[arg(long)]
     log_file: Option<String>,
 }
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 enum Commands {
     /// Interactive chat with the kernel
-    Chat {
-        /// Maximum LLM loop iterations for this session
-        #[arg(long)]
-        max_iterations: Option<u32>,
-        /// Maximum LLM tokens for this session
-        #[arg(long)]
-        max_tokens: Option<u32>,
-        /// Maximum budget in USD for this session
-        #[arg(long)]
-        budget_usd: Option<f64>,
-    },
+    Chat(ChatArgs),
     /// First-run setup wizard
     Init,
     /// Start the kernel as a background daemon
-    Start {
-        /// Detach the process and run in background
-        #[arg(short, long)]
-        detach: bool,
-    },
+    Start(StartArgs),
     /// Run a task autonomously
     #[command(alias = "do")]
-    Run {
-        /// The task description (natural language)
-        task: String,
-        /// Execution mode: auto, safe, unrestricted
-        #[arg(short, long, default_value = "auto")]
-        mode: String,
-        /// Optional schedule (cron expression)
-        #[arg(short, long)]
-        schedule: Option<String>,
-        /// Maximum LLM loop iterations for this task
-        #[arg(long)]
-        max_iterations: Option<u32>,
-        /// Maximum LLM tokens for this task
-        #[arg(long)]
-        max_tokens: Option<u32>,
-        /// Maximum budget in USD for this task
-        #[arg(long)]
-        budget_usd: Option<f64>,
-    },
+    Run(RunArgs),
     /// Check kernel status
     Status,
     /// Stop the daemon or a specific agent
-    Kill {
-        /// Agent ID to kill (optional, stops daemon if omitted)
-        id: Option<String>,
-    },
-    /// Stop the daemon (Legacy, use 'kill' without ID)
+    Kill(KillArgs),
+    /// Stop the daemon (Legacy)
     Stop,
     /// Manage autonomous hands (list, activate, deactivate, status)
-    Hands {
-        /// Action: list, activate, deactivate, status
-        #[arg(default_value = "list")]
-        action: String,
-        /// Additional arguments (hand name, instance ID, etc.)
-        #[arg(trailing_var_arg = true)]
-        args: Vec<String>,
-    },
+    Hands(HandsArgs),
     /// Audit Trail commands
-    Audit {
-        /// Action: logs, verify
-        #[arg(default_value = "logs")]
-        action: String,
-        /// Additional arguments
-        #[arg(trailing_var_arg = true)]
-        args: Vec<String>,
-    },
+    Audit(AuditArgs),
     /// Open the terminal web dashboard at http://localhost:PORT
-    Dashboard {
-        /// Port to listen on
-        #[arg(short, long, default_value = "8080")]
-        port: u16,
-        /// Do not open browser automatically
-        #[arg(long)]
-        no_open: bool,
-    },
+    Dashboard(DashboardArgs),
     /// Manage Village inhabitants (list, inspect, stop, remove)
-    Agents {
-        /// Action: list, inspect, stop, remove
-        #[arg(default_value = "list")]
-        action: String,
-        /// Agent ID or name
-        id: Option<String>,
-    },
+    Agents(AgentArgs),
     /// Manage MCP server connections (list, add, remove)
-    Mcp {
-        /// Action: list, add, remove
-        #[arg(default_value = "list")]
-        action: String,
-        /// Additional arguments (name, command, args...)
-        #[arg(trailing_var_arg = true)]
-        args: Vec<String>,
-    },
+    Mcp(McpArgs),
     /// Manage channel bridges (list, info)
-    Channels {
-        /// Action: list, info
-        #[arg(default_value = "list")]
-        action: String,
-        /// Target channel (e.g., telegram, discord)
-        channel: Option<String>,
-    },
+    Channels(ChannelArgs),
     /// Run system diagnostics and health checks
     Doctor,
     /// Manage budgets and track LLM costs
-    Treasury(treasury::TreasuryArgs),
+    Treasury {
+        #[command(subcommand)]
+        command: treasury::TreasuryCommands,
+    },
     /// Manage and export agent memory
-    #[command(subcommand)]
-    Memory(memory::MemoryCommands),
+    Memory {
+        #[command(subcommand)]
+        command: memory::MemoryCommands,
+    },
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+#[derive(Args, Debug)]
+struct ChatArgs {
+    /// Maximum LLM loop iterations for this session
+    #[arg(long)]
+    max_iterations: Option<u32>,
+    /// Maximum LLM tokens for this session
+    #[arg(long)]
+    max_tokens: Option<u32>,
+    /// Maximum budget in USD for this session
+    #[arg(long)]
+    budget_usd: Option<f64>,
+}
+
+#[derive(Args, Debug)]
+struct StartArgs {
+    /// Detach the process and run in background
+    #[arg(short, long)]
+    detach: bool,
+}
+
+#[derive(Args, Debug)]
+struct RunArgs {
+    /// The task description (natural language)
+    task: String,
+    /// Execution mode: auto, safe, unrestricted
+    #[arg(short, long, default_value = "auto")]
+    mode: String,
+    /// Optional schedule (cron expression)
+    #[arg(short, long)]
+    schedule: Option<String>,
+    /// Maximum LLM loop iterations for this task
+    #[arg(long)]
+    max_iterations: Option<u32>,
+    /// Maximum LLM tokens for this task
+    #[arg(long)]
+    max_tokens: Option<u32>,
+    /// Maximum budget in USD for this task
+    #[arg(long)]
+    budget_usd: Option<f64>,
+}
+
+#[derive(Args, Debug)]
+struct KillArgs {
+    /// Agent ID to kill (optional, stops daemon if omitted)
+    id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct HandsArgs {
+    /// Action: list, activate, deactivate, status
+    #[arg(default_value = "list")]
+    action: String,
+    /// Additional arguments (hand name, instance ID, etc.)
+    #[arg(trailing_var_arg = true)]
+    args: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct AuditArgs {
+    /// Action: logs, verify
+    #[arg(default_value = "logs")]
+    action: String,
+    /// Additional arguments
+    #[arg(trailing_var_arg = true)]
+    args: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct DashboardArgs {
+    /// Port to listen on
+    #[arg(short, long, default_value = "8080")]
+    port: u16,
+    /// Do not open browser automatically
+    #[arg(long)]
+    no_open: bool,
+}
+
+#[derive(Args, Debug)]
+struct AgentArgs {
+    /// Action: list, inspect, stop, remove
+    #[arg(default_value = "list")]
+    action: String,
+    /// Agent ID or name
+    id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct McpArgs {
+    /// Action: list, add, remove
+    #[arg(default_value = "list")]
+    action: String,
+    /// Additional arguments (name, command, args...)
+    #[arg(trailing_var_arg = true)]
+    args: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct ChannelArgs {
+    /// Action: list, info
+    #[arg(default_value = "list")]
+    action: String,
+    /// Target channel (e.g., telegram, discord)
+    channel: Option<String>,
+}
+
+fn main() {
+    // Spawn a thread with a larger stack size for the CLI
+    // This is a workaround for STATUS_STACK_OVERFLOW on Windows due to deep clap recursion
+    const STACK_SIZE: usize = 4 * 1024 * 1024; // 4MB
+
+    let child = std::thread::Builder::new()
+        .name("cli-main".into())
+        .stack_size(STACK_SIZE)
+        .spawn(|| {
+            let rt = tokio::runtime::Builder::new_multi_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            rt.block_on(async_main())
+        })
+        .expect("Failed to spawn CLI thread");
+
+    if let Err(e) = child.join() {
+        eprintln!("THREAD PANIC: {:?}", e);
+        std::process::exit(1);
+    }
+}
+
+async fn async_main() -> anyhow::Result<()> {
     // Load environment variables from .env file
     dotenvy::dotenv().ok();
 
+    // Parse CLI arguments
     let cli = Cli::parse();
 
     // Setup logging
@@ -212,99 +260,93 @@ async fn main() -> anyhow::Result<()> {
         sk_types::KernelConfig::load(std::path::Path::new(path))?
     } else {
         // Look for config in default locations
-        let default_path = dirs::config_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("."))
-            .join("sovereign-kernel")
-            .join("config.toml");
+        let local_path = std::path::PathBuf::from("config.toml");
+        let local_sub_path = std::path::PathBuf::from("sovereign-kernel").join("config.toml");
+        let user_path = dirs::config_dir()
+            .map(|d| d.join("sovereign-kernel").join("config.toml"));
 
-        if default_path.exists() {
-            sk_types::KernelConfig::load(&default_path)?
+        if local_path.exists() {
+            sk_types::KernelConfig::load(&local_path)?
+        } else if local_sub_path.exists() {
+            sk_types::KernelConfig::load(&local_sub_path)?
+        } else if let Some(p) = user_path {
+            if p.exists() {
+                sk_types::KernelConfig::load(&p)?
+            } else {
+                sk_types::KernelConfig::default()
+            }
         } else {
             sk_types::KernelConfig::default()
         }
     };
 
     match cli.command {
-        Commands::Chat {
-            max_iterations,
-            max_tokens,
-            budget_usd,
-        } => {
+        Commands::Chat(args) => {
             let mut cfg = config;
-            if let Some(i) = max_iterations {
+            if let Some(i) = args.max_iterations {
                 cfg.max_iterations_per_task = i;
             }
-            if let Some(t) = max_tokens {
+            if let Some(t) = args.max_tokens {
                 cfg.max_tokens_per_task = t;
             }
-            if let Some(b) = budget_usd {
+            if let Some(b) = args.budget_usd {
                 cfg.total_token_budget_usd_cents = Some((b * 100.0) as u64);
             }
             chat::run(cfg).await?
         }
         Commands::Init => init::run().await?,
-        Commands::Start { detach } => daemon::start(config, detach).await?,
-        Commands::Run {
-            task,
-            mode,
-            schedule,
-            max_iterations,
-            max_tokens,
-            budget_usd,
-        } => {
+        Commands::Start(args) => daemon::start(config, args.detach).await?,
+        Commands::Run(args) => {
             let mut cfg = config;
-            if let Some(i) = max_iterations {
+            if let Some(i) = args.max_iterations {
                 cfg.max_iterations_per_task = i;
             }
-            if let Some(t) = max_tokens {
+            if let Some(t) = args.max_tokens {
                 cfg.max_tokens_per_task = t;
             }
-            if let Some(b) = budget_usd {
+            if let Some(b) = args.budget_usd {
                 cfg.total_token_budget_usd_cents = Some((b * 100.0) as u64);
             }
-            run::execute(cfg, &task, &mode, schedule).await?
+            run::execute(cfg, &args.task, &args.mode, args.schedule).await?
         }
         Commands::Status => status::print_status().await?,
-        Commands::Kill { id } => {
-            if let Some(agent_id) = id {
-                // TODO: Implement kill agent
+        Commands::Kill(args) => {
+            if let Some(agent_id) = args.id {
                 println!("Killing agent {}...", agent_id);
             } else {
                 daemon::stop().await?;
             }
         }
         Commands::Stop => daemon::stop().await?,
-        Commands::Hands { action, args } => hands::run(config, &action, &args).await?,
-        Commands::Audit { action, args } => audit::run(config, &action, &args).await?,
-        Commands::Dashboard { port, no_open } => {
+        Commands::Hands(args) => hands::run(config, &args.action, &args.args).await?,
+        Commands::Audit(args) => audit::run(config, &args.action, &args.args).await?,
+        Commands::Dashboard(args) => {
             let kernel = std::sync::Arc::new(sk_kernel::SovereignKernel::init(config).await?);
             let state = std::sync::Arc::new(dashboard::AppState {
                 kernel,
                 started_at: std::time::Instant::now(),
                 telegram_connected: false,
             });
-            let url = format!("http://localhost:{port}");
+            let url = format!("http://localhost:{}", args.port);
             println!("⚡ Sovereign Kernel Dashboard → {url}");
-            println!("   Press Ctrl+C to stop.");
-            if !no_open {
+            if !args.no_open {
                 let _ = open::that(&url);
             }
-            if let Err(e) = dashboard::start_server(state, port).await {
-                tracing::error!("Dashboard server failed to start: {}", e);
-            }
+            dashboard::start_server(state, args.port).await?;
         }
-        Commands::Agents { action, id } => agents::run(config, &action, id).await?,
-        Commands::Mcp { action, args } => mcp::run(config, &action, &args).await?,
+        Commands::Agents(args) => agents::run(config, &args.action, args.id).await?,
+        Commands::Mcp(args) => mcp::run(config, &args.action, &args.args).await?,
         Commands::Doctor => doctor::run(&config).await?,
-        Commands::Treasury(args) => {
+        Commands::Treasury { command } => {
             let api_url = config.api_listen.clone();
             let api_key = std::env::var("SOVEREIGN_API_KEY").ok();
+            let args = treasury::TreasuryArgs { command };
             treasury::run(args, &format!("http://{}", api_url), api_key.as_deref()).await?;
         }
-        Commands::Channels { action, channel } => {
-            channels::run(config, &action, channel.as_deref()).await?;
+        Commands::Channels(args) => {
+            channels::run(config, &args.action, args.channel.as_deref()).await?;
         }
-        Commands::Memory(command) => {
+        Commands::Memory { command } => {
             memory::handle_memory_command(command).await?;
         }
     }

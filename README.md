@@ -31,6 +31,7 @@ Sovereign Kernel is a production-grade AI agent framework built entirely in Rust
 ## Table of Contents
 
 - [Features](#features)
+- [Use Cases & Achievements](#use-cases--achievements)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Configuration](#configuration)
@@ -93,6 +94,24 @@ Sovereign Kernel is a production-grade AI agent framework built entirely in Rust
 - **File operations** — read, write, edit, glob — path-sandboxed
 - **Voice** — STT/TTS via OpenAI Whisper and TTS-1
 - **Code execution** — Docker/native sandbox with timeout
+
+---
+
+## Use Cases & Achievements
+
+The Sovereign Kernel has achieved a robust foundation capable of acting as a hyper-versatile, on-device AI operative. Due to its isolated multi-agent design, it excels at:
+
+1. **DevOps & Infrastructure Autonomy**
+   - **Achievement:** Capable of diagnosing misconfigured container registries and patching Kubernetes manifests directly from a unified command line via `Shell` and `Docker Sandbox` tools.
+   - **Use Case:** "Monitor these NGINX logs for anomalous requests; if found, automatically write an IP-ban firewall script but wait for my Slack approval to deploy."
+
+2. **Always-On Threat Intelligence Analyst**
+   - **Achievement:** Leveraging the 106+ expert skills (built-in knowledge modules) natively integrated into the *Memory Substrate* to map incoming CVEs against your local environment.
+   - **Use Case:** Spawning a background agent that monitors specific security feeds (via `Browser` & `Web Fetch` tools) and immediately summarizes breaking Zero-Days in a designated Discord channel.
+
+3. **Autonomous Software Engineering Taskforce**
+   - **Achievement:** Spanning multi-agent subroutines using the *Village* to break monolithic tasks into: Code Writing (Agent A), Code Review (Agent B), and Unit Testing (Agent C).
+   - **Use Case:** Providing the OS a directory path (`/internal_tools`) and instructing it to complete all open GitHub issues tagged "Good First Issue" natively.
 
 ---
 

@@ -13,7 +13,7 @@ use tracing::{info, warn};
 /// The Sovereign Kernel — top-level king.
 pub struct SovereignKernel {
     /// Global configuration.
-    pub config: Arc<tokio::sync::RwLock<KernelConfig>>,
+    pub config: Arc<std::sync::RwLock<KernelConfig>>,
     /// Soul identity.
     pub soul: SoulIdentity,
     /// Memory substrate.
@@ -29,7 +29,7 @@ pub struct SovereignKernel {
     /// Browser session manager.
     pub browser: Arc<sk_engine::runtime::browser::BrowserManager>,
     /// Skill registry.
-    pub skills: Arc<tokio::sync::RwLock<sk_tools::skills::SkillRegistry>>,
+    pub skills: Arc<std::sync::RwLock<sk_tools::skills::SkillRegistry>>,
     /// Agent-to-Agent message bus.
     pub bus: Arc<crate::bus::InterAgentBus>,
     /// Global agent registry.
@@ -42,13 +42,13 @@ pub struct SovereignKernel {
     pub supervisor: Arc<crate::supervisor::Supervisor>,
     /// Handler to send back responses to channels like Telegram/Discord.
     pub delivery_handler:
-        tokio::sync::RwLock<Option<Arc<dyn sk_types::scheduler::CronDeliveryHandler>>>,
+        std::sync::RwLock<Option<Arc<dyn sk_types::scheduler::CronDeliveryHandler>>>,
     /// Docker sandbox container pool.
     pub sandbox_pool: Arc<sk_engine::runtime::docker_sandbox::ContainerPool>,
     /// Global metering engine for cost tracking and budget enforcement.
     pub metering: Arc<crate::metering::MeteringEngine>,
     /// Global hand registry for managing capability packages.
-    pub hands: Arc<tokio::sync::RwLock<sk_hands::registry::HandRegistry>>,
+    pub hands: Arc<std::sync::RwLock<sk_hands::registry::HandRegistry>>,
     /// Track active agent loops for cancellation/inspection.
     pub active_loops: Arc<DashMap<AgentId, CancellationToken>>,
 }
@@ -185,7 +185,7 @@ impl SovereignKernel {
                 }
             }
         }
-        let skills = Arc::new(tokio::sync::RwLock::new(
+        let skills = Arc::new(std::sync::RwLock::new(
             sk_tools::skills::SkillRegistry::load_from_dir(skills_path),
         ));
 
@@ -226,10 +226,10 @@ impl SovereignKernel {
             let _ = std::fs::create_dir_all(&custom_hands_path);
         }
         hand_registry.load_custom_hands(&custom_hands_path);
-        let hands = Arc::new(tokio::sync::RwLock::new(hand_registry));
-
+        let hands = Arc::new(std::sync::RwLock::new(hand_registry));
+ 
         Ok(Self {
-            config: Arc::new(tokio::sync::RwLock::new(config)),
+            config: Arc::new(std::sync::RwLock::new(config)),
             soul,
             memory,
             mcp,
@@ -243,7 +243,7 @@ impl SovereignKernel {
             event_bus,
             cron,
             supervisor,
-            delivery_handler: tokio::sync::RwLock::new(None),
+            delivery_handler: std::sync::RwLock::new(None),
             sandbox_pool,
             metering,
             hands,
@@ -256,7 +256,7 @@ impl SovereignKernel {
         &self,
         handler: Arc<dyn sk_types::scheduler::CronDeliveryHandler>,
     ) {
-        let mut lock = self.delivery_handler.write().await;
+        let mut lock = self.delivery_handler.write().unwrap();
         *lock = Some(handler);
     }
 
@@ -372,7 +372,6 @@ impl SovereignKernel {
         };
 
         // 2. Restore session
-        let _config = self.config.read().await;
         let mut session = match self
             .memory
             .sessions
@@ -462,7 +461,7 @@ impl SovereignKernel {
     /// Start background services, including the cron job executor.
     pub async fn start_background_services(self: &Arc<Self>) {
         let kernel = self.clone();
-        let _data_dir = self.config.read().await.data_dir.clone();
+        let _data_dir = self.config.read().unwrap().data_dir.clone();
         tokio::spawn(async move {
             tracing::info!("Starting background cron scheduler...");
             loop {
@@ -574,7 +573,7 @@ impl SovereignKernel {
                                         k.cron.record_success(job_id);
                                         // Execute delivery
                                         if let Some(handler) =
-                                            k.delivery_handler.read().await.as_ref()
+                                            k.delivery_handler.read().unwrap().as_ref()
                                         {
                                             let response_text = res.response.clone();
                                             let h_clone = handler.clone();
@@ -625,7 +624,7 @@ impl SovereignKernel {
             info!("Applying hot-reload action: {:?}", action);
             match action {
                 ReloadSkills => {
-                    let _config = self.config.read().await;
+                    let _config = self.config.read().unwrap();
                     let mut skills_path = std::env::current_dir()
                         .unwrap_or_default()
                         .join("crates")
@@ -640,13 +639,13 @@ impl SovereignKernel {
                         }
                     }
                     let new_registry = sk_tools::skills::SkillRegistry::load_from_dir(skills_path);
-                    let mut lock = self.skills.write().await;
+                    let mut lock = self.skills.write().unwrap();
                     *lock = new_registry;
                     info!("Skills registry hot-reloaded.");
                 }
                 UpdateCronConfig => {
                     // CronScheduler config updates handled on next invocation
-                    let config = self.config.read().await;
+                    let config = self.config.read().unwrap();
                     info!(
                         "Cron configuration updated (max_jobs={}).",
                         config.max_cron_jobs
@@ -657,59 +656,61 @@ impl SovereignKernel {
                     info!("Approval policy hot-reload noted (takes effect on next check).");
                 }
                 ReloadMcpServers => {
-                    let config = self.config.read().await;
+                    let mcp_servers_map = {
+                        let config = self.config.read().unwrap();
+                        let mut map = std::collections::HashMap::new();
+                        for server in &config.mcp_servers {
+                            let entry = sk_types::config::McpServerEntry {
+                                transport: match &server.transport {
+                                    sk_types::config::McpTransportEntry::Stdio { .. } => {
+                                        "stdio".to_string()
+                                    }
+                                    sk_types::config::McpTransportEntry::Sse { .. } => {
+                                        "sse".to_string()
+                                    }
+                                },
+                                command: match &server.transport {
+                                    sk_types::config::McpTransportEntry::Stdio { command, .. } => {
+                                        Some(command.clone())
+                                    }
+                                    _ => None,
+                                },
+                                args: match &server.transport {
+                                    sk_types::config::McpTransportEntry::Stdio { args, .. } => {
+                                        args.clone()
+                                    }
+                                    _ => Vec::new(),
+                                },
+                                env: match &server.env {
+                                    sk_types::config::McpEnv::List(nodes) => nodes
+                                        .iter()
+                                        .map(|k| (k.clone(), std::env::var(k).unwrap_or_default()))
+                                        .collect(),
+                                    sk_types::config::McpEnv::Map(map) => map
+                                        .iter()
+                                        .map(|(k, v)| {
+                                            let val = if let Some(env_name) = v.strip_prefix('$') {
+                                                std::env::var(env_name).unwrap_or_default()
+                                            } else {
+                                                v.clone()
+                                            };
+                                            (k.clone(), val)
+                                        })
+                                        .collect(),
+                                },
+                                url: match &server.transport {
+                                    sk_types::config::McpTransportEntry::Sse { url, .. } => {
+                                        Some(url.clone())
+                                    }
+                                    _ => None,
+                                },
+                            };
+                            map.insert(server.name.clone(), entry);
+                        }
+                        map
+                    }; // config guard dropped here
+
                     let mut mcp = self.mcp.write().await;
-                    // TODO: Implement smart diffing for MCP servers instead of full reconnect
-                    // for now we just reconnect all
-                    let mut mcp_servers_map = std::collections::HashMap::new();
-                    for server in &config.mcp_servers {
-                        let entry = sk_types::config::McpServerEntry {
-                            transport: match &server.transport {
-                                sk_types::config::McpTransportEntry::Stdio { .. } => {
-                                    "stdio".to_string()
-                                }
-                                sk_types::config::McpTransportEntry::Sse { .. } => {
-                                    "sse".to_string()
-                                }
-                            },
-                            command: match &server.transport {
-                                sk_types::config::McpTransportEntry::Stdio { command, .. } => {
-                                    Some(command.clone())
-                                }
-                                _ => None,
-                            },
-                            args: match &server.transport {
-                                sk_types::config::McpTransportEntry::Stdio { args, .. } => {
-                                    args.clone()
-                                }
-                                _ => Vec::new(),
-                            },
-                            env: match &server.env {
-                                sk_types::config::McpEnv::List(nodes) => nodes
-                                    .iter()
-                                    .map(|k| (k.clone(), std::env::var(k).unwrap_or_default()))
-                                    .collect(),
-                                sk_types::config::McpEnv::Map(map) => map
-                                    .iter()
-                                    .map(|(k, v)| {
-                                        let val = if let Some(env_name) = v.strip_prefix('$') {
-                                            std::env::var(env_name).unwrap_or_default()
-                                        } else {
-                                            v.clone()
-                                        };
-                                        (k.clone(), val)
-                                    })
-                                    .collect(),
-                            },
-                            url: match &server.transport {
-                                sk_types::config::McpTransportEntry::Sse { url, .. } => {
-                                    Some(url.clone())
-                                }
-                                _ => None,
-                            },
-                        };
-                        mcp_servers_map.insert(server.name.clone(), entry);
-                    }
                     mcp.connect_all(&mcp_servers_map).await?;
                     info!("MCP servers hot-reloaded.");
                 }
@@ -726,7 +727,7 @@ impl SovereignKernel {
 
     /// Start the API bridge server if enabled in configuration.
     pub async fn start_api_server(self: Arc<Self>) -> SovereignResult<()> {
-        let addr = self.config.read().await.api_listen.clone();
+        let addr = self.config.read().unwrap().api_listen.clone();
         crate::api::start_server(self, &addr).await
     }
 
@@ -747,14 +748,17 @@ async fn init_llm_driver(
 )> {
     let dm = &config.default_model;
 
+    println!("!!! init_llm_driver start");
     // 1. Initialize primary driver
     let primary_api_key = std::env::var(&dm.api_key_env).unwrap_or_default();
+    println!("!!! creating primary driver: provider={}, model={}", dm.provider, dm.model);
     let (primary_driver, primary_model) = create_driver(
         &dm.provider,
         &dm.model,
         &primary_api_key,
         dm.base_url.as_deref(),
     )?;
+    println!("!!! primary driver created");
 
     // 2. Initialize fallbacks
     let mut entries = vec![(primary_model.clone(), primary_driver)];
@@ -790,17 +794,27 @@ async fn init_llm_driver(
         ];
 
         for (provider, model, env_var) in auto_fallbacks {
+            println!("!!! Checking auto fallback: provider={}, env={}", provider, env_var);
             // Skip the primary provider to avoid duplicates
             if provider == dm.provider.to_lowercase() {
+                println!("!!! Skipping because it's primary");
                 continue;
             }
             if let Ok(api_key) = std::env::var(env_var) {
                 if !api_key.is_empty() {
+                    println!("!!! Creating fallback driver for provider={}", provider);
                     if let Ok((driver, model_name)) = create_driver(provider, model, &api_key, None)
                     {
+                        println!("!!! Fallback driver created for model={}", model_name);
                         entries.push((model_name, driver));
+                    } else {
+                        println!("!!! create_driver returned error for {}", provider);
                     }
+                } else {
+                    println!("!!! api key empty for {}", provider);
                 }
+            } else {
+                println!("!!! env var missing: {}", env_var);
             }
         }
     }
@@ -811,6 +825,7 @@ async fn init_llm_driver(
     );
     let sentinel: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> =
         Arc::new(sk_engine::sentinel::SentinelDriver::new(entries));
+    println!("!!! init_llm_driver complete");
 
     Ok((sentinel, primary_model))
 }
@@ -827,7 +842,11 @@ fn create_driver(
 )> {
     if let Some(url) = base_url {
         let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = Arc::new(
-            sk_engine::drivers::openai::OpenAIDriver::new(api_key.to_string(), url.to_string()),
+            sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key.to_string(),
+                url.to_string(),
+                provider.to_string(),
+            ),
         );
         return Ok((driver, model.to_string()));
     }
@@ -847,6 +866,7 @@ fn create_driver(
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
                 api_key.to_string(),
                 "https://api.openai.com/v1".to_string(),
+                "openai".to_string(),
             )),
             model.to_string(),
         ),
@@ -861,6 +881,7 @@ fn create_driver(
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
                 api_key.to_string(),
                 "https://api.groq.com/openai/v1".to_string(),
+                "groq".to_string(),
             )),
             model.to_string(),
         ),
@@ -868,6 +889,7 @@ fn create_driver(
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
                 api_key.to_string(),
                 "https://api.deepseek.com".to_string(),
+                "deepseek".to_string(),
             )),
             model.to_string(),
         ),
@@ -875,6 +897,7 @@ fn create_driver(
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
                 api_key.to_string(),
                 "https://api.x.ai/v1".to_string(),
+                "xai".to_string(),
             )),
             model.to_string(),
         ),
@@ -882,6 +905,7 @@ fn create_driver(
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
                 api_key.to_string(),
                 "https://openrouter.ai/api/v1".to_string(),
+                "openrouter".to_string(),
             )),
             model.to_string(),
         ),
@@ -889,6 +913,31 @@ fn create_driver(
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
                 api_key.to_string(),
                 "https://api.mistral.ai/v1".to_string(),
+                "mistral".to_string(),
+            )),
+            model.to_string(),
+        ),
+        "together" => (
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key.to_string(),
+                "https://api.together.xyz/v1".to_string(),
+                "together".to_string(),
+            )),
+            model.to_string(),
+        ),
+        "perplexity" => (
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key.to_string(),
+                "https://api.perplexity.ai".to_string(),
+                "perplexity".to_string(),
+            )),
+            model.to_string(),
+        ),
+        "nvidia" => (
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
+                api_key.to_string(),
+                "https://integrate.api.nvidia.com/v1".to_string(),
+                "nvidia".to_string(),
             )),
             model.to_string(),
         ),
@@ -897,12 +946,13 @@ fn create_driver(
             Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
                 api_key.to_string(),
                 "http://localhost:11434/v1".to_string(),
+                "ollama".to_string(),
             )),
             model.to_string(),
         ),
         _ => {
             return Err(SovereignError::Config(format!(
-                "Unknown LLM provider '{}'",
+                "Unknown LLM provider '{}' (Try setting base_url in config to use a custom OpenAI-compatible provider)",
                 provider
             )));
         }

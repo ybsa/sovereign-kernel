@@ -1,8 +1,29 @@
+use sk_types::{AgentId, SovereignError};
 use sk_engine::agent_loop::AgentLoopConfig;
 use std::sync::Arc;
 use tracing::info;
 
 use crate::SovereignKernel;
+
+/// Detect if a model name suggests a "small" local model (under ~10B parameters).
+fn is_small_model(model_name: &str) -> bool {
+    let lower = model_name.to_lowercase();
+    // Detect by parameter count markers
+    let size_markers = ["1b", "2b", "3b", "4b", "7b", "8b", "3.2", "3.1:8b"];
+    for marker in &size_markers {
+        if lower.contains(marker) {
+            return true;
+        }
+    }
+    // Detect by common small model families used locally
+    let small_families = ["llama3.2", "phi", "tinyllama", "gemma:2b", "gemma2:2b", "qwen2:0.5b", "qwen2:1.5b"];
+    for family in &small_families {
+        if lower.contains(family) {
+            return true;
+        }
+    }
+    false
+}
 
 /// Creates a standardized AgentLoopConfig with all default tools registered.
 pub fn create_agent_config(
@@ -10,114 +31,139 @@ pub fn create_agent_config(
     driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
     system_prompt: String,
     model_name: String,
-    agent_id: sk_types::AgentId,
+    agent_id: AgentId,
     browser_manager: Arc<sk_engine::runtime::browser::BrowserManager>,
-    _skill_registry: Arc<tokio::sync::RwLock<sk_tools::skills::SkillRegistry>>,
+    _skill_registry: Arc<std::sync::RwLock<sk_tools::skills::SkillRegistry>>,
 ) -> AgentLoopConfig {
+    let small_model = is_small_model(&model_name);
+    if small_model {
+        info!(model = %model_name, "Detected small/local model — using reduced tool set (8 core tools)");
+    }
+
+    // --- CORE TOOLS (always available) ---
     let mut tools = vec![
         sk_tools::memory_tools::remember_tool(),
         sk_tools::memory_tools::recall_tool(),
-        sk_tools::memory_tools::forget_tool(),
-        sk_tools::web_search::web_search_tool(),
-        sk_tools::web_fetch::web_fetch_tool(),
         sk_tools::file_ops::read_file_tool(),
         sk_tools::file_ops::write_file_tool(),
         sk_tools::file_ops::list_dir_tool(),
-        sk_tools::file_ops::delete_file_tool(),
-        sk_tools::file_ops::move_file_tool(),
-        sk_tools::file_ops::copy_file_tool(),
         sk_tools::shell::shell_exec_tool(),
-        sk_tools::code_exec::code_exec_tool(),
-        sk_tools::shared_memory::shared_memory_store_tool(),
-        sk_tools::shared_memory::shared_memory_recall_tool(),
-        sk_tools::scheduler::schedule_create_tool(),
-        sk_tools::scheduler::schedule_list_tool(),
-        sk_tools::scheduler::schedule_delete_tool(),
-        sk_tools::voice_tools::text_to_speech_tool(),
-        sk_tools::voice_tools::speech_to_text_tool(),
+        sk_tools::web_search::web_search_tool(),
+        sk_tools::web_fetch::web_fetch_tool(),
     ];
-    tools.extend(sk_tools::browser_tools::browser_tools());
-    tools.extend(sk_tools::host::host_tools());
-    tools.push(sk_tools::skills::get_skill_tool());
-    tools.push(sk_tools::skills::list_skills_tool());
-    tools.push(sk_tools::ottos_outpost::ottos_outpost_tool());
 
-    // Pull in dynamic tools from the MCP registry
-    if let Ok(mcp_lock) = kernel.mcp.try_read() {
-        tools.extend(mcp_lock.all_tools());
-    } else {
-        tracing::warn!("Failed to acquire MCP read lock, MCP tools will be missing.");
-    }
+    // --- EXTENDED TOOLS (only for large models) ---
+    if !small_model {
+        tools.push(sk_tools::memory_tools::forget_tool());
+        tools.push(sk_tools::file_ops::delete_file_tool());
+        tools.push(sk_tools::file_ops::move_file_tool());
+        tools.push(sk_tools::file_ops::copy_file_tool());
+        tools.push(sk_tools::code_exec::code_exec_tool());
+        tools.push(sk_tools::shared_memory::shared_memory_store_tool());
+        tools.push(sk_tools::shared_memory::shared_memory_recall_tool());
+        tools.push(sk_tools::scheduler::schedule_create_tool());
+        tools.push(sk_tools::scheduler::schedule_list_tool());
+        tools.push(sk_tools::scheduler::schedule_delete_tool());
+        tools.push(sk_tools::voice_tools::text_to_speech_tool());
+        tools.push(sk_tools::voice_tools::speech_to_text_tool());
+        tools.extend(sk_tools::browser_tools::browser_tools());
+        tools.extend(sk_tools::host::host_tools());
+        tools.push(sk_tools::skills::get_skill_tool());
+        tools.push(sk_tools::skills::list_skills_tool());
+        tools.push(sk_tools::ottos_outpost::ottos_outpost_tool());
 
-    // Agent-to-Agent message tool
-    tools.push(sk_types::ToolDefinition {
-        name: "agent_message".into(),
-        description: "Send a direct message to another active agent on the system. Use this to coordinate or delegate tasks.".into(),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "to_agent_id": {
-                    "type": "string",
-                    "description": "The unique Agent ID of the recipient."
+        // Pull in dynamic tools from the MCP registry
+        if let Ok(mcp_lock) = kernel.mcp.try_read() {
+            tools.extend(mcp_lock.all_tools());
+        } else {
+            tracing::warn!("Failed to acquire MCP read lock, MCP tools will be missing.");
+        }
+
+        // Agent-to-Agent message tool
+        tools.push(sk_types::ToolDefinition {
+            name: "agent_message".into(),
+            description: "Send a direct message to another active agent on the system. Use this to coordinate or delegate tasks.".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "to_agent_id": {
+                        "type": "string",
+                        "description": "The unique Agent ID of the recipient."
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "The contents of the message to send."
+                    }
                 },
-                "message": {
-                    "type": "string",
-                    "description": "The contents of the message to send."
-                }
-            },
-            "required": ["to_agent_id", "message"]
-        }),
-    });
+                "required": ["to_agent_id", "message"]
+            }),
+        });
 
-    tools.push(sk_types::ToolDefinition {
-        name: "summon_skeleton".into(),
-        description: "The Witch (The Summoner) uses her magic to dynamically spawn a background skeleton worker. It will run in Sandbox mode by default. You can continue working while it runs. Use check_skeleton to see its status.".into(),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "skeleton_name": { "type": "string", "description": "Name of the skeleton (e.g. 'researcher')" },
-                "task_description": { "type": "string", "description": "What the skeleton should do (summoned by the Witch)." },
-                "capabilities": { "type": "array", "items": { "type": "string" }, "description": "Capabilities the skeleton needs (e.g. 'web', 'file_read', 'browser')" },
-                "mode_hint": { "type": "string", "enum": ["safe", "unrestricted", "scheduled"], "description": "Execution mode hint." }
-            },
-            "required": ["skeleton_name", "task_description", "capabilities"]
-        }),
-    });
+        tools.push(sk_types::ToolDefinition {
+            name: "summon_skeleton".into(),
+            description: "The Witch (The Summoner) uses her magic to dynamically spawn a background skeleton worker. It will run in Sandbox mode by default. You can continue working while it runs. Use check_skeleton to see its status.".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "skeleton_name": { "type": "string", "description": "Name of the skeleton (e.g. 'researcher')" },
+                    "task_description": { "type": "string", "description": "What the skeleton should do (summoned by the Witch)." },
+                    "capabilities": { "type": "array", "items": { "type": "string" }, "description": "Capabilities the skeleton needs (e.g. 'web', 'file_read', 'browser')" },
+                    "mode_hint": { "type": "string", "enum": ["safe", "unrestricted", "scheduled"], "description": "Execution mode hint." }
+                },
+                "required": ["skeleton_name", "task_description", "capabilities"]
+            }),
+        });
 
-    tools.push(sk_types::ToolDefinition {
-        name: "builder".into(),
-        description: "The Builder (The Architect) transforms a natural language task into a permanent Village member (Hand). The Architect forges the permanent infrastructure, while the Witch summons the workers.".into(),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "task": { "type": "string", "description": "The permanent Hand to forge (e.g. 'Create a WhatsApp specialist')" }
-            },
-            "required": ["task"]
-        }),
-    });
+        tools.push(sk_types::ToolDefinition {
+            name: "builder".into(),
+            description: "The Builder (The Architect) transforms a natural language task into a permanent Village member (Hand). The Architect forges the permanent infrastructure, while the Witch summons the workers.".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "task": { "type": "string", "description": "The permanent Hand to forge (e.g. 'Create a WhatsApp specialist')" }
+                },
+                "required": ["task"]
+            }),
+        });
 
-    tools.push(sk_types::ToolDefinition {
-        name: "check_skeleton".into(),
-        description: "Check the status of a worker summoned by the Witch.".into(),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "skeleton_id": { "type": "string", "description": "The Agent ID of the skeleton" }
-            },
-            "required": ["skeleton_id"]
-        }),
-    });
+        tools.push(sk_types::ToolDefinition {
+            name: "check_skeleton".into(),
+            description: "Check the status of a worker summoned by the Witch.".into(),
+            input_schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "skeleton_id": { "type": "string", "description": "The Agent ID of the skeleton" }
+                },
+                "required": ["skeleton_id"]
+            }),
+        });
+    }
 
     let b = browser_manager;
     let aid = agent_id;
     let k = kernel.clone();
 
-    let cfg_snap = kernel.config.blocking_read();
+    let cfg_snap = kernel.config.read().unwrap();
     let max_iter = cfg_snap.max_iterations_per_task;
     let max_tok = cfg_snap.max_tokens_per_task;
     let step_dump = cfg_snap.step_dump_enabled;
     let forensics = cfg_snap.effective_workspaces_dir();
     drop(cfg_snap);
+
+    // --- OS-Aware System Prompt ---
+    let mut system_prompt = system_prompt;
+    let os_name = std::env::consts::OS;
+    let tool_names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
+    
+    system_prompt.push_str(&format!(
+        "\n\n## System Context\n- You are running on **{}**.\n- Use {} file paths (e.g. `{}`).\n- Your available tools are EXACTLY: {}\n- ONLY call tools from this list. Do NOT invent tool names.\n",
+        os_name,
+        if os_name == "windows" { "Windows" } else { "Unix" },
+        if os_name == "windows" { "C:\\Users\\..." } else { "/home/..." },
+        tool_names.join(", ")
+    ));
+
+    system_prompt.push_str("\n## Tool Use Instructions\n- When using a tool, provide ONLY the raw JSON arguments as defined in the schema.\n- DO NOT include types, descriptions, or the schema itself in the values.\n- Example: Use `{\"content\": \"hello\"}`, NOT `{\"content\": {\"type\": \"string\", \"content\": \"hello\"}}`.\n- If the user asks a simple question like 'hi', just respond with text — do NOT call any tools.\n");
 
     AgentLoopConfig {
         driver,
@@ -146,8 +192,10 @@ pub fn create_agent_config(
                 // Enforce global budget
                 kernel
                     .config
-                    .blocking_read()
-                    .check_budget(kernel.metering.total_cost())?;
+                    .read()
+                    .unwrap()
+                    .check_budget(kernel.metering.total_cost())
+                    .map_err(|e| SovereignError::Internal(e.to_string()))?;
 
                 Ok(())
             }))
@@ -158,8 +206,28 @@ pub fn create_agent_config(
             let kernel = k.clone();
             let browser = b.clone();
             let aid = aid;
+            
+            // --- Resilient Parser (Schema Stripper) ---
+            let mut sanitized_input = tool_call.input.clone();
+            if let Some(obj) = sanitized_input.as_object_mut() {
+                for (_key, value) in obj.iter_mut() {
+                    // Check if value is an object that looks like a schema-hallucination
+                    // e.g. {"type": "string", "content": "actual_val"} 
+                    // or {"type": "string", "description": "...", "value": "actual_val"}
+                    if let Some(val_obj) = value.as_object() {
+                         if val_obj.contains_key("type") && (val_obj.contains_key("content") || val_obj.contains_key("value")) {
+                             if let Some(actual) = val_obj.get("content").or_else(|| val_obj.get("value")) {
+                                 tracing::debug!("Schema stripper: recovered actual value from hallucinated schema object");
+                                 *value = actual.clone();
+                             }
+                         }
+                    }
+                }
+            }
+            // ------------------------------------------
+
             let agent_id_str = aid.to_string();
-            let config_snap = kernel.config.blocking_read();
+            let config_snap = kernel.config.read().unwrap();
             let default_mode = config_snap.execution_mode;
             let approval_list = config_snap.approval_whitelist.clone();
             let workspaces_dir = config_snap.effective_workspaces_dir();
@@ -189,7 +257,7 @@ pub fn create_agent_config(
             if mode == sk_types::config::ExecutionMode::Sandbox {
                 let risk = crate::approval::ApprovalManager::classify_risk(
                     &tool_call.name,
-                    Some(&tool_call.input),
+                    Some(&sanitized_input),
                 );
                 let is_host_read =
                     tool_call.name == "host_read_file" || tool_call.name == "host_list_dir";
@@ -228,7 +296,7 @@ pub fn create_agent_config(
                 if let Err(detail) =
                     kernel
                         .safety
-                        .check(&tool_call.name, &tool_call.input, Some(&aid))
+                        .check(&tool_call.name, &sanitized_input, Some(&aid))
                 {
                     return Err(sk_types::SovereignError::ToolExecutionError(detail));
                 }
@@ -244,7 +312,7 @@ pub fn create_agent_config(
 
             match tool_call.name.as_str() {
                 "village_forge" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let task_desc = args
                             .get("task_description")
                             .and_then(|v| v.as_str())
@@ -259,7 +327,7 @@ pub fn create_agent_config(
                     }
                 }
                 "agent_message" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let to_agent_id_str = args
                             .get("to_agent_id")
                             .and_then(|v| v.as_str())
@@ -286,7 +354,7 @@ pub fn create_agent_config(
                     }
                 }
                 "summon_skeleton" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let skeleton_name = args
                             .get("skeleton_name")
                             .and_then(|v| v.as_str())
@@ -360,7 +428,7 @@ pub fn create_agent_config(
                     }
                 }
                 "check_skeleton" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let skeleton_id_str = args
                             .get("skeleton_id")
                             .and_then(|v| v.as_str())
@@ -413,7 +481,7 @@ pub fn create_agent_config(
                     }
                 }
                 "builder" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let task_str = args.get("task").and_then(|v| v.as_str()).unwrap_or("");
                         let _k = kernel.clone();
                         let model_name = kernel.model_name.clone();
@@ -466,7 +534,7 @@ pub fn create_agent_config(
                         ));
                     }
 
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
                         let topic = args.get("topic").and_then(|v| v.as_str()).unwrap_or("");
                         match kernel.memory.shared.store(aid, content, topic) {
@@ -510,7 +578,7 @@ pub fn create_agent_config(
                         ));
                     }
 
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
                         match kernel.memory.shared.recall(query) {
                             Ok(results) => {
@@ -542,7 +610,7 @@ pub fn create_agent_config(
                     }
                 }
                 "schedule_create" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let name = args
                             .get("name")
                             .and_then(|v| v.as_str())
@@ -643,7 +711,7 @@ pub fn create_agent_config(
                     }
                 }
                 "schedule_delete" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let job_id_str = args.get("job_id").and_then(|v| v.as_str()).unwrap_or("");
                         if let Ok(job_id) = std::str::FromStr::from_str(job_id_str) {
                             match kernel.cron.remove_job(job_id) {
@@ -671,7 +739,7 @@ pub fn create_agent_config(
                     }
                 }
                 "remember" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::memory_tools::handle_remember(&kernel.memory, aid, content)
                             .map(|out| healer_result(&tool_id, out, false))
@@ -682,7 +750,7 @@ pub fn create_agent_config(
                     }
                 }
                 "recall" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
                         let limit = args
                             .get("limit")
@@ -698,7 +766,7 @@ pub fn create_agent_config(
                     }
                 }
                 "forget" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let memory_id =
                             args.get("memory_id").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::memory_tools::handle_forget(&kernel.memory, memory_id)
@@ -710,7 +778,7 @@ pub fn create_agent_config(
                     }
                 }
                 "web_search" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let query = args.get("query").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::web_search::handle_web_search(query)
                             .map(|out| healer_result(&tool_id, out, false))
@@ -721,7 +789,7 @@ pub fn create_agent_config(
                     }
                 }
                 "web_fetch" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let url = args.get("url").and_then(|v| v.as_str()).unwrap_or("");
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current()
@@ -735,7 +803,7 @@ pub fn create_agent_config(
                     }
                 }
                 "read_file" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::file_ops::handle_read_file(&workspaces_dir, path)
                             .map(|out| healer_result(&tool_id, out, false))
@@ -746,7 +814,7 @@ pub fn create_agent_config(
                     }
                 }
                 "write_file" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
                         let append = args
@@ -767,7 +835,7 @@ pub fn create_agent_config(
                     }
                 }
                 "list_dir" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
                         sk_tools::file_ops::handle_list_dir(&workspaces_dir, path)
                             .map(|out| healer_result(&tool_id, out, false))
@@ -778,7 +846,7 @@ pub fn create_agent_config(
                     }
                 }
                 "delete_file" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::file_ops::handle_delete_file(&workspaces_dir, path)
                             .map(|out| healer_result(&tool_id, out, false))
@@ -789,7 +857,7 @@ pub fn create_agent_config(
                     }
                 }
                 "move_file" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let source = args.get("source").and_then(|v| v.as_str()).unwrap_or("");
                         let dest = args
                             .get("destination")
@@ -804,7 +872,7 @@ pub fn create_agent_config(
                     }
                 }
                 "copy_file" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let source = args.get("source").and_then(|v| v.as_str()).unwrap_or("");
                         let dest = args
                             .get("destination")
@@ -819,7 +887,7 @@ pub fn create_agent_config(
                     }
                 }
                 "shell_exec" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let command = args.get("command").and_then(|v| v.as_str()).unwrap_or("");
                         let working_dir = args.get("working_dir").and_then(|v| v.as_str());
                         let timeout_secs = args.get("timeout_secs").and_then(|v| v.as_u64());
@@ -917,7 +985,7 @@ pub fn create_agent_config(
                     }
                 }
                 "code_exec" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let language = args.get("language").and_then(|v| v.as_str()).unwrap_or("");
                         let code = args.get("code").and_then(|v| v.as_str()).unwrap_or("");
                         let use_sandbox = args
@@ -1054,7 +1122,7 @@ pub fn create_agent_config(
                     }
                 }
                 "ottos_outpost" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let language = args.get("language").and_then(|v| v.as_str()).unwrap_or("");
                         let exec_env_str = args
                             .get("execution_env")
@@ -1129,7 +1197,7 @@ pub fn create_agent_config(
                 "browser_navigate" => tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(
                         sk_engine::runtime::browser::tool_browser_navigate(
-                            &tool_call.input,
+                            &sanitized_input,
                             &browser,
                             &aid.to_string(),
                         ),
@@ -1140,7 +1208,7 @@ pub fn create_agent_config(
                 "browser_click" => tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(
                         sk_engine::runtime::browser::tool_browser_click(
-                            &tool_call.input,
+                            &sanitized_input,
                             &browser,
                             &aid.to_string(),
                         ),
@@ -1151,7 +1219,7 @@ pub fn create_agent_config(
                 "browser_type" => tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(
                         sk_engine::runtime::browser::tool_browser_type(
-                            &tool_call.input,
+                            &sanitized_input,
                             &browser,
                             &aid.to_string(),
                         ),
@@ -1162,7 +1230,7 @@ pub fn create_agent_config(
                 "browser_screenshot" => tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(
                         sk_engine::runtime::browser::tool_browser_screenshot(
-                            &tool_call.input,
+                            &sanitized_input,
                             &browser,
                             &aid.to_string(),
                         ),
@@ -1173,7 +1241,7 @@ pub fn create_agent_config(
                 "browser_read_page" => tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(
                         sk_engine::runtime::browser::tool_browser_read_page(
-                            &tool_call.input,
+                            &sanitized_input,
                             &browser,
                             &aid.to_string(),
                         ),
@@ -1184,7 +1252,7 @@ pub fn create_agent_config(
                 "browser_close" => tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(
                         sk_engine::runtime::browser::tool_browser_close(
-                            &tool_call.input,
+                            &sanitized_input,
                             &browser,
                             &aid.to_string(),
                         ),
@@ -1193,19 +1261,14 @@ pub fn create_agent_config(
                 .map(|out| healer_result(&tool_id, out, false))
                 .map_err(sk_types::SovereignError::ToolExecutionError),
                 "get_skill" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let name = args.get("name").and_then(|v| v.as_str()).unwrap_or("");
-                        let locks = kernel.skills.clone();
-                        tokio::task::block_in_place(|| {
-                            tokio::runtime::Handle::current().block_on(async {
-                                let lock = locks.read().await;
-                                Ok(healer_result(
-                                    &tool_id,
-                                    sk_tools::skills::handle_get_skill(&lock, name),
-                                    false,
-                                ))
-                            })
-                        })
+                        let lock = kernel.skills.read().unwrap();
+                        Ok(healer_result(
+                            &tool_id,
+                            sk_tools::skills::handle_get_skill(&lock, name),
+                            false,
+                        ))
                     } else {
                         Err(sk_types::SovereignError::ToolExecutionError(
                             "Invalid arguments".into(),
@@ -1213,20 +1276,15 @@ pub fn create_agent_config(
                     }
                 }
                 "list_skills" => {
-                    let locks = kernel.skills.clone();
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(async {
-                            let lock = locks.read().await;
-                            Ok(healer_result(
-                                &tool_id,
-                                sk_tools::skills::handle_list_skills(&lock),
-                                false,
-                            ))
-                        })
-                    })
+                    let lock = kernel.skills.read().unwrap();
+                    Ok(healer_result(
+                        &tool_id,
+                        sk_tools::skills::handle_list_skills(&lock),
+                        false,
+                    ))
                 }
                 "text_to_speech" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let text = args.get("text").and_then(|v| v.as_str()).unwrap_or("");
                         let voice = args.get("voice").and_then(|v| v.as_str());
                         let output_path = args.get("output_path").and_then(|v| v.as_str());
@@ -1248,7 +1306,7 @@ pub fn create_agent_config(
                     }
                 }
                 "speech_to_text" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let file_path =
                             args.get("file_path").and_then(|v| v.as_str()).unwrap_or("");
 
@@ -1265,7 +1323,7 @@ pub fn create_agent_config(
                     }
                 }
                 "compile_rust_skill" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let skill_name = args
                             .get("skill_name")
                             .and_then(|v| v.as_str())
@@ -1349,7 +1407,7 @@ edition = "2021"
                             match res {
                                 Ok(exec_res) if exec_res.exit_code == 0 => {
                                     // 5. Success! Move binary to skills directory.
-                                    let lock = kernel.skills.write().await;
+                                    let lock = kernel.skills.write().unwrap();
                                     let skills_dir = lock.dir.clone();
                                     drop(lock);
 
@@ -1385,7 +1443,7 @@ edition = "2021"
                                     let _ = std::fs::remove_dir_all(&temp_abs_dir);
 
                                     // 7. Hot reload!
-                                    let mut lock = kernel.skills.write().await;
+                                    let mut lock = kernel.skills.write().unwrap();
                                     lock.reload();
                                     drop(lock);
 
@@ -1407,7 +1465,7 @@ edition = "2021"
                     }
                 }
                 "host_read_file" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::host::file_full::handle_host_read_file(path)
                             .map(|out| healer_result(&tool_id, out, false))
@@ -1418,7 +1476,7 @@ edition = "2021"
                     }
                 }
                 "host_write_file" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         let content = args.get("content").and_then(|v| v.as_str()).unwrap_or("");
                         let append = args
@@ -1434,7 +1492,7 @@ edition = "2021"
                     }
                 }
                 "host_list_dir" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let path = args.get("path").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::host::file_full::handle_host_list_dir(path)
                             .map(|out| healer_result(&tool_id, out, false))
@@ -1445,7 +1503,7 @@ edition = "2021"
                     }
                 }
                 "host_desktop_control" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("");
                         let value = args.get("value").and_then(|v| v.as_str()).unwrap_or("");
                         sk_tools::host::desktop_control::handle_desktop_control(action, value)
@@ -1457,7 +1515,7 @@ edition = "2021"
                     }
                 }
                 "host_system_config" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let action = args.get("action").and_then(|v| v.as_str()).unwrap_or("");
                         let target = args.get("target").and_then(|v| v.as_str());
                         let value = args.get("value").and_then(|v| v.as_str());
@@ -1470,7 +1528,7 @@ edition = "2021"
                     }
                 }
                 "host_install_app" => {
-                    if let Some(args) = tool_call.input.as_object() {
+                    if let Some(args) = sanitized_input.as_object() {
                         let package_id = args
                             .get("package_id")
                             .and_then(|v| v.as_str())
@@ -1496,7 +1554,7 @@ edition = "2021"
                         tokio::task::block_in_place(|| {
                             tokio::runtime::Handle::current().block_on(async {
                                 let mut mcp_lock = kernel.mcp.write().await;
-                                match mcp_lock.call_tool(&tool_call.name, &tool_call.input).await {
+                                match mcp_lock.call_tool(&tool_call.name, &sanitized_input).await {
                                     Ok(res) => Ok(healer_result(&tool_id, res, false)),
                                     Err(e) => Err(sk_types::SovereignError::ToolExecutionError(
                                         e.to_string(),
@@ -1505,10 +1563,18 @@ edition = "2021"
                             })
                         })
                     } else {
-                        Err(sk_types::SovereignError::ToolExecutionError(format!(
-                            "Unknown tool: {}",
-                            tool_call.name
-                        )))
+                        // --- Graceful Unknown Tool Handler ---
+                        // Instead of returning an error (which trips the circuit breaker),
+                        // return a helpful nudge so the model corrects itself.
+                        tracing::warn!(tool = %tool_call.name, "Model called non-existent tool, returning nudge");
+                        Ok(healer_result(
+                            &tool_id,
+                            format!(
+                                "Error: '{}' is not a valid tool. You can ONLY call these tools: remember, recall, list_dir, read_file, write_file, shell_exec, web_search, web_fetch. Please try again with one of these exact names.",
+                                tool_call.name
+                            ),
+                            true, // is_error = true so model knows to correct
+                        ))
                     }
                 }
             }?;
@@ -1553,7 +1619,8 @@ system_prompt = "You are a specialized worker focused on: {}. Your goal is to as
                                 // 3. Save to custom hands dir (~/.sovereign/hands/)
                                 let hands_dir = kernel_clone
                                     .config
-                                    .blocking_read()
+                                    .read()
+                                    .unwrap()
                                     .data_dir
                                     .join("hands");
                                 if !hands_dir.exists() {
@@ -1568,7 +1635,7 @@ system_prompt = "You are a specialized worker focused on: {}. Your goal is to as
 
                                 // 4. Reload Hands Registry
                                 info!("Reloading Hand Registry...");
-                                let mut lock = kernel_clone.hands.write().await;
+                                let mut lock = kernel_clone.hands.write().unwrap();
                                 lock.load_custom_hands(&hands_dir);
                                 drop(lock);
 

@@ -15,15 +15,17 @@ use tracing::{debug, warn};
 pub struct OpenAIDriver {
     api_key: String,
     base_url: String,
+    provider_name: String,
     client: reqwest::Client,
 }
 
 impl OpenAIDriver {
     /// Create a new OpenAI-compatible driver.
-    pub fn new(api_key: String, base_url: String) -> Self {
+    pub fn new(api_key: String, base_url: String, provider_name: String) -> Self {
         Self {
             api_key,
             base_url,
+            provider_name,
             client: reqwest::Client::new(),
         }
     }
@@ -108,7 +110,7 @@ struct OaiUsage {
 #[async_trait]
 impl LlmDriver for OpenAIDriver {
     fn provider(&self) -> &str {
-        "openai"
+        &self.provider_name
     }
     async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
         let mut oai_messages: Vec<OaiMessage> = Vec::new();
@@ -207,6 +209,8 @@ impl LlmDriver for OpenAIDriver {
         let tool_choice = if oai_tools.is_empty() {
             None
         } else {
+            // NVIDIA / Minimax models sometimes require "auto" to be explicitly reinforced
+            // in the request to trigger tool-calling reliably.
             Some(serde_json::json!("auto"))
         };
 
@@ -219,6 +223,13 @@ impl LlmDriver for OpenAIDriver {
             tool_choice,
             stream: false,
         };
+
+        if self.provider_name == "nvidia" {
+            debug!(
+                request = %serde_json::to_string_pretty(&oai_request).unwrap_or_default(),
+                "NVIDIA Request Body"
+            );
+        }
 
         let max_retries = 3;
         for attempt in 0..=max_retries {
@@ -296,6 +307,14 @@ impl LlmDriver for OpenAIDriver {
                 .text()
                 .await
                 .map_err(|e| LlmError::NetworkError(e.to_string()))?;
+
+            if self.provider_name == "nvidia" {
+                debug!(
+                    response = %body,
+                    "NVIDIA Response Body"
+                );
+            }
+
             let oai_response: OaiResponse =
                 serde_json::from_str(&body).map_err(|e| LlmError::ParseError(e.to_string()))?;
 
@@ -319,8 +338,23 @@ impl LlmDriver for OpenAIDriver {
                 }
             }
 
+            // --- JSON-in-content Recovery ---
+            if tool_calls.is_empty() && !content.is_empty() {
+                if let Some(recovered) = recover_tool_calls_from_text(&content) {
+                    debug!(count = recovered.len(), "Recovered tool calls from message content");
+                    tool_calls = recovered;
+                }
+            }
+            // --------------------------------
+
             let stop_reason = match choice.finish_reason.as_deref() {
-                Some("stop") => StopReason::EndTurn,
+                Some("stop") => {
+                    if !tool_calls.is_empty() {
+                        StopReason::ToolUse
+                    } else {
+                        StopReason::EndTurn
+                    }
+                }
                 Some("tool_calls") => StopReason::ToolUse,
                 Some("length") => StopReason::MaxTokens,
                 _ => {
@@ -353,6 +387,61 @@ impl LlmDriver for OpenAIDriver {
             status: 0_u16,
             message: "Max retries exceeded".to_string(),
         })
+    }
+}
+
+fn recover_tool_calls_from_text(text: &str) -> Option<Vec<ToolCall>> {
+    let mut tool_calls = Vec::new();
+    let mut current_text = text;
+
+    // Look for JSON-like structures that look like tool calls:
+    // {"name": "...", "input": {...}} or {"name": "...", "parameters": {...}}
+    while let Some(start) = current_text.find('{') {
+        current_text = &current_text[start..];
+        
+        // Find matching closing brace (simple heuristic)
+        let mut brace_count = 0;
+        let mut end_pos = None;
+        for (i, c) in current_text.char_indices() {
+            if c == '{' { brace_count += 1; }
+            else if c == '}' {
+                brace_count -= 1;
+                if brace_count == 0 {
+                    end_pos = Some(i + 1);
+                    break;
+                }
+            }
+        }
+
+        if let Some(end) = end_pos {
+            let potential_json = &current_text[..end];
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(potential_json) {
+                if let Some(obj) = val.as_object() {
+                    if let Some(name) = obj.get("name").and_then(|n| n.as_str()) {
+                        // Support both "input" and "parameters" (common in small models)
+                        let input = obj.get("input")
+                            .or_else(|| obj.get("parameters"))
+                            .cloned()
+                            .unwrap_or(serde_json::json!({}));
+                        
+                        tool_calls.push(ToolCall {
+                            id: format!("recovered_{}", &uuid::Uuid::new_v4().to_string()[..8]),
+                            name: name.to_string(),
+                            input,
+                        });
+                    }
+                }
+            }
+            current_text = &current_text[end..];
+        } else {
+            break;
+        }
+    }
+
+    if tool_calls.is_empty() {
+        None
+    } else {
+        Some(tool_calls)
     }
 }
 
@@ -464,7 +553,7 @@ mod tests {
 
     #[test]
     fn test_openai_driver_creation() {
-        let driver = OpenAIDriver::new("test-key".to_string(), "http://localhost".to_string());
+        let driver = OpenAIDriver::new("test-key".to_string(), "http://localhost".to_string(), "openai".to_string());
         assert_eq!(driver.api_key.as_str(), "test-key");
     }
 

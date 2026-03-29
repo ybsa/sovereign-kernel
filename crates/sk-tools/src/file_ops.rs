@@ -64,6 +64,12 @@ pub fn copy_file_tool() -> ToolDefinition {
 
 /// Validates that a path is within the permitted workspace.
 pub fn validate_safe_path(root: &Path, path: &str) -> Result<PathBuf, sk_types::SovereignError> {
+    // Ensure the workspace root directory exists; create it if missing.
+    if !root.exists() {
+        std::fs::create_dir_all(root).map_err(|e| {
+            sk_types::SovereignError::ToolExecutionError(format!("Failed to create workspace root: {e}"))
+        })?;
+    }
     let base = root.canonicalize().map_err(|e| {
         sk_types::SovereignError::ToolExecutionError(format!("Invalid workspace root: {e}"))
     })?;
