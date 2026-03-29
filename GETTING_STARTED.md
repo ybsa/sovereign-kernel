@@ -1,69 +1,73 @@
 # Getting Started with Sovereign Kernel 🚀
 
-Welcome to the **Village**. This guide will get you up and running in 2 minutes.
+Welcome to Sovereign Kernel, your local-first Agentic Operating System. This guide will help you install the kernel, configure your preferred LLM provider, and spawn your first background daemon.
 
-## 1. What is Sovereign Kernel?
+## 1. Prerequisites
 
-Sovereign Kernel is a **local-first AI operating system** built in Rust. Unlike simple chatbots, it is a **single-binary kernel** that manages autonomous agents ("Village members") that can use tools, browse the web, run code, and recover from crashes.
+Before installing the kernel, please ensure your system has the following:
+- **Rust (v1.75+)**: Installed via [rustup](https://rustup.rs/).
+- **SQLite3**: Required for The Archive (Memory Substrate).
+- **Supported OS**: Windows 10+, macOS 12+, or Linux (Kernel 5.13+ recommended for Landlock LSM security features).
 
-## 2. Why use it?
+## 2. Installation
 
-- **Total Privacy**: Everything runs on your machine; results are stored in a local SQLite "Archive".
-- **Hardened Security**: Agents run in a [Landlock/seccomp](docs/SAFETY_CONTROLS.md) sandbox (The Warden).
-- **Proactive Autonomy**: It doesn't just talk; it **does**. It can schedule tasks, browse, and build its own tools.
-- **Expert Knowledge**: Swappable "Hands" and 106+ expert "Skills" for coding, security, research, and more.
-
-## 3. Quick Setup
-
-### Option A: Download Pre-built Binaries (Easiest)
-
-1. Go to the [Latest Release](https://github.com/ybsa/sovereign-kernel/releases/latest) page.
-2. Download the archive for your OS (`windows-latest.zip`, `ubuntu-latest.tar.gz`, or `macos-latest.tar.gz`).
-3. Extract the archive to a folder of your choice.
-4. Open a terminal in that folder.
-
-### Option B: Build from Source
+Clone the repository and compile the highly optimized release binary using `cargo`:
 
 ```bash
-git clone https://github.com/ybsa/sovereign-kernel.git
+git clone https://github.com/your-org/sovereign-kernel.git
 cd sovereign-kernel
-cargo build --release
+
+# Build the core workspace
+cargo build --release --workspace
+
+# Optional: Run the built-in system diagnostics script
+cargo run --release -- doctor
 ```
 
-## 4. Initialization
+## 3. Configuration & API Keys
 
-Regardless of how you got the binary, you must initialize the kernel:
+Sovereign Kernel supports over 50 LLM Providers (OpenAI, Anthropic, NVIDIA NIM, Groq, local Ollama). You define your keys using environment variables to keep them completely isolated from the source code.
 
+1. **Copy the environment template**:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Add your preferred API key** inside `.env`:
+   ```env
+   # Example for OpenAI
+   OPENAI_API_KEY="sk-proj-..."
+   
+   # Example for Anthropic
+   ANTHROPIC_API_KEY="sk-ant-..."
+   
+   # Example for NVIDIA NIM (Mistral/Llama)
+   NVIDIA_API_KEY="nvapi-..."
+   ```
+
+3. **Modify `config.toml`**: Ensure the kernel points to the correct provider loop.
+   ```toml
+   [default_model]
+   provider = "openai" # Or "anthropic", "nvidia"
+   model = "gpt-4o"
+   api_key_env = "OPENAI_API_KEY"
+   ```
+
+## 4. Launching the OS
+
+You can interact with Sovereign Kernel in two primary ways:
+
+### A) The CLI Terminal (Foreground)
+Launch the interactive terminal chat to directly converse with the Oracle.
 ```bash
-# On Windows
-.\sovereign.exe init
-
-# On Linux/macOS
-./sovereign init
+cargo run --release -- run "Hello Oracle, please generate a Python script that calculates fibonacci."
 ```
 
-### Add API Keys
-
-Create a `.env` file in the same folder as the binary with at least one key:
-
-```env
-ANTHROPIC_API_KEY=your_key_here
-# OR
-OPENAI_API_KEY=your_key_here
+### B) The Background Daemon (API Bridge)
+If you want to plug the OS into your own UI, Discord bot, or Web Application, launch the background daemon. 
+By default, this binds to `http://127.0.0.1:3030`.
+```bash
+cargo run --release -- start --detach
 ```
 
-## 5. How to Use
-
-| Goal | Command |
-| --- | --- |
-| **Interactive Chat** | `sovereign chat` |
-| **One-shot Task** | `sovereign run "Analyze this repo and find bugs"` |
-| **Background Mode** | `sovereign start --detach` |
-| **Web UI** | `sovereign dashboard` |
-| **Health Check** | `sovereign doctor` |
-
-## 📚 Deep Dive
-
-- [Documentation Index](README.md#documentation)
-- [How it works (Architecture)](docs/ARCHITECTURE.md)
-- [Safety & Sandboxing](docs/SAFETY_CONTROLS.md)
+For advanced instructions on hitting the REST API or using Agentic Tools, please refer to the [USER_GUIDE.md](./USER_GUIDE.md).

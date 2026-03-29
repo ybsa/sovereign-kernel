@@ -178,10 +178,7 @@ impl MeteringEngine {
 
     /// Get total cost across all agents.
     pub fn total_cost(&self) -> f64 {
-        self.state
-            .read()
-            .map(|s| s.total_cost)
-            .unwrap_or(0.0)
+        self.state.read().map(|s| s.total_cost).unwrap_or(0.0)
     }
 
     /// Get a budget status snapshot.

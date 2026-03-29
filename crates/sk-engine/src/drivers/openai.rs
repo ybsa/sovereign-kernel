@@ -341,7 +341,10 @@ impl LlmDriver for OpenAIDriver {
             // --- JSON-in-content Recovery ---
             if tool_calls.is_empty() && !content.is_empty() {
                 if let Some(recovered) = recover_tool_calls_from_text(&content) {
-                    debug!(count = recovered.len(), "Recovered tool calls from message content");
+                    debug!(
+                        count = recovered.len(),
+                        "Recovered tool calls from message content"
+                    );
                     tool_calls = recovered;
                 }
             }
@@ -398,13 +401,14 @@ fn recover_tool_calls_from_text(text: &str) -> Option<Vec<ToolCall>> {
     // {"name": "...", "input": {...}} or {"name": "...", "parameters": {...}}
     while let Some(start) = current_text.find('{') {
         current_text = &current_text[start..];
-        
+
         // Find matching closing brace (simple heuristic)
         let mut brace_count = 0;
         let mut end_pos = None;
         for (i, c) in current_text.char_indices() {
-            if c == '{' { brace_count += 1; }
-            else if c == '}' {
+            if c == '{' {
+                brace_count += 1;
+            } else if c == '}' {
                 brace_count -= 1;
                 if brace_count == 0 {
                     end_pos = Some(i + 1);
@@ -419,11 +423,12 @@ fn recover_tool_calls_from_text(text: &str) -> Option<Vec<ToolCall>> {
                 if let Some(obj) = val.as_object() {
                     if let Some(name) = obj.get("name").and_then(|n| n.as_str()) {
                         // Support both "input" and "parameters" (common in small models)
-                        let input = obj.get("input")
+                        let input = obj
+                            .get("input")
                             .or_else(|| obj.get("parameters"))
                             .cloned()
                             .unwrap_or(serde_json::json!({}));
-                        
+
                         tool_calls.push(ToolCall {
                             id: format!("recovered_{}", &uuid::Uuid::new_v4().to_string()[..8]),
                             name: name.to_string(),
@@ -553,7 +558,11 @@ mod tests {
 
     #[test]
     fn test_openai_driver_creation() {
-        let driver = OpenAIDriver::new("test-key".to_string(), "http://localhost".to_string(), "openai".to_string());
+        let driver = OpenAIDriver::new(
+            "test-key".to_string(),
+            "http://localhost".to_string(),
+            "openai".to_string(),
+        );
         assert_eq!(driver.api_key.as_str(), "test-key");
     }
 

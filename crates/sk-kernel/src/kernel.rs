@@ -227,7 +227,7 @@ impl SovereignKernel {
         }
         hand_registry.load_custom_hands(&custom_hands_path);
         let hands = Arc::new(std::sync::RwLock::new(hand_registry));
- 
+
         Ok(Self {
             config: Arc::new(std::sync::RwLock::new(config)),
             soul,
@@ -670,9 +670,9 @@ impl SovereignKernel {
                                     }
                                 },
                                 command: match &server.transport {
-                                    sk_types::config::McpTransportEntry::Stdio { command, .. } => {
-                                        Some(command.clone())
-                                    }
+                                    sk_types::config::McpTransportEntry::Stdio {
+                                        command, ..
+                                    } => Some(command.clone()),
                                     _ => None,
                                 },
                                 args: match &server.transport {
@@ -751,7 +751,10 @@ async fn init_llm_driver(
     println!("!!! init_llm_driver start");
     // 1. Initialize primary driver
     let primary_api_key = std::env::var(&dm.api_key_env).unwrap_or_default();
-    println!("!!! creating primary driver: provider={}, model={}", dm.provider, dm.model);
+    println!(
+        "!!! creating primary driver: provider={}, model={}",
+        dm.provider, dm.model
+    );
     let (primary_driver, primary_model) = create_driver(
         &dm.provider,
         &dm.model,
@@ -794,7 +797,10 @@ async fn init_llm_driver(
         ];
 
         for (provider, model, env_var) in auto_fallbacks {
-            println!("!!! Checking auto fallback: provider={}, env={}", provider, env_var);
+            println!(
+                "!!! Checking auto fallback: provider={}, env={}",
+                provider, env_var
+            );
             // Skip the primary provider to avoid duplicates
             if provider == dm.provider.to_lowercase() {
                 println!("!!! Skipping because it's primary");
@@ -841,13 +847,12 @@ fn create_driver(
     String,
 )> {
     if let Some(url) = base_url {
-        let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> = Arc::new(
-            sk_engine::drivers::openai::OpenAIDriver::new(
+        let driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> =
+            Arc::new(sk_engine::drivers::openai::OpenAIDriver::new(
                 api_key.to_string(),
                 url.to_string(),
                 provider.to_string(),
-            ),
-        );
+            ));
         return Ok((driver, model.to_string()));
     }
 

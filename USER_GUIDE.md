@@ -1,61 +1,45 @@
-# 🗺️ Step-by-Step Setup Guide (Windows)
+# 🗺️ Sovereign Kernel User Guide
 
-Welcome! This guide will teach you exactly how to set up the Sovereign Kernel on your computer using the pre-built Windows version.
+This guide details how to interact with the Sovereign Kernel at a deep structural level. Now that Sovereign Kernel is v1.0 and fully verified, you can interface with it directly using its headless REST API or the CLI.
 
-## Phase 1: Download & Extract
+## 1. Using The REST API Bridge
 
-1.  **Go to the Releases Page**: Visit [github.com/ybsa/sovereign-kernel/releases/latest](https://github.com/ybsa/sovereign-kernel/releases/latest).
-2.  **Download the Zip**: Click on `sovereign-kernel-windows-latest.zip`.
-3.  **Extract**: Right-click the downloaded file and select **"Extract All..."**. Choose a folder like `C:\SovereignKernel`.
+If you launched Sovereign Kernel in daemon mode (`cargo run --release -- start --detach`), it will run a lightweight `Axum` HTTP server in the background (default port `3030`).
 
-## Phase 2: Adding Your API Keys (The "Brain")
+You can easily route queries to the active LLM memory pool using standard JSON payloads.
 
-The Kernel needs an API key to "think". You can get one from [Anthropic (Claude)](https://console.anthropic.com/) or [OpenAI (ChatGPT)](https://platform.openai.com/).
-
-1.  Inside your `SovereignKernel` folder, create a new text file.
-2.  Rename it exactly to `.env` (make sure there is a dot at the beginning and no `.txt` at the end).
-3.  Open it with Notepad and paste your key like this:
-
-    ```env
-    ANTHROPIC_API_KEY=your_key_here
-    ```
-
-4.  Save and close.
-
-## Phase 3: First-Time Initialization
-
-1.  Press `Win + R`, type `powershell`, and hit Enter.
-2.  Type `cd C:\SovereignKernel` (or wherever you extracted it).
-3.  Run the setup wizard:
-    ```powershell
-    .\sovereign.exe init
-    ```
-4.  **Follow the Prompts**:
-    - Pick your LLM provider (e.g., Anthropic).
-    - The wizard will check your key and create your configuration file.
-
-## Phase 4: Testing Your First Agent
-
-Now for the fun part! Let's talk to your agent.
-
-### Option A: Interactive Chat
-Run this to enter a direct conversation:
-```powershell
-.\sovereign.exe chat
+**Example Request:**
+```bash
+curl -X POST http://127.0.0.1:3030/v1/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Hello Oracle, what is the status of the Treasury?"
+  }'
 ```
 
-### Option B: Autonomous Task
-Ask the agent to do something on your computer:
-```powershell
-.\sovereign.exe run "Check my disk space and summarize it"
+The server automatically negotiates the token constraints and maps the response onto the Event Bus natively!
+
+## 2. Using "The Forge" (Tool Execution)
+
+By default, Sovereign Kernel operates in a strict sandbox. If you explicitly want an agent to modify files on your computer or run a shell command, the agent must be granted the `shell_exec` or `code_exec` capability.
+
+- If you interact via the CLI (`cargo run -- run "Do X"`), the CLI will pause and prompt you: "The agent wants to execute: 'ls -la'. Approve? [y/N]"
+- This is part of **The Warden** security protocol preventing autonomous agents from maliciously overwriting directories.
+
+## 3. Monitoring The Treasury 💰
+
+Sovereign Kernel natively tracks every fractional cent consumed by your API keys (Anthropic, NVIDIA, OpenAI).
+
+To view your exact lifetime usage without parsing logs, hit the Treasury API:
+```bash
+curl http://127.0.0.1:3030/v1/treasury/status
 ```
+It returns an instantaneous JSON read-out of your `total_cents_used` against your configured maximum budget.
 
-## 💡 Pro Tips for New Users
+## 4. Troubleshooting 
 
-- **The Dashboard**: Run `.\sovereign.exe dashboard` to open a beautiful web interface in your browser.
-- **Safety**: By default, the agent is in **Sandbox Mode**. It will ask for your permission before editing files or running commands.
-- **Help**: Type `.\sovereign.exe --help` at any time to see all available commands.
+**Context Overflow?**
+If you pass too many tokens into a long-running session, Sovereign Kernel features "The Healer." It will seamlessly activate a background LLM pipeline to explicitly summarize the last 50 messages, drastically shrinking your token count without destroying context.
 
----
-
-*Congratulations! You are now running your own sovereign agent village locally.* 🚀
+**Database Drift?**
+If you want to view exactly what a specific agent remembers, simply use standard SQLite tools to view `memory.db` generated inside the kernel's execution directory.

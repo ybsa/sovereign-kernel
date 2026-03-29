@@ -3,10 +3,10 @@ log_level = "info"
 execution_mode = "sandbox"
 
 [default_model]
-provider = "nvidia"
-model = "minimaxai/minimax-m2.5"
-api_key_env = "NVIDIA_API_KEY"
-# base_url = "https://integrate.api.nvidia.com/v1" # Now built into the kernel
+provider = "openai"
+model = "gpt-4o"
+api_key_env = "OPENAI_API_KEY"
+# base_url = "https://api.openai.com/v1"
 
 [memory]
 decay_rate = 0.1

@@ -203,11 +203,7 @@ impl CopilotDriver {
         } else {
             token.base_url.clone()
         };
-        super::openai::OpenAIDriver::new(
-            token.token.to_string(),
-            base_url,
-            "copilot".to_string(),
-        )
+        super::openai::OpenAIDriver::new(token.token.to_string(), base_url, "copilot".to_string())
     }
 }
 

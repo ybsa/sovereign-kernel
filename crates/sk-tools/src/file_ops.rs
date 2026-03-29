@@ -67,7 +67,9 @@ pub fn validate_safe_path(root: &Path, path: &str) -> Result<PathBuf, sk_types::
     // Ensure the workspace root directory exists; create it if missing.
     if !root.exists() {
         std::fs::create_dir_all(root).map_err(|e| {
-            sk_types::SovereignError::ToolExecutionError(format!("Failed to create workspace root: {e}"))
+            sk_types::SovereignError::ToolExecutionError(format!(
+                "Failed to create workspace root: {e}"
+            ))
         })?;
     }
     let base = root.canonicalize().map_err(|e| {

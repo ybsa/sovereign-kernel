@@ -11,7 +11,7 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use sk_types::{AgentId, SovereignError, SovereignResult, KernelConfig};
+use sk_types::{AgentId, KernelConfig, SovereignError, SovereignResult};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -115,10 +115,7 @@ pub async fn start_server(kernel: Arc<SovereignKernel>, addr: &str) -> Sovereign
         )
         .route("/v1/agents/:id/thinking", get(thinking_handler))
         .route("/v1/triggers/webhook", post(webhook_handler))
-        .route(
-            "/v1/config",
-            get(get_config_handler),
-        )
+        .route("/v1/config", get(get_config_handler))
         .route("/v1/config/update", post(update_config_handler))
         .route("/v1/tools", get(list_tools_handler))
         .route("/v1/treasury/status", get(treasury_status_handler))

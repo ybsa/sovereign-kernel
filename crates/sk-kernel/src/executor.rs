@@ -1,5 +1,5 @@
-use sk_types::{AgentId, SovereignError};
 use sk_engine::agent_loop::AgentLoopConfig;
+use sk_types::{AgentId, SovereignError};
 use std::sync::Arc;
 use tracing::info;
 
@@ -16,7 +16,15 @@ fn is_small_model(model_name: &str) -> bool {
         }
     }
     // Detect by common small model families used locally
-    let small_families = ["llama3.2", "phi", "tinyllama", "gemma:2b", "gemma2:2b", "qwen2:0.5b", "qwen2:1.5b"];
+    let small_families = [
+        "llama3.2",
+        "phi",
+        "tinyllama",
+        "gemma:2b",
+        "gemma2:2b",
+        "qwen2:0.5b",
+        "qwen2:1.5b",
+    ];
     for family in &small_families {
         if lower.contains(family) {
             return true;
@@ -154,7 +162,7 @@ pub fn create_agent_config(
     let mut system_prompt = system_prompt;
     let os_name = std::env::consts::OS;
     let tool_names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
-    
+
     system_prompt.push_str(&format!(
         "\n\n## System Context\n- You are running on **{}**.\n- Use {} file paths (e.g. `{}`).\n- Your available tools are EXACTLY: {}\n- ONLY call tools from this list. Do NOT invent tool names.\n",
         os_name,
@@ -206,21 +214,25 @@ pub fn create_agent_config(
             let kernel = k.clone();
             let browser = b.clone();
             let aid = aid;
-            
+
             // --- Resilient Parser (Schema Stripper) ---
             let mut sanitized_input = tool_call.input.clone();
             if let Some(obj) = sanitized_input.as_object_mut() {
                 for (_key, value) in obj.iter_mut() {
                     // Check if value is an object that looks like a schema-hallucination
-                    // e.g. {"type": "string", "content": "actual_val"} 
+                    // e.g. {"type": "string", "content": "actual_val"}
                     // or {"type": "string", "description": "...", "value": "actual_val"}
                     if let Some(val_obj) = value.as_object() {
-                         if val_obj.contains_key("type") && (val_obj.contains_key("content") || val_obj.contains_key("value")) {
-                             if let Some(actual) = val_obj.get("content").or_else(|| val_obj.get("value")) {
-                                 tracing::debug!("Schema stripper: recovered actual value from hallucinated schema object");
-                                 *value = actual.clone();
-                             }
-                         }
+                        if val_obj.contains_key("type")
+                            && (val_obj.contains_key("content") || val_obj.contains_key("value"))
+                        {
+                            if let Some(actual) =
+                                val_obj.get("content").or_else(|| val_obj.get("value"))
+                            {
+                                tracing::debug!("Schema stripper: recovered actual value from hallucinated schema object");
+                                *value = actual.clone();
+                            }
+                        }
                     }
                 }
             }

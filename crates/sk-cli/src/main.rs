@@ -262,8 +262,7 @@ async fn async_main() -> anyhow::Result<()> {
         // Look for config in default locations
         let local_path = std::path::PathBuf::from("config.toml");
         let local_sub_path = std::path::PathBuf::from("sovereign-kernel").join("config.toml");
-        let user_path = dirs::config_dir()
-            .map(|d| d.join("sovereign-kernel").join("config.toml"));
+        let user_path = dirs::config_dir().map(|d| d.join("sovereign-kernel").join("config.toml"));
 
         if local_path.exists() {
             sk_types::KernelConfig::load(&local_path)?
