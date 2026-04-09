@@ -7,9 +7,15 @@ use sk_types::{SovereignError, SovereignResult, ToolCall, ToolDefinition};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use std::future::Future;
+use std::pin::Pin;
+
 /// A handler that executes a specific tool call.
-pub type ToolHandler =
-    Arc<dyn Fn(&ToolCall) -> SovereignResult<sk_types::ToolResult> + Send + Sync>;
+pub type ToolHandler = Arc<
+    dyn Fn(ToolCall) -> Pin<Box<dyn Future<Output = SovereignResult<sk_types::ToolResult>> + Send>>
+        + Send
+        + Sync,
+>;
 
 /// Central registry for tools available to the agent.
 #[derive(Clone)]
@@ -30,7 +36,13 @@ impl ToolRegistry {
     /// Register a new tool with its metadata and execution handler.
     pub fn register<F>(&mut self, definition: ToolDefinition, handler: F)
     where
-        F: Fn(&ToolCall) -> SovereignResult<sk_types::ToolResult> + Send + Sync + 'static,
+        F: Fn(
+                ToolCall,
+            )
+                -> Pin<Box<dyn Future<Output = SovereignResult<sk_types::ToolResult>> + Send>>
+            + Send
+            + Sync
+            + 'static,
     {
         self.handlers
             .insert(definition.name.clone(), Arc::new(handler));
@@ -43,9 +55,9 @@ impl ToolRegistry {
     }
 
     /// Execute a tool call using the registered handlers.
-    pub fn execute(&self, call: &ToolCall) -> SovereignResult<sk_types::ToolResult> {
+    pub async fn execute(&self, call: ToolCall) -> SovereignResult<sk_types::ToolResult> {
         if let Some(handler) = self.handlers.get(&call.name) {
-            handler(call)
+            handler(call).await
         } else {
             Err(SovereignError::ToolExecutionError(format!(
                 "Unknown tool: {}",
@@ -54,23 +66,25 @@ impl ToolRegistry {
         }
     }
 
-    /// Return an executor closure suitable for `AgentLoopConfig` that enforces capabilities.
     pub fn executor(
         &self,
         _agent_capabilities: Vec<sk_types::security::Capability>,
     ) -> crate::agent_loop::ToolExecutor {
         let registry = self.clone();
         Box::new(move |call| {
-            // Check capabilities
-            if let Some(_def) = registry.definitions.iter().find(|d| d.name == call.name) {
-                // Capability checks removed as per sk-types update
-            } else {
-                return Err(SovereignError::ToolExecutionError(format!(
-                    "Unknown tool: {}",
-                    call.name
-                )));
-            }
-            registry.execute(call)
+            let registry = registry.clone();
+            Box::pin(async move {
+                // Check capabilities
+                if let Some(_def) = registry.definitions.iter().find(|d| d.name == call.name) {
+                    // Capability checks removed as per sk-types update
+                } else {
+                    return Err(SovereignError::ToolExecutionError(format!(
+                        "Unknown tool: {}",
+                        call.name
+                    )));
+                }
+                registry.execute(call).await
+            })
         })
     }
 }

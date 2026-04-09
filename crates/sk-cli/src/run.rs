@@ -55,65 +55,108 @@ pub async fn execute(
         return Ok(());
     }
 
-    // --- Direct execution mode ---
-    let intent = if mode_hint == "auto" {
+    // --- Agent Library Lookup ---
+    let mut task_parts = task.splitn(2, ' ');
+    let first_word = task_parts.next().unwrap_or("");
+    let remaining_task = task_parts.next().unwrap_or(task);
+
+    let agent_dir = std::path::PathBuf::from("agents").join(first_word);
+    let manifest_path = agent_dir.join("manifest.toml");
+
+    let (intent, _skill_def, custom_soul) = if manifest_path.exists() {
+        println!(
+            "📂 Loading agent from library: {}",
+            first_word.bright_cyan().bold()
+        );
+        let manifest_content = std::fs::read_to_string(&manifest_path)?;
+        let manifest: sk_types::agent::AgentManifest = toml::from_str(&manifest_content)?;
+
+        let soul_path = agent_dir.join("SOUL.md");
+        let soul = if soul_path.exists() {
+            Some(std::fs::read_to_string(soul_path)?)
+        } else {
+            None
+        };
+
+        (
+            sk_kernel::wizard::AgentIntent {
+                name: manifest.name,
+                description: manifest.description,
+                task: remaining_task.to_string(),
+                skills: manifest.skills,
+                model_tier: "default".into(),
+                scheduled: false,
+                schedule: None,
+                capabilities: manifest.capabilities.tools,
+                mode: Some(mode_hint.to_string()),
+                is_otto: false,
+            },
+            None,
+            soul,
+        )
+    } else if mode_hint == "auto" {
         println!("🔍 Analyzing task intent...");
-        sk_kernel::wizard::SetupWizard::analyze_task_intent(
+        let (intent, skill) = sk_kernel::wizard::SetupWizard::analyze_task_intent(
             kernel.driver.clone(),
             &kernel.model_name,
             task,
         )
-        .await?
+        .await?;
+        (intent, skill, None)
     } else {
-        sk_kernel::wizard::AgentIntent {
-            name: "cli_agent".into(),
-            description: "Agent spawned via CLI".into(),
-            task: task.into(),
-            skills: vec![],
-            model_tier: "default".into(),
-            scheduled: false,
-            schedule: None,
-            capabilities: vec!["file_read".into(), "web".into(), "shell".into()],
-            mode: Some(mode_hint.to_string()),
-        }
+        (
+            sk_kernel::wizard::AgentIntent {
+                name: "cli_agent".into(),
+                description: "Agent spawned via CLI".into(),
+                task: task.into(),
+                skills: vec![],
+                model_tier: "default".into(),
+                scheduled: false,
+                schedule: None,
+                capabilities: vec!["file_read".into(), "web".into(), "shell".into()],
+                mode: Some(mode_hint.to_string()),
+                is_otto: false,
+            },
+            None,
+            None,
+        )
     };
 
     println!("🚀 Spawning agent: {}", intent.name);
     let agent_id = AgentId::new();
 
-    // Set security mode
-    let is_unrestricted = intent
-        .mode
-        .as_deref()
-        .map(|m| m == "unrestricted")
-        .unwrap_or(false);
+    use colored::*;
+    use std::io::Write;
 
-    if is_unrestricted {
-        println!("⚠️  WARNING: Running in UNRESTRICTED mode.");
-    } else {
-        // Force sandbox for safety
-        let _ =
-            kernel
-                .memory
-                .structured
-                .set(agent_id, "forced_sandbox", serde_json::Value::Bool(true));
+    let stream_handler: Option<sk_engine::agent_loop::StreamHandler> =
+        Some(Box::new(move |chunk| {
+            if chunk.starts_with("\n🔧 Calling tool:") {
+                println!("{}", chunk.bright_cyan().bold());
+            } else {
+                print!("{}", chunk);
+                let _ = std::io::stdout().flush();
+            }
+        }));
+
+    let mut system_prompt = kernel.soul.to_system_prompt_fragment();
+    if let Some(soul) = custom_soul {
+        system_prompt = format!("{}\n\n{}", system_prompt, soul);
     }
 
-    let system_prompt = kernel.soul.to_system_prompt_fragment();
     let agent_config = sk_kernel::executor::create_agent_config(
         kernel.clone(),
         kernel.driver.clone(),
         system_prompt,
         kernel.model_name.clone(),
         agent_id,
-        kernel.browser.clone(),
         kernel.skills.clone(),
+        stream_handler,
     );
 
     let mut session = sk_types::Session::new(agent_id);
 
     println!("--- Agent Output ---");
-    let result = sk_engine::agent_loop::run_agent_loop(agent_config, &mut session, task)
+    let result = sk_engine::agent_loop::run_agent_loop(agent_config, &mut session, &intent.task)
         .await
         .map_err(|e| anyhow::anyhow!("Agent loop failed: {e}"))?;
 

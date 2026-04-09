@@ -4,9 +4,9 @@
 ![MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 ![Status](https://img.shields.io/badge/status-v1.0.0--stable-brightgreen?style=flat-square)
 
-> **A local-first, memory-safe, locally audited AI Operating System. Single Rust binary. Runs everywhere.**
+> **A local-first, memory-safe AI Operating System. Single Rust binary. Runs everywhere.**
 
-Sovereign Kernel is a production-grade Agentic framework built entirely in Rust. It serves as a strict, deeply isolated, and financially metered operating system that governs LLM actions (from over 50+ remote and local models) before they touch your host machine.
+Sovereign Kernel is a production-grade Agentic Operating System and **Agent Development Kit (ADK)** built entirely in Rust. It provides a modular, strategy-based framework for building autonomous agents with deep repository awareness via **The Librarian** (background semantic indexing).
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
@@ -14,57 +14,94 @@ Sovereign Kernel is a production-grade Agentic framework built entirely in Rust.
 │               The Agentic Operating System                  │
 │                                                             │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │ 50+ LLM  │  │ 30+ Chat │  │  106+    │  │ Security │   │
-│  │ Providers│  │ Channels │  │  Skills  │  │ Sandbox  │   │
+│  │ 50+ LLM  │  │ Terminal │  │  100+    │  │ Security │   │
+│  │ Providers│  │   CLI    │  │  Skills  │  │ Sandbox  │   │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
 │                                                             │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │  Memory  │  │  Agents  │  │  Tools   │  │ Axum REST│   │
-│  │ Substrate│  │  Swarm   │  │ (30+)    │  │  Bridge  │   │
+│  │  Memory  │  │  Agent   │  │ Modular  │  │   MCP    │   │
+│  │ Substrate│  │ Registry │  │  Tools   │  │ Protocol │   │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🏆 Empirically Verified Architecture
+## 🏗️ Architecture
 
-Version 1.0 of the Sovereign Kernel has undergone a deep, interior binary trace logic test to mathematically prove its stability. 
+A 9-crate Rust workspace with clean separation of concerns:
 
-1. **The Archive (Memory Substrate):** Every single conversational step is physically serialized natively to an SQLite WAL loop. Semantic embedding searches parse the binary cleanly. No context is ever lost.
-2. **The Oracle (LLM Matrix):** Dynamically proven to handle Anthropic, OpenAI, NVIDIA NIM, and Ollama APIs asynchronously. It seamlessly handles fractional token parsing.
-3. **The Treasury (Fiscal Engine):** The architecture guarantees budget enforcement natively intercepts and tracks the cost of an LLM query down to the millionth of a cent before routing it back into the Agent.
-4. **The Healer (Agent Memory Compaction):** Actively traces oversized context windows. It natively spins up parallel LLM triggers to compress histories and protect your token threshold limits without deleting critical context.
-5. **The Forge (Tool Execution Sandbox):** Isolated logic guarantees dangerous Shell/Python/File System scripts are explicitly gated before interacting with OS layers like PTY, `cmd /C`, or `sh`.
+| Crate | Purpose |
+| :--- | :--- |
+| **sk-types** | Shared types, errors, capabilities, configuration schema |
+| **sk-soul** | Agent identity parser (SOUL.md, IDENTITY.md) |
+| **sk-memory** | SQLite-backed memory substrate (structured KV, semantic vectors, BM25, sessions, audit) |
+| **sk-engine** | LLM orchestration, agent loops, driver catalog, sandboxing |
+| **sk-mcp** | Model Context Protocol server/client integration |
+| **sk-kernel** | Core daemon: security, approval gates, event bus, cron, supervisor, tool registry |
+| **sk-tools** | Tool implementations (shell, file ops, browser, code exec, skills) |
+| **sk-hands** | Pre-built agent capability packages |
+| **sk-cli** | CLI surface and interactive terminal |
 
 ---
 
-## 🛡️ "The Warden" Security Core
+## 🚀 Verified LLM Providers
 
-Because an LLM can generate arbitrary operational commands or Python scripts, the Kernel isolates every Agent. 
-- **Filesystem Isolation:** `Landlock LSM` ensures no physical directory can be overwritten by a rogue agent unless explicitly mounted.
-- **Syscall Filtering:** `seccomp-bpf` restricts the syscalls accessible to background threads.
-- **Merkle Audit:** Every network egress and `stdout` pipe returned by an agentic loop is cryptographically wrapped into a tamper-evident audit trail!
+| Provider | Status | Notes |
+| :--- | :--- | :--- |
+| **OpenAI** | ✅ Verified | GPT-4o, o1-preview |
+| **Anthropic** | ✅ Verified | Claude 3.5/4 Sonnet (Native Tool Use) |
+| **Google Gemini** | ✅ Verified | Gemini 2.5 Flash/Pro |
+| **NVIDIA NIM** | ✅ Verified | Mistral, Llama via NIM API |
+| **Ollama** | ✅ Verified | Any local model (OpenAI-compatible) |
+| **Groq** | ✅ Verified | Ultra-fast inference |
+| **DeepSeek** | ✅ Verified | DeepSeek-V2/V3 |
+| **OpenRouter** | ✅ Verified | Multi-model routing |
+| **xAI / Grok** | ✅ Verified | Grok models |
+| **Mistral** | ✅ Verified | Mistral Large/Small |
 
-## 🚀 Use Cases
+---
 
-1. **DevOps & Infrastructure Autonomy:** Provide read-only keys to an agent and ask it to diagnose remote Kubernetes registries, using built-in Sandboxed shell tools to generate patching manifests dynamically.
-2. **Always-On Threat Intelligence:** Span background daemons via the API Bridge to automatically funnel remote CVE JSONs into the SQLite brain for semantic search correlation.
-3. **Autonomous Software Code Reviews:** Hook the `Axum` Rest Bridge up to your Discord, and direct the kernel to summarize thousands of lines of PRs automatically into a channel using highly complex "Skills."
+## 🛡️ Security Model
+
+Sovereign Kernel provides multi-layered protection for LLM-driven agent operations:
+
+- **Unified Approval Manager** — Risk-based gating (Low → Medium → High → Critical) with human-in-the-loop for dangerous operations
+- **Modular Tool Registry** — All tools dispatched through a type-safe `ToolHandler` trait with per-tool risk classification
+- **Filesystem Sandbox** — Agents operate in isolated workspace directories
+- **Audit Trail** — Merkle chain of every agent action for forensic analysis
+- **Budget Enforcement** — Real-time cost tracking with hard-kill on overspend
+
+---
 
 ## 📚 Documentation
 
-Everything you need to successfully execute internal Agents or bind external frontends to the OS is fully documented:
+| Document | Description |
+| :--- | :--- |
+| [🏎️ Getting Started](GETTING_STARTED.md) | Installation, config, and first run |
+| [🧭 User Guide](USER_GUIDE.md) | API, tools, and advanced usage |
+| [🏛️ Architecture](docs/ARCHITECTURE.md) | Deep dive into all 9 crates |
+| [🗺️ Project Map](docs/PROJECT_MAP.md) | Lore terminology and directory layout |
+| [🛡️ Security](SECURITY.md) | Vulnerability disclosure and security model |
+| [🤝 Contributing](CONTRIBUTING.md) | How to contribute |
 
-1. [🏎️ GETTING STARTED](GETTING_STARTED.md) - How to configure your LLM APIs (`.env`) safely and correctly build the release binary!
-2. [🧭 USER GUIDE](USER_GUIDE.md) - Exploring the Headless API Bridge and Tool Sandboxes.
-3. [🛡️ SECURITY POLICY](SECURITY.md) - Rules for vulnerability disclosure and "The Warden" boundaries.
-4. [🤝 CONTRIBUTING](CONTRIBUTING.md) - How to push PRs, code style choices, and Rust type specifications!
+---
+
+## ⚙️ Quick Start
+
+```bash
+git clone https://github.com/OpenEris/sovereign-kernel.git
+cd sovereign-kernel
+cp config.toml.example config.toml   # Edit with your provider
+cp .env.example .env                  # Add your API keys
+cargo build --release --workspace
+cargo run --release -- run "Hello, what can you do?"
+```
 
 ## ⚙️ Requirements
-- `Rust 1.75+` (Required)
-- `SQLite3` (Required)
-- Windows 10+, macOS, Linux (Kernel 5.13+ Recommended)
+- **Rust 1.75+** (Required)
+- **SQLite3** (Bundled via rusqlite)
+- Windows 10+, macOS, or Linux
 
 ## 📜 License
-Generously licensed under the [MIT License](LICENSE).
+Licensed under the [MIT License](LICENSE).

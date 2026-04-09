@@ -4,6 +4,7 @@
 //! a /v1/embeddings endpoint (OpenAI, Ollama, Together, etc.).
 
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use sk_types::SovereignError;
 
 /// Trait for computing text embeddings.
@@ -22,6 +23,84 @@ pub trait EmbeddingDriver: Send + Sync {
 
     /// Get the embedding dimensions.
     fn dimensions(&self) -> usize;
+}
+
+/// OpenAI-compatible embedding driver.
+pub struct OpenAIEmbeddingDriver {
+    api_key: String,
+    base_url: String,
+    model: String,
+    dimensions: usize,
+    client: reqwest::Client,
+}
+
+impl OpenAIEmbeddingDriver {
+    pub fn new(api_key: String, base_url: String, model: String, dimensions: usize) -> Self {
+        Self {
+            api_key,
+            base_url,
+            model,
+            dimensions,
+            client: reqwest::Client::new(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct OaiEmbeddingRequest {
+    model: String,
+    input: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct OaiEmbeddingResponse {
+    data: Vec<OaiEmbeddingData>,
+}
+
+#[derive(Deserialize)]
+struct OaiEmbeddingData {
+    embedding: Vec<f32>,
+}
+
+#[async_trait]
+impl EmbeddingDriver for OpenAIEmbeddingDriver {
+    async fn embed(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, SovereignError> {
+        let url = format!("{}/embeddings", self.base_url);
+        let req = OaiEmbeddingRequest {
+            model: self.model.clone(),
+            input: texts.iter().map(|s| s.to_string()).collect(),
+        };
+
+        let mut builder = self.client.post(&url).json(&req);
+        if !self.api_key.is_empty() {
+            builder = builder.header("authorization", format!("Bearer {}", self.api_key));
+        }
+
+        let resp = builder
+            .send()
+            .await
+            .map_err(|e| SovereignError::Internal(format!("Network error: {e}")))?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(SovereignError::Internal(format!(
+                "Embedding API error ({}): {}",
+                status, body
+            )));
+        }
+
+        let data: OaiEmbeddingResponse = resp
+            .json()
+            .await
+            .map_err(|e| SovereignError::Internal(format!("Parse error: {e}")))?;
+
+        Ok(data.data.into_iter().map(|d| d.embedding).collect())
+    }
+
+    fn dimensions(&self) -> usize {
+        self.dimensions
+    }
 }
 
 /// Stub for a local embedding driver (future: mistral.rs integration).

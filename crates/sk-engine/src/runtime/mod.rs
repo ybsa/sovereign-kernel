@@ -1,10 +1,8 @@
 pub mod apply_patch;
 pub mod audit;
 pub mod auth_cooldown;
-pub mod browser;
 pub mod command_lane;
 pub mod context_overflow;
-pub mod docker_sandbox;
 pub mod embedding;
 pub mod graceful_shutdown;
 pub mod hooks;
@@ -29,3 +27,5 @@ pub mod web_content;
 pub mod web_fetch;
 pub mod web_search;
 pub mod workspace_sandbox;
+
+

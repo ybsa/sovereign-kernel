@@ -1,45 +1,85 @@
 # 🗺️ Sovereign Kernel User Guide
 
-This guide details how to interact with the Sovereign Kernel at a deep structural level. Now that Sovereign Kernel is v1.0 and fully verified, you can interface with it directly using its headless REST API or the CLI.
+This guide covers how to interact with Sovereign Kernel beyond basic setup.
 
-## 1. Using The REST API Bridge
+## 1. CLI Commands
 
-If you launched Sovereign Kernel in daemon mode (`cargo run --release -- start --detach`), it will run a lightweight `Axum` HTTP server in the background (default port `3030`).
-
-You can easily route queries to the active LLM memory pool using standard JSON payloads.
-
-**Example Request:**
 ```bash
-curl -X POST http://127.0.0.1:3030/v1/chat \
+sovereign chat                  # Interactive chat mode
+sovereign run "task"            # One-shot task execution
+sovereign init                  # Interactive setup wizard
+sovereign status                # Show kernel and agent status
+sovereign kill <agent-id>       # Kill a running agent
+sovereign hands list            # List available capability packages
+sovereign hands install <name>  # Install a Hand
+sovereign doctor                # System diagnostics
+sovereign memory export         # Export memory to JSON
+sovereign memory import <file>  # Import memory from file
+```
+
+## 2. Execution Modes
+
+### Sandbox Mode (Default)
+- Dangerous operations (shell exec, code exec, file delete) trigger an approval prompt
+- The agent pauses and waits for human approval or denial
+- Recommended for interactive use
+
+### Unrestricted Mode
+- Set `execution_mode = "unrestricted"` in `config.toml`
+- All operations execute without approval prompts
+- Use with caution — the agent has full access to your system
+
+## 3. Using the REST API
+
+When running in daemon mode, Sovereign Kernel exposes a REST API on port `50051`:
+
+```bash
+# Send a message
+curl -X POST http://127.0.0.1:50051/v1/chat \
   -H "Content-Type: application/json" \
-  -d '{
-    "message": "Hello Oracle, what is the status of the Treasury?"
-  }'
+  -d '{"message": "What files are in the current directory?"}'
+
+# Check treasury (cost tracking)
+curl http://127.0.0.1:50051/v1/treasury/status
+
+# List pending approvals
+curl http://127.0.0.1:50051/v1/approvals
+
+# Approve a pending request
+curl -X POST http://127.0.0.1:50051/v1/approvals/{id}/approve
 ```
 
-The server automatically negotiates the token constraints and maps the response onto the Event Bus natively!
+## 4. Tool Security
 
-## 2. Using "The Forge" (Tool Execution)
+Every tool call is classified by risk level:
 
-By default, Sovereign Kernel operates in a strict sandbox. If you explicitly want an agent to modify files on your computer or run a shell command, the agent must be granted the `shell_exec` or `code_exec` capability.
+| Risk Level | Examples | Behavior |
+| :--- | :--- | :--- |
+| **Low** | `read_file`, `web_search`, `recall` | Auto-approved |
+| **Medium** | `write_file`, `browser_navigate` | Logged, auto-approved |
+| **High** | `shell_exec`, `delete_file`, `move_file` | Requires approval |
+| **Critical** | `code_exec`, `host_desktop_control` | Always requires approval |
 
-- If you interact via the CLI (`cargo run -- run "Do X"`), the CLI will pause and prompt you: "The agent wants to execute: 'ls -la'. Approve? [y/N]"
-- This is part of **The Warden** security protocol preventing autonomous agents from maliciously overwriting directories.
+## 5. Memory System
 
-## 3. Monitoring The Treasury 💰
+Sovereign Kernel maintains persistent memory across sessions:
 
-Sovereign Kernel natively tracks every fractional cent consumed by your API keys (Anthropic, NVIDIA, OpenAI).
+- **`remember`** — Store a fact in agent-scoped memory
+- **`recall`** — Search agent memory using BM25 + semantic similarity
+- **`forget`** — Remove a specific memory entry
+- **Shared Memory** — Cross-agent knowledge store (requires `SharedMemory` capability)
 
-To view your exact lifetime usage without parsing logs, hit the Treasury API:
-```bash
-curl http://127.0.0.1:3030/v1/treasury/status
-```
-It returns an instantaneous JSON read-out of your `total_cents_used` against your configured maximum budget.
+## 6. Skills
 
-## 4. Troubleshooting 
+Over 100 expert skill prompts are bundled in `crates/sk-tools/skills/`. Each skill provides domain-specific guidance (e.g., `git`, `docker`, `kubernetes`, `python`, `rust`).
+
+## 7. Troubleshooting
 
 **Context Overflow?**
-If you pass too many tokens into a long-running session, Sovereign Kernel features "The Healer." It will seamlessly activate a background LLM pipeline to explicitly summarize the last 50 messages, drastically shrinking your token count without destroying context.
+The Healer automatically activates when context exceeds 80% of the model's token limit. It summarizes older turns while preserving recent context.
 
-**Database Drift?**
-If you want to view exactly what a specific agent remembers, simply use standard SQLite tools to view `memory.db` generated inside the kernel's execution directory.
+**Missing API Key?**
+Check that your `.env` file contains the correct key and that `config.toml` references the right `api_key_env` field name.
+
+**Database Issues?**
+The memory database (`memory.db`) is stored in the kernel's data directory. You can inspect it with any SQLite client.

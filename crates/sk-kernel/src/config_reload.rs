@@ -152,11 +152,11 @@ pub fn build_reload_plan(old: &KernelConfig, new: &KernelConfig) -> ReloadPlan {
             .push("memory config changed".to_string());
     }
 
-    // Default model (driver needs recreation)
-    if field_changed(&old.default_model, &new.default_model) {
+    // LLM Providers (driver needs recreation if provider list changes)
+    if field_changed(&old.llm, &new.llm) {
         plan.restart_required = true;
         plan.restart_reasons
-            .push("default_model changed".to_string());
+            .push("LLM provider configuration changed".to_string());
     }
 
     // Home/data directory changes
@@ -222,10 +222,6 @@ pub fn build_reload_plan(old: &KernelConfig, new: &KernelConfig) -> ReloadPlan {
 
     if field_changed(&old.a2a, &new.a2a) {
         plan.hot_actions.push(HotAction::ReloadA2aConfig);
-    }
-
-    if field_changed(&old.fallback_providers, &new.fallback_providers) {
-        plan.hot_actions.push(HotAction::ReloadFallbackProviders);
     }
 
     // ----- No-op fields -----

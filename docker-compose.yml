@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   sovereign-kernel:
     build:
@@ -9,19 +7,17 @@ services:
     container_name: sovereign-kernel-daemon
     restart: unless-stopped
     ports:
-      # API Bridge mapping
-      - "4200:4200"
-      # Dashboard mapping
-      - "8080:8080"
+      # API Bridge (REST/gRPC)
+      - "50051:50051"
     environment:
-      # Configure language model drivers in config.toml or here via environment overrides.
       - RUST_LOG=info
-      # If you prefer env vars, drop them here:
-      # - ANTHROPIC_API_KEY=sk-ant-api...
-      # - OPENAI_API_KEY=sk-... 
-      # - TELEGRAM_BOT_TOKEN=...
+      # Add your API keys here or use an env_file:
+      # - OPENAI_API_KEY=...
+      # - ANTHROPIC_API_KEY=...
+    env_file:
+      - .env
     volumes:
-      # Persist configuration and memory database locally
+      # Persist configuration and memory database
       - sovereign_data:/home/sovereign/.sovereign-kernel
 
 volumes:

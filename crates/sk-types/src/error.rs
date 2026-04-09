@@ -105,6 +105,15 @@ pub enum SovereignError {
     /// Invalid user input.
     #[error("Invalid input: {0}")]
     InvalidInput(String),
+
+    /// Missing API key for an LLM provider.
+    #[error("Missing API key for provider '{provider}'. Please set {env_var_name} or the 'api_key' field.")]
+    MissingApiKey {
+        /// The name of the provider.
+        provider: String,
+        /// The name of the environment variable (or a hint).
+        env_var_name: String,
+    },
 }
 
 /// Alias for Result with SovereignError.

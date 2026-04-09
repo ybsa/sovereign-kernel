@@ -126,6 +126,86 @@ impl SemanticStore {
         Ok(results)
     }
 
+    /// Search for similar memories with an optional source prefix filter.
+    pub fn search_with_filter(
+        &self,
+        agent_id: Option<AgentId>,
+        source_prefix: Option<&str>,
+        query_embedding: &[f32],
+        limit: usize,
+    ) -> SovereignResult<Vec<SemanticSearchResult>> {
+        let mut results = Vec::new();
+
+        {
+            let conn = self
+                .conn
+                .lock()
+                .map_err(|e| SovereignError::Memory(format!("Lock poisoned: {e}")))?;
+
+            let mut query_str = String::from("SELECT id, agent_id, content, embedding, source, created_at FROM semantic_memories WHERE embedding IS NOT NULL");
+            let mut params = Vec::new();
+
+            if let Some(aid) = agent_id {
+                query_str.push_str(" AND agent_id = ?");
+                params.push(aid.to_string());
+            }
+
+            if let Some(prefix) = source_prefix {
+                query_str.push_str(" AND source LIKE ?");
+                params.push(format!("{}%", prefix));
+            }
+
+            let mut stmt = conn
+                .prepare(&query_str)
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
+
+            let rows = stmt
+                .query_map(rusqlite::params_from_iter(params), |row| {
+                    let id: String = row.get(0)?;
+                    let aid_str: String = row.get(1)?;
+                    let content: String = row.get(2)?;
+                    let emb_bytes: Vec<u8> = row.get(3)?;
+                    let source: String = row.get(4)?;
+                    let created_at: String = row.get(5)?;
+
+                    let aid = aid_str.parse().unwrap_or_else(|_| AgentId::new());
+                    Ok((id, aid, content, emb_bytes, source, created_at))
+                })
+                .map_err(|e| SovereignError::Memory(e.to_string()))?;
+
+            for row in rows {
+                let (id, aid, content, emb_bytes, source, created_at) =
+                    row.map_err(|e| SovereignError::Memory(e.to_string()))?;
+                let embedding = embedding_from_bytes(&emb_bytes);
+                let similarity = cosine_similarity(query_embedding, &embedding);
+
+                results.push(SemanticSearchResult {
+                    entry: SemanticEntry {
+                        id,
+                        agent_id: aid,
+                        content,
+                        source,
+                        created_at,
+                    },
+                    similarity,
+                });
+            }
+        }
+
+        results.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        results.truncate(limit);
+
+        for result in &results {
+            let _ = self.touch(&result.entry.id);
+        }
+
+        Ok(results)
+    }
+
     /// Update the access timestamp and count for a memory.
     fn touch(&self, memory_id: &str) -> SovereignResult<()> {
         let conn = self

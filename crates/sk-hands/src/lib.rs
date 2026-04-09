@@ -269,9 +269,15 @@ pub struct HandAgentConfig {
     pub max_tokens: u32,
     #[serde(default = "default_temperature")]
     pub temperature: f32,
+    #[serde(default = "default_strategy")]
+    pub strategy: String,
     pub system_prompt: String,
     #[serde(default)]
     pub max_iterations: Option<u32>,
+}
+
+fn default_strategy() -> String {
+    "react".to_string()
 }
 
 fn default_module() -> String {
@@ -326,7 +332,17 @@ pub struct HandDefinition {
     pub dashboard: HandDashboard,
     /// Bundled skill content (populated at load time, not in TOML).
     #[serde(skip)]
-    pub skill_content: Option<String>,
+    pub skill_content: Option<SkillContent>,
+}
+
+/// Structured content for an Otto-style skill.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillContent {
+    pub name: String,
+    pub description: String,
+    pub code: String,
+    pub dependencies: String,
+    pub instructions: String,
 }
 
 /// Runtime status of a Hand instance.

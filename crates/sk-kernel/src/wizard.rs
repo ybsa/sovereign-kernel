@@ -10,6 +10,7 @@ use sk_types::agent::{
     AgentManifest, ManifestCapabilities, ModelConfig, Priority, ResourceQuota, ScheduleMode,
 };
 use std::collections::HashMap;
+use tracing::info;
 
 /// The extracted intent from a user's natural language description.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,6 +33,9 @@ pub struct AgentIntent {
     pub capabilities: Vec<String>,
     /// Execution mode: "safe" or "unrestricted".
     pub mode: Option<String>,
+    /// Whether this is an Otto-style agent (self-evolving code synthesis).
+    #[serde(default)]
+    pub is_otto: bool,
 }
 
 /// A generated setup plan from the wizard.
@@ -78,7 +82,12 @@ impl SetupWizard {
                         }
                     }
                 }
-                "shell" => caps.shell.push("*".to_string()),
+                "shell" => {
+                    caps.shell.push("*".to_string());
+                    if !caps.tools.contains(&"shell_exec".to_string()) {
+                        caps.tools.push("shell_exec".to_string());
+                    }
+                }
                 "memory" => {
                     caps.memory_read.push("*".to_string());
                     caps.memory_write.push("*".to_string());
@@ -270,6 +279,9 @@ impl SetupWizard {
                         .map(String::from),
                     );
                 }
+                "shell" => {
+                    tools.push("shell_exec".to_string());
+                }
                 other => tools.push(other.to_string()),
             }
         }
@@ -312,6 +324,7 @@ impl SetupWizard {
                     task = intent.task
                 ),
                 max_iterations: Some(30),
+                strategy: "react".to_string(),
             },
             dashboard: Default::default(),
             skill_content: None,
@@ -373,7 +386,7 @@ impl SetupWizard {
         driver: std::sync::Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
         model: &str,
         task: &str,
-    ) -> sk_types::SovereignResult<AgentIntent> {
+    ) -> sk_types::SovereignResult<(AgentIntent, Option<sk_hands::HandDefinition>)> {
         let system_prompt = r#"You are the Sovereign Kernel Witch (The Summoner). 
 Your magic allows you to transform a user's task into a structured JSON AgentIntent.
 While the Builder forges the permanent Hands, you are the seer who plans missions and summons temporary workers (Skeletons).
@@ -387,10 +400,12 @@ JSON Schema:
   "scheduled": true|false,
   "schedule": "cron-expr or null",
   "capabilities": ["web", "files", "shell", "memory", "browser"],
-  "mode": "safe" | "unrestricted"
+  "mode": "safe" | "unrestricted",
+  "is_otto": true|false
 }
 Rules:
 - name: lowercase, no spaces.
+- is_otto: set to TRUE if the task requires creating NEW tools, building custom parsers, or complex coding that doesn't exist yet. 'Otto' agents build their own solutions.
 - mode: use 'unrestricted' ONLY for system admin, wallpaper, notifications, or app installs. Else 'safe'.
 - model_tier: use 'complex' for coding/logic, 'simple' for basic info fetching.
 - ONLY return VALID JSON. No prose."#;
@@ -429,10 +444,101 @@ Rules:
             intent_json
         };
 
-        Self::parse_intent(clean_json.trim()).map_err(|e| {
+        let mut intent: AgentIntent = Self::parse_intent(clean_json.trim()).map_err(|e| {
             sk_types::SovereignError::Internal(format!(
                 "Failed to parse wizard intent: {e}\nRaw: {clean_json}"
             ))
+        })?;
+
+        // If it's an Otto agent, synthesize the core skill now
+        let mut skill_def = None;
+        if intent.is_otto {
+            info!("Summoner detected Otto-style intent. Synthesizing high-fidelity skill...");
+            let skill = Self::synthesize_otto_skill(&intent.task).await?;
+            intent.skills.push(skill.id.clone()); // Fixed name -> id
+            skill_def = Some(skill);
+        }
+
+        Ok((intent, skill_def))
+    }
+
+    /// Calls the Google Agent SDK (ADK Bridge) to synthesize a high-fidelity Rust skill.
+    pub async fn synthesize_otto_skill(
+        task: &str,
+    ) -> sk_types::SovereignResult<sk_hands::HandDefinition> {
+        let api_key = std::env::var("GOOGLE_API_KEY")
+            .or_else(|_| std::env::var("GEMINI_API_KEY"))
+            .map_err(|_| {
+                sk_types::SovereignError::Internal(
+                    "GOOGLE_API_KEY or GEMINI_API_KEY not set".into(),
+                )
+            })?;
+
+        let output = tokio::process::Command::new("python")
+            .arg("crates/sk-tools/src/otto_architect.py")
+            .arg(&api_key)
+            .arg("Otto-Style Self-Evolution")
+            .arg(task)
+            .output()
+            .await
+            .map_err(|e| {
+                sk_types::SovereignError::Internal(format!("Failed to execute ADK Bridge: {}", e))
+            })?;
+
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(sk_types::SovereignError::Internal(format!(
+                "ADK Bridge failed: {}",
+                err
+            )));
+        }
+
+        let result_json = String::from_utf8_lossy(&output.stdout);
+        let skill_data: serde_json::Value = serde_json::from_str(&result_json).map_err(|e| {
+            sk_types::SovereignError::Internal(format!("Failed to parse ADK result: {}", e))
+        })?;
+
+        if let Some(error) = skill_data.get("error") {
+            return Err(sk_types::SovereignError::Internal(format!(
+                "ADK Architect error: {}",
+                error
+            )));
+        }
+
+        // We return a "HandDefinition" shell that Otto can compile
+        Ok(sk_hands::HandDefinition {
+            id: skill_data["name"].as_str().unwrap().to_string(),
+            name: skill_data["name"].as_str().unwrap().to_uppercase(),
+            description: skill_data["description"].as_str().unwrap().to_string(),
+            category: sk_hands::HandCategory::Development,
+            icon: "⚙️".to_string(),
+            tools: vec![],
+            skills: vec![], // It is a skill itself
+            mcp_servers: vec![],
+            requires: vec![],
+            settings: vec![],
+            agent: sk_hands::HandAgentConfig {
+                name: skill_data["name"].as_str().unwrap().to_string(),
+                description: skill_data["description"].as_str().unwrap().to_string(),
+                module: "builtin:chat".to_string(), // Will be skill-managed
+                provider: "gemini".to_string(),
+                model: "gemini-1.5-pro".to_string(),
+                api_key_env: None,
+                base_url: None,
+                max_tokens: 4096,
+                temperature: 0.7,
+                system_prompt: skill_data["instructions"].as_str().unwrap().to_string(),
+                max_iterations: Some(30),
+                strategy: "react".to_string(),
+            },
+            dashboard: Default::default(),
+            skill_content: Some(sk_hands::SkillContent {
+                name: skill_data["name"].as_str().unwrap().to_string(),
+                description: skill_data["description"].as_str().unwrap().to_string(),
+                code: skill_data["code"].as_str().unwrap().to_string(),
+                dependencies: skill_data["dependencies"].as_str().unwrap().to_string(),
+                instructions: skill_data["instructions"].as_str().unwrap().to_string(),
+            }),
         })
     }
 }
@@ -452,6 +558,7 @@ mod tests {
             schedule: None,
             capabilities: vec!["web".to_string(), "memory".to_string()],
             mode: None,
+            is_otto: false,
         }
     }
 
@@ -535,6 +642,7 @@ mod tests {
             schedule: None,
             capabilities: vec!["web".to_string()],
             mode: None,
+            is_otto: false,
         };
         let plan = SetupWizard::build_plan(intent);
         assert!(plan
@@ -561,6 +669,7 @@ mod tests {
             schedule: None,
             capabilities: vec!["memory".to_string()],
             mode: None,
+            is_otto: false,
         };
         let plan = SetupWizard::build_plan(intent);
         assert!(plan
@@ -587,6 +696,7 @@ mod tests {
             schedule: None,
             capabilities: vec!["browser".to_string()],
             mode: None,
+            is_otto: false,
         };
         let plan = SetupWizard::build_plan(intent);
         assert!(plan

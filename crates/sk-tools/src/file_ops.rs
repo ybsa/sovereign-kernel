@@ -59,11 +59,11 @@ pub fn copy_file_tool() -> ToolDefinition {
 }
 
 // ---------------------------------------------------------------------------
-// Security enforcement
-// ---------------------------------------------------------------------------
-
-/// Validates that a path is within the permitted workspace.
-pub fn validate_safe_path(root: &Path, path: &str) -> Result<PathBuf, sk_types::SovereignError> {
+pub fn validate_safe_path(
+    root: &Path,
+    path: &str,
+    unrestricted: bool,
+) -> Result<PathBuf, sk_types::SovereignError> {
     // Ensure the workspace root directory exists; create it if missing.
     if !root.exists() {
         std::fs::create_dir_all(root).map_err(|e| {
@@ -96,7 +96,7 @@ pub fn validate_safe_path(root: &Path, path: &str) -> Result<PathBuf, sk_types::
                         "Security error: Failed to canonicalize parent: {e}"
                     ))
                 })?;
-                if !canon_parent.starts_with(&base) {
+                if !unrestricted && !canon_parent.starts_with(&base) {
                     return Err(sk_types::SovereignError::ToolExecutionError(format!(
                         "🛡️ SECURITY VIOLATION: Path '{}' is outside the permitted workspace '{}'",
                         path,
@@ -109,7 +109,7 @@ pub fn validate_safe_path(root: &Path, path: &str) -> Result<PathBuf, sk_types::
         }
     };
 
-    if !canonical_path.starts_with(&base) {
+    if !unrestricted && !canonical_path.starts_with(&base) {
         return Err(sk_types::SovereignError::ToolExecutionError(format!(
             "🛡️ SECURITY VIOLATION: Path '{}' is outside the permitted workspace '{}'",
             path,
@@ -126,8 +126,12 @@ pub fn validate_safe_path(root: &Path, path: &str) -> Result<PathBuf, sk_types::
 
 const MAX_FILE_SIZE_BYTES: u64 = 1024 * 1024; // 1MB limit for reads
 
-pub fn handle_read_file(root: &Path, path: &str) -> Result<String, sk_types::SovereignError> {
-    let safe_path = validate_safe_path(root, path)?;
+pub fn handle_read_file(
+    root: &Path,
+    path: &str,
+    unrestricted: bool,
+) -> Result<String, sk_types::SovereignError> {
+    let safe_path = validate_safe_path(root, path, unrestricted)?;
 
     let metadata = fs::metadata(&safe_path)
         .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
@@ -150,8 +154,9 @@ pub fn handle_write_file(
     path: &str,
     content: &str,
     append: bool,
+    unrestricted: bool,
 ) -> Result<String, sk_types::SovereignError> {
-    let safe_path = validate_safe_path(root, path)?;
+    let safe_path = validate_safe_path(root, path, unrestricted)?;
 
     // Ensure parent directories exist
     if let Some(parent) = safe_path.parent() {
@@ -177,9 +182,12 @@ pub fn handle_write_file(
         path
     ))
 }
-
-pub fn handle_list_dir(root: &Path, path: &str) -> Result<String, sk_types::SovereignError> {
-    let safe_path = validate_safe_path(root, path)?;
+pub fn handle_list_dir(
+    root: &Path,
+    path: &str,
+    unrestricted: bool,
+) -> Result<String, sk_types::SovereignError> {
+    let safe_path = validate_safe_path(root, path, unrestricted)?;
     let mut entries = Vec::new();
 
     entries.push(format!(
@@ -215,11 +223,20 @@ pub fn handle_list_dir(root: &Path, path: &str) -> Result<String, sk_types::Sove
             size
         ));
     }
+
+    if entries.len() <= 2 {
+        return Ok(format!("SUCCESS: Directory '{}' is empty.", path));
+    }
+
     Ok(entries.join("\n"))
 }
 
-pub fn handle_delete_file(root: &Path, path: &str) -> Result<String, sk_types::SovereignError> {
-    let safe_path = validate_safe_path(root, path)?;
+pub fn handle_delete_file(
+    root: &Path,
+    path: &str,
+    unrestricted: bool,
+) -> Result<String, sk_types::SovereignError> {
+    let safe_path = validate_safe_path(root, path, unrestricted)?;
     let metadata = fs::metadata(&safe_path)
         .map_err(|e| sk_types::SovereignError::ToolExecutionError(e.to_string()))?;
 
@@ -238,9 +255,10 @@ pub fn handle_move_file(
     root: &Path,
     source: &str,
     dest: &str,
+    unrestricted: bool,
 ) -> Result<String, sk_types::SovereignError> {
-    let safe_src = validate_safe_path(root, source)?;
-    let safe_dst = validate_safe_path(root, dest)?;
+    let safe_src = validate_safe_path(root, source, unrestricted)?;
+    let safe_dst = validate_safe_path(root, dest, unrestricted)?;
 
     if let Some(parent) = safe_dst.parent() {
         fs::create_dir_all(parent)
@@ -256,9 +274,10 @@ pub fn handle_copy_file(
     root: &Path,
     source: &str,
     dest: &str,
+    unrestricted: bool,
 ) -> Result<String, sk_types::SovereignError> {
-    let safe_src = validate_safe_path(root, source)?;
-    let safe_dst = validate_safe_path(root, dest)?;
+    let safe_src = validate_safe_path(root, source, unrestricted)?;
+    let safe_dst = validate_safe_path(root, dest, unrestricted)?;
 
     if let Some(parent) = safe_dst.parent() {
         fs::create_dir_all(parent)
@@ -289,7 +308,7 @@ mod tests {
         let canon_root = root.canonicalize().unwrap();
 
         // Valid relative path (for a new file, validate_safe_path returns base.join(path))
-        let safe = validate_safe_path(root, "test.txt").unwrap();
+        let safe = validate_safe_path(root, "test.txt", false).unwrap();
         assert!(
             safe.starts_with(&canon_root),
             "Expected {:?} to start with {:?}",
@@ -299,7 +318,7 @@ mod tests {
 
         // Valid sub-directory path
         fs::create_dir(root.join("sub")).unwrap();
-        let safe_sub = validate_safe_path(root, "sub/file.txt").unwrap();
+        let safe_sub = validate_safe_path(root, "sub/file.txt", false).unwrap();
         assert!(
             safe_sub.starts_with(&canon_root),
             "Expected {:?} to start with {:?}",
@@ -308,7 +327,7 @@ mod tests {
         );
 
         // Invalid: directory traversal attempt
-        let result = validate_safe_path(root, "../outside.txt");
+        let result = validate_safe_path(root, "../outside.txt", false);
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
@@ -322,30 +341,41 @@ mod tests {
         let root = dir.path();
 
         // Write file
-        handle_write_file(root, "hello.txt", "world", false).unwrap();
-        let content = handle_read_file(root, "hello.txt").unwrap();
+        handle_write_file(root, "hello.txt", "world", false, false).unwrap();
+        let content = handle_read_file(root, "hello.txt", false).unwrap();
         assert_eq!(content, "world");
 
         // Append file
-        handle_write_file(root, "hello.txt", " again", true).unwrap();
-        let content_appended = handle_read_file(root, "hello.txt").unwrap();
+        handle_write_file(root, "hello.txt", " again", true, false).unwrap();
+        let content_appended = handle_read_file(root, "hello.txt", false).unwrap();
         assert_eq!(content_appended, "world again");
 
         // List dir
-        let list = handle_list_dir(root, ".").unwrap();
+        let list = handle_list_dir(root, ".", false).unwrap();
         assert!(list.contains("hello.txt"));
 
         // Copy file
-        handle_copy_file(root, "hello.txt", "hello_copy.txt").unwrap();
+        handle_copy_file(root, "hello.txt", "hello_copy.txt", false).unwrap();
         assert!(root.join("hello_copy.txt").exists());
 
         // Move file
-        handle_move_file(root, "hello_copy.txt", "hello_moved.txt").unwrap();
+        handle_move_file(root, "hello_copy.txt", "hello_moved.txt", false).unwrap();
         assert!(!root.join("hello_copy.txt").exists());
         assert!(root.join("hello_moved.txt").exists());
 
         // Delete file
-        handle_delete_file(root, "hello_moved.txt").unwrap();
+        handle_delete_file(root, "hello_moved.txt", false).unwrap();
         assert!(!root.join("hello_moved.txt").exists());
+    }
+
+    #[test]
+    fn test_file_ops_unrestricted() {
+        let dir = tempdir().unwrap();
+        let root = dir.path();
+
+        // This would normally fail, but with unrestricted=true it should allow absolute outside paths
+        let outside_path = if cfg!(windows) { "C:\\" } else { "/" };
+        let result = validate_safe_path(root, outside_path, true);
+        assert!(result.is_ok());
     }
 }

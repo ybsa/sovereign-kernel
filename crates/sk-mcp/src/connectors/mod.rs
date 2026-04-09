@@ -3,4 +3,3 @@
 //! Replaces standalone Python/Node adapters with native Rust loops.
 
 pub mod sql;
-pub mod telegram;

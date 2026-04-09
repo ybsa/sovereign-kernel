@@ -1,37 +1,59 @@
-# Changelog
+# Changelog — Sovereign Kernel
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.0.1] — 2026-04-09
 
-## [1.1.0] - 2026-03-27
+### Security
+- **CRITICAL**: Scrubbed hardcoded API key from `.env` file. Key was never committed to git but existed on disk.
+- **HIGH**: Removed hardcoded personal filesystem path from `config.toml`. Replaced with generic default.
+- Hardened `.gitignore` to exclude `config.toml` (user-specific), `cargo_check.log`, and AI assistant directories.
+- Created `config.toml.example` as the distributable template with full documentation.
 
-### Added in 1.1.0
+### Changed
+- **Modular Tool Registry**: Migrated tool execution from a monolithic `executor.rs` match statement to a dynamic `ToolRegistry` pattern with individual `ToolHandler` trait implementations.
+- **Unified Approval Manager**: Consolidated the legacy `SafetyGate` and `ApprovalManager` into a single system with atomic pending-count tracking (fixes TOCTOU race condition).
+- **Risk Classification**: Elevated `host_desktop_control`, `host_system_config`, and `host_install_app` to `RiskLevel::Critical`.
+- **Event Bus**: Added `KernelEvent::Broadcast` variant for agent-to-agent broadcast communication.
+- **Code Execution**: `code_exec` now defaults to sandboxed execution when in `ExecutionMode::Sandbox`.
+- **System Prompts**: Made the system administrator authorization prompt conditional on `ExecutionMode::Unrestricted`.
 
-- **50+ New Expert Skills**: Comprehensive SKILL.md guides across Backend, Frontend, Cloud (AWS/Azure/GCP), DevOps, Security, Data Science, and Mobile development.
-- **Memory Migration CLI**: Added `sovereign memory export`, `import`, and `stats` to the core CLI.
-- **Unified Village Integration**: Improved multi-agent coordination and cross-agent shared memory.
-- **Natural Language Builder**: Enhanced `sovereign run` for autonomous agent spawning.
-- **Getting Started Guide**: New concise `GETTING_STARTED.md` for both pre-built binary users and developers.
-- **Integration Tests**: New workspace-wide memory consistency and tool tests.
+### Fixed
+- Fixed `AgentRegistry::get()` method call mismatch in agent tools.
+- Fixed `McpServerConfig` → `McpServerConfigEntry` type mismatch in kernel MCP initialization.
+- Fixed `SkillRegistry` field access (`skill.name` vs `skill.id`).
+- Removed orphan `tools.rs` file from sk-kernel (module is a directory).
+- Cleaned up `unused_import` warning in `sk-types/tests/config_test.rs`.
 
-### Fixed in 1.1.0
+### Documentation
+- Rewrote `README.md` with current 9-crate architecture.
+- Updated `GETTING_STARTED.md` with `config.toml.example` workflow and full provider table.
+- Updated `ARCHITECTURE.md` to reflect modular tool registry and removal of sk-channels.
+- Updated `PROJECT_MAP.md` with accurate directory structure.
+- Updated `SECURITY.md` with unified approval manager details.
+- Updated `USER_GUIDE.md` with current API port (50051).
+- Updated `docker-compose.yml` to remove obsolete dashboard port.
+- Removed `cargo_check.log` from repository.
 
-- **Markdown Linting**: Resolved 344+ warnings across 139 files for 100% standards compliance.
-- **Build Quality**: Fixed all `cargo clippy` and `rustfmt` issues in `sk-memory` and `sk-kernel`.
-- **Formatting**: Unified whitespace and trailing character standards across the Rust crates.
+---
 
-### Changed in 1.1.0
+## [1.0.0-rc.3] — 2026-04-04
 
-- **CLI Ergonomics**: Flattened memory commands for better usability.
+### Added
+- **Backward-Compatible LLM Configuration**: Supported `[default_model]` (legacy table), `[[fallback_providers]]` (legacy array), and the new `[[llm]]` array format using custom Serde deserialization.
+- **Robust API Key Resolution**: Implemented `LlmProviderSpec::resolve_api_key()` with tiered lookup (explicit key → env var → error).
+- **Lock Safety Macros**: Introduced `rlock!`, `wlock!`, and `lock!` macros in `sk-kernel` to replace unsafe `.unwrap()` calls with explicit poisoning checks and file/line context.
+- **Security Mitigation**: Added `blocked_args` (default: `["/C", "-c", "-Command"]`) to `ExecPolicy` to prevent arbitrary command execution via allowed shells.
+- **Platform-Aware Sandbox**: Refactored `extract_base_command` to use `Path::file_name` for reliable cross-platform command extraction.
 
-## [1.0.0] - 2026-03-25
+### Changed
+- **Default API Port**: Standardized the REST/gRPC bridge port to `50051` across all components and documentation.
+- **Windows Shell Security**: Added `cmd` and `powershell` to the default `ExecPolicy::safe_bins` while enforcing argument-level blocking.
+- **Refactored `init_llm_driver`**: Prioritized the new `llm` provider array with improved error propagation for missing credentials.
 
-### Added in 1.0.0
+### Fixed
+- **Subprocess Sandbox Tests**: Resolved platform-specific failures by making tests aware of `dir` (Windows) vs `ls` (Unix).
+- **Config Attributes**: Fixed duplicate `llm` field attributes causing model output errors.
+- **Documentation Drift**: Synchronized `README.md`, `GETTING_STARTED.md`, and `docker-compose.yml` with the latest configuration standards.
 
-- **Core Village Engine**: The initial release of the Sovereign Kernel.
-- **Security Sandbox**: Landlock LSM and seccomp-bpf integration.
-- **Channel Bridge**: Support for Telegram, Discord, and Slack adapters.
-- **The Forge**: CDP-based browser automation tools.
-- **The Resurrector**: SQLite-based agent crash recovery and checkpoints.
+---

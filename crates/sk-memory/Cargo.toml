@@ -16,6 +16,7 @@ uuid = { workspace = true }
 rusqlite = { workspace = true }
 async-trait = { workspace = true }
 sha2.workspace = true
+reqwest = { workspace = true }
 [dev-dependencies]
 tempfile = { workspace = true }
 tokio-test = { workspace = true }

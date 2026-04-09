@@ -178,6 +178,26 @@ impl Message {
         }
     }
 
+    /// Create an assistant message with multiple content blocks.
+    pub fn full_assistant(blocks: Vec<ContentBlock>) -> Self {
+        Self {
+            role: Role::Assistant,
+            content: MessageContent::Blocks(blocks),
+        }
+    }
+
+    /// Create a tool result message.
+    pub fn tool_result(tool_use_id: String, content: String, is_error: bool) -> Self {
+        Self {
+            role: Role::User, // Tool results are technically sent from the "user" side to the model
+            content: MessageContent::Blocks(vec![ContentBlock::ToolResult {
+                tool_use_id,
+                content: MessageContent::Text(content),
+                is_error,
+            }]),
+        }
+    }
+
     /// Estimate the number of tokens this message will consume (approx 4 chars per token).
     pub fn estimated_tokens(&self) -> usize {
         self.content.text_length() / 4

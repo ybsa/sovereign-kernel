@@ -124,8 +124,9 @@ pub async fn run(config: KernelConfig, action: &str, args: &[String]) -> anyhow:
             let model = kernel.model_name.clone();
 
             match SetupWizard::analyze_task_intent(driver, &model, &description).await {
-                Ok(intent) => {
-                    let hand_def = SetupWizard::intent_to_hand(&intent);
+                Ok((intent, skill_def)) => {
+                    let hand_def =
+                        skill_def.unwrap_or_else(|| SetupWizard::intent_to_hand(&intent));
                     let toml_content = SetupWizard::export_hand(&hand_def)?;
 
                     let filename = format!("{}.toml", hand_def.id);

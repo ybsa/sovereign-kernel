@@ -43,6 +43,10 @@ struct OaiRequest {
     tool_choice: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     stream: bool,
+    /// Force the model to only call one tool at a time.
+    /// Many providers (Ollama, Groq, local models) don't support parallel tool calls.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    parallel_tool_calls: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -117,18 +121,17 @@ impl LlmDriver for OpenAIDriver {
 
         // Convert messages
         for msg in &request.messages {
-            let mut text_content = None;
+            let mut text_parts = Vec::new();
             let mut tool_calls = Vec::new();
-            let mut _tool_call_id = None;
+            let mut tool_results = Vec::new();
 
             match &msg.content {
                 sk_types::message::MessageContent::Text(t) => {
                     if !t.is_empty() {
-                        text_content = Some(t.clone());
+                        text_parts.push(t.clone());
                     }
                 }
                 sk_types::message::MessageContent::Blocks(b) => {
-                    let mut text_parts = Vec::new();
                     for block in b {
                         match block {
                             sk_types::message::ContentBlock::Text { text } => {
@@ -149,47 +152,54 @@ impl LlmDriver for OpenAIDriver {
                                 content,
                                 ..
                             } => {
-                                text_parts.push(content.text_content());
-                                _tool_call_id = Some(tool_use_id.clone());
+                                tool_results.push((tool_use_id.clone(), content.text_content()));
                             }
                             _ => {}
                         }
                     }
-                    if !text_parts.is_empty() {
-                        text_content = Some(text_parts.join("\n"));
-                    }
                 }
             }
 
-            match msg.role {
-                Role::System => {
-                    oai_messages.push(OaiMessage {
-                        role: "system".to_string(),
-                        content: text_content,
-                        tool_calls: None,
-                        tool_call_id: None,
-                    });
-                }
-                Role::User => {
-                    oai_messages.push(OaiMessage {
-                        role: "user".to_string(),
-                        content: text_content,
-                        tool_calls: None,
-                        tool_call_id: None,
-                    });
-                }
-                Role::Assistant => {
-                    oai_messages.push(OaiMessage {
-                        role: "assistant".to_string(),
-                        content: text_content,
-                        tool_calls: if tool_calls.is_empty() {
-                            None
-                        } else {
-                            Some(tool_calls)
-                        },
-                        tool_call_id: None,
-                    });
-                }
+            let text_content = if text_parts.is_empty() {
+                None
+            } else {
+                Some(text_parts.join("\n"))
+            };
+
+            let string_role = match msg.role {
+                Role::System => "system",
+                Role::User => "user",
+                Role::Assistant => "assistant",
+            };
+
+            // Only push the primary message if it actually contains text, tool calls,
+            // or if it isn't just an empty wrapper around tool_results.
+            let is_pure_tool_response = msg.role == Role::User
+                && !tool_results.is_empty()
+                && text_content.is_none()
+                && tool_calls.is_empty();
+
+            if !is_pure_tool_response {
+                oai_messages.push(OaiMessage {
+                    role: string_role.to_string(),
+                    content: text_content,
+                    tool_calls: if tool_calls.is_empty() {
+                        None
+                    } else {
+                        Some(tool_calls)
+                    },
+                    tool_call_id: None,
+                });
+            }
+
+            // Unpack all tool results natively as proper OpenAI 'tool' role payloads
+            for (t_id, t_res) in tool_results {
+                oai_messages.push(OaiMessage {
+                    role: "tool".to_string(),
+                    content: Some(t_res),
+                    tool_calls: None,
+                    tool_call_id: Some(t_id),
+                });
             }
         }
 
@@ -222,6 +232,12 @@ impl LlmDriver for OpenAIDriver {
             tools: oai_tools,
             tool_choice,
             stream: false,
+            // Force single tool call mode — many providers reject parallel calls
+            parallel_tool_calls: if request.tools.is_empty() {
+                None
+            } else {
+                Some(false)
+            },
         };
 
         if self.provider_name == "nvidia" {
@@ -269,13 +285,11 @@ impl LlmDriver for OpenAIDriver {
                 let body = resp.text().await.unwrap_or_default();
 
                 // Groq "tool_use_failed": model generated tool call in XML format.
-                // Parse the failed_generation and convert to a proper tool call response.
                 if status == 400 && body.contains("tool_use_failed") {
                     if let Some(response) = parse_groq_failed_tool_call(&body) {
                         warn!("Recovered tool call from Groq failed_generation");
                         return Ok(response);
                     }
-                    // If parsing fails, retry on next attempt
                     if attempt < max_retries {
                         let retry_ms = (attempt + 1) as u64 * 1500;
                         warn!(status, attempt, retry_ms, "tool_use_failed, retrying");
@@ -284,9 +298,20 @@ impl LlmDriver for OpenAIDriver {
                     }
                 }
 
-                // Auto-cap max_tokens when model rejects our value (e.g. Groq Maverick limit 8192)
+                // Auto-recover from "single tool-calls" error
+                if status == 400
+                    && (body.contains("single tool-calls") || body.contains("parallel_tool_calls"))
+                    && attempt < max_retries
+                {
+                    warn!(
+                        "Provider rejected parallel tool calls — forcing single mode and retrying"
+                    );
+                    oai_request.parallel_tool_calls = Some(false);
+                    continue;
+                }
+
+                // Auto-cap max_tokens when model rejects our value
                 if status == 400 && body.contains("max_tokens") && attempt < max_retries {
-                    // Extract the limit from error: "must be less than or equal to `8192`"
                     let cap = extract_max_tokens_limit(&body).unwrap_or(oai_request.max_tokens / 2);
                     warn!(
                         old = oai_request.max_tokens,

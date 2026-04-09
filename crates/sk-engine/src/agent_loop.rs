@@ -6,6 +6,8 @@
 
 use crate::llm_driver::{CompletionRequest, LlmDriver, StopReason};
 use sk_types::{Message, Session, SovereignResult, ToolCall, ToolDefinition};
+use std::future::Future;
+use std::pin::Pin;
 use tracing::{debug, info, warn};
 
 /// Result of an agent loop execution.
@@ -24,8 +26,11 @@ pub struct AgentLoopResult {
 }
 
 /// Configuration for an agent loop run.
-pub type ToolExecutor =
-    Box<dyn Fn(&ToolCall) -> SovereignResult<sk_types::ToolResult> + Send + Sync>;
+pub type ToolExecutor = Box<
+    dyn Fn(ToolCall) -> Pin<Box<dyn Future<Output = SovereignResult<sk_types::ToolResult>> + Send>>
+        + Send
+        + Sync,
+>;
 pub type StreamHandler = Box<dyn Fn(&str) + Send + Sync>;
 pub type UsageHandler =
     Box<dyn Fn(crate::llm_driver::TokenUsage) -> SovereignResult<()> + Send + Sync>;
@@ -301,7 +306,7 @@ pub async fn run_agent_loop(
                     }
 
                     // 2. Execute tool
-                    let tool_result = match (config.tool_executor)(tool_call) {
+                    let tool_result = match (config.tool_executor)(tool_call.clone()).await {
                         Ok(res) => {
                             consecutive_errors = 0;
                             res

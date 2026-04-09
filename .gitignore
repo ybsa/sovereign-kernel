@@ -10,6 +10,10 @@ logs/
 clippy.txt
 *.pid
 cli.log.*
+cargo_check.log
+
+# User-specific configuration (use config.toml.example as template)
+config.toml
 
 # Databases
 *.db
@@ -29,3 +33,7 @@ sovereign_memory_export.*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Antigravity/AI assistant data
+brain/
+.gemini/

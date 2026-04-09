@@ -23,6 +23,12 @@ pub async fn handle_shell_exec(
     working_dir: Option<&str>,
     timeout_secs: Option<u64>,
 ) -> Result<String, sk_types::SovereignError> {
+    tracing::info!(
+        "Executing shell command: '{}' in dir: {:?}",
+        command,
+        working_dir
+    );
+
     use sk_types::config::ExecSecurityMode;
 
     match policy.mode {
@@ -51,8 +57,22 @@ pub async fn handle_shell_exec(
     }
 
     let mut cmd = if cfg!(target_os = "windows") {
-        let mut c = tokio::process::Command::new("cmd");
-        c.args(["/C", command]);
+        // Use Base64 EncodedCommand to ensure absolutely no quoting/escaping issues with spaces
+        // in usernames or complex paths.
+        use base64::{engine::general_purpose, Engine as _};
+        let utf16_bytes: Vec<u8> = command
+            .encode_utf16()
+            .flat_map(|c| c.to_le_bytes().into_iter())
+            .collect();
+        let encoded_command = general_purpose::STANDARD.encode(&utf16_bytes);
+
+        let mut c = tokio::process::Command::new("powershell");
+        c.args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-EncodedCommand",
+            &encoded_command,
+        ]);
         c
     } else {
         let mut c = tokio::process::Command::new("sh");
@@ -74,18 +94,37 @@ pub async fn handle_shell_exec(
 
             let mut response = String::new();
             response.push_str(&format!("Exit Code: {}\n", exit_code));
+
             if !stdout.trim().is_empty() {
                 response.push_str(&format!("STDOUT:\n{}\n", stdout.trim()));
             }
             if !stderr.trim().is_empty() {
                 response.push_str(&format!("STDERR:\n{}\n", stderr.trim()));
             }
-            if response.trim() == format!("Exit Code: {}", exit_code) {
-                response.push_str("Command executed successfully with no output.");
+
+            // --- THE "BLINDNESS" FIX ---
+            if stdout.trim().is_empty() && stderr.trim().is_empty() {
+                if out.status.success() {
+                    response.push_str("SUCCESS: The command finished successfully but produced no output. (Is the target empty or requested action silent?)");
+                } else {
+                    response.push_str("FAILURE: The command failed but produced no error output.");
+                }
             }
+            // ---------------------------
+
+            tracing::info!(
+                "Shell exec finished. Exit code: {}, STDOUT length: {}, STDERR length: {}",
+                exit_code,
+                stdout.len(),
+                stderr.len()
+            );
             Ok(response)
         }
-        Ok(Err(e)) => Err(sk_types::SovereignError::ToolExecutionError(e.to_string())),
+        Ok(Err(e)) => {
+            tracing::error!("Shell exec failed to run: {}", e);
+            Err(sk_types::SovereignError::ToolExecutionError(e.to_string()))
+        }
+
         Err(_) => Err(sk_types::SovereignError::ToolExecutionError(format!(
             "Command timed out after {} seconds.",
             timeout_duration.as_secs()
@@ -104,6 +143,7 @@ mod tests {
             mode: ExecSecurityMode::Full,
             allowed_commands: vec![],
             safe_bins: vec![],
+            blocked_args: vec![],
             timeout_secs: 30,
             max_output_bytes: 1024,
             no_output_timeout_secs: 10,
@@ -120,6 +160,7 @@ mod tests {
             mode: ExecSecurityMode::Full,
             allowed_commands: vec![],
             safe_bins: vec![],
+            blocked_args: vec![],
             timeout_secs: 30,
             max_output_bytes: 1024,
             no_output_timeout_secs: 10,
@@ -141,6 +182,7 @@ mod tests {
             mode: ExecSecurityMode::Deny,
             allowed_commands: vec![],
             safe_bins: vec![],
+            blocked_args: vec![],
             timeout_secs: 30,
             max_output_bytes: 1024,
             no_output_timeout_secs: 10,

@@ -4,18 +4,13 @@ use clap::{Args, Parser, Subcommand};
 
 mod agents;
 mod audit;
-mod bridge;
-mod channels;
 mod chat;
 mod daemon;
-mod dashboard;
 mod doctor;
 mod hands;
 mod init;
 mod mcp;
 mod memory;
-mod middleware;
-mod openai_compat;
 mod run;
 mod status;
 mod treasury;
@@ -60,14 +55,10 @@ enum Commands {
     Hands(HandsArgs),
     /// Audit Trail commands
     Audit(AuditArgs),
-    /// Open the terminal web dashboard at http://localhost:PORT
-    Dashboard(DashboardArgs),
     /// Manage Village inhabitants (list, inspect, stop, remove)
     Agents(AgentArgs),
     /// Manage MCP server connections (list, add, remove)
     Mcp(McpArgs),
-    /// Manage channel bridges (list, info)
-    Channels(ChannelArgs),
     /// Run system diagnostics and health checks
     Doctor,
     /// Manage budgets and track LLM costs
@@ -150,16 +141,6 @@ struct AuditArgs {
 }
 
 #[derive(Args, Debug)]
-struct DashboardArgs {
-    /// Port to listen on
-    #[arg(short, long, default_value = "8080")]
-    port: u16,
-    /// Do not open browser automatically
-    #[arg(long)]
-    no_open: bool,
-}
-
-#[derive(Args, Debug)]
 struct AgentArgs {
     /// Action: list, inspect, stop, remove
     #[arg(default_value = "list")]
@@ -178,14 +159,6 @@ struct McpArgs {
     args: Vec<String>,
 }
 
-#[derive(Args, Debug)]
-struct ChannelArgs {
-    /// Action: list, info
-    #[arg(default_value = "list")]
-    action: String,
-    /// Target channel (e.g., telegram, discord)
-    channel: Option<String>,
-}
 
 fn main() {
     // Spawn a thread with a larger stack size for the CLI
@@ -319,20 +292,6 @@ async fn async_main() -> anyhow::Result<()> {
         Commands::Stop => daemon::stop().await?,
         Commands::Hands(args) => hands::run(config, &args.action, &args.args).await?,
         Commands::Audit(args) => audit::run(config, &args.action, &args.args).await?,
-        Commands::Dashboard(args) => {
-            let kernel = std::sync::Arc::new(sk_kernel::SovereignKernel::init(config).await?);
-            let state = std::sync::Arc::new(dashboard::AppState {
-                kernel,
-                started_at: std::time::Instant::now(),
-                telegram_connected: false,
-            });
-            let url = format!("http://localhost:{}", args.port);
-            println!("⚡ Sovereign Kernel Dashboard → {url}");
-            if !args.no_open {
-                let _ = open::that(&url);
-            }
-            dashboard::start_server(state, args.port).await?;
-        }
         Commands::Agents(args) => agents::run(config, &args.action, args.id).await?,
         Commands::Mcp(args) => mcp::run(config, &args.action, &args.args).await?,
         Commands::Doctor => doctor::run(&config).await?,
@@ -341,9 +300,6 @@ async fn async_main() -> anyhow::Result<()> {
             let api_key = std::env::var("SOVEREIGN_API_KEY").ok();
             let args = treasury::TreasuryArgs { command };
             treasury::run(args, &format!("http://{}", api_url), api_key.as_deref()).await?;
-        }
-        Commands::Channels(args) => {
-            channels::run(config, &args.action, args.channel.as_deref()).await?;
         }
         Commands::Memory { command } => {
             memory::handle_memory_command(command).await?;

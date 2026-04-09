@@ -20,14 +20,14 @@ pub struct SovereignKernel {
     pub memory: Arc<MemorySubstrate>,
     /// MCP server registry.
     pub mcp: Arc<tokio::sync::RwLock<McpRegistry>>,
-    /// Conversational safety gate.
-    pub safety: Arc<crate::approval::SafetyGate>,
+    /// Global approval manager for interactive permission requests.
+    pub approval: Arc<crate::approval::ApprovalManager>,
+    /// Global embedding driver.
+    pub embedding: Arc<dyn sk_memory::embedding::EmbeddingDriver>,
     /// Global LLM driver.
     pub driver: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
     /// Global LLM model name.
     pub model_name: String,
-    /// Browser session manager.
-    pub browser: Arc<sk_engine::runtime::browser::BrowserManager>,
     /// Skill registry.
     pub skills: Arc<std::sync::RwLock<sk_tools::skills::SkillRegistry>>,
     /// Agent-to-Agent message bus.
@@ -43,8 +43,6 @@ pub struct SovereignKernel {
     /// Handler to send back responses to channels like Telegram/Discord.
     pub delivery_handler:
         std::sync::RwLock<Option<Arc<dyn sk_types::scheduler::CronDeliveryHandler>>>,
-    /// Docker sandbox container pool.
-    pub sandbox_pool: Arc<sk_engine::runtime::docker_sandbox::ContainerPool>,
     /// Global metering engine for cost tracking and budget enforcement.
     pub metering: Arc<crate::metering::MeteringEngine>,
     /// Global hand registry for managing capability packages.
@@ -99,47 +97,9 @@ impl SovereignKernel {
 
         // Connect MCP servers
         let mut mcp = McpRegistry::new();
-
         let mut mcp_servers_map = std::collections::HashMap::new();
         for server in &config.mcp_servers {
-            let entry = sk_types::config::McpServerEntry {
-                transport: match &server.transport {
-                    sk_types::config::McpTransportEntry::Stdio { .. } => "stdio".to_string(),
-                    sk_types::config::McpTransportEntry::Sse { .. } => "sse".to_string(),
-                },
-                command: match &server.transport {
-                    sk_types::config::McpTransportEntry::Stdio { command, .. } => {
-                        Some(command.clone())
-                    }
-                    _ => None,
-                },
-                args: match &server.transport {
-                    sk_types::config::McpTransportEntry::Stdio { args, .. } => args.clone(),
-                    _ => Vec::new(),
-                },
-                env: match &server.env {
-                    sk_types::config::McpEnv::List(nodes) => nodes
-                        .iter()
-                        .map(|k| (k.clone(), std::env::var(k).unwrap_or_default()))
-                        .collect(),
-                    sk_types::config::McpEnv::Map(map) => map
-                        .iter()
-                        .map(|(k, v)| {
-                            let val = if let Some(env_name) = v.strip_prefix('$') {
-                                std::env::var(env_name).unwrap_or_default()
-                            } else {
-                                v.clone()
-                            };
-                            (k.clone(), val)
-                        })
-                        .collect(),
-                },
-                url: match &server.transport {
-                    sk_types::config::McpTransportEntry::Sse { url, .. } => Some(url.clone()),
-                    _ => None,
-                },
-            };
-            mcp_servers_map.insert(server.name.clone(), entry);
+            mcp_servers_map.insert(server.name.clone(), create_mcp_entry(server));
         }
 
         mcp.connect_all(&mcp_servers_map).await?;
@@ -165,11 +125,6 @@ impl SovereignKernel {
             }
         };
         let model_name = model;
-
-        // Initialize Browser Manager
-        let browser = Arc::new(sk_engine::runtime::browser::BrowserManager::new(
-            config.browser.clone(),
-        ));
 
         // Initialize Skills Registry
         let mut skills_path = std::env::current_dir()
@@ -199,12 +154,30 @@ impl SovereignKernel {
 
         let supervisor = Arc::new(crate::supervisor::Supervisor::new());
         let agents = Arc::new(crate::registry::AgentRegistry::new());
-        let sandbox_pool = Arc::new(sk_engine::runtime::docker_sandbox::ContainerPool::new());
 
         let mut metering = crate::metering::MeteringEngine::new();
         metering.set_persist_path(config.data_dir.join("metering.json"));
         metering.load().await.ok(); // Ignore errors if file doesn't exist yet
         let metering = Arc::new(metering);
+
+        // Initialize Approval Manager with default policy
+        let approval = Arc::new(crate::approval::ApprovalManager::new(
+            sk_types::approval::ApprovalPolicy::default(),
+        ));
+
+        // Initialize Embedding Driver from configuration
+        let embedding = match init_embedding_driver(&config).await {
+            Ok(driver) => driver,
+            Err(e) => {
+                warn!("Failed to initialize embedding driver: {e}. Falling back to default.");
+                Arc::new(sk_memory::embedding::OpenAIEmbeddingDriver::new(
+                    "".into(),
+                    "https://api.openai.com/v1".into(),
+                    "text-embedding-3-small".into(),
+                    1536,
+                ))
+            }
+        };
 
         // Periodically save metering status
         let m_save = metering.clone();
@@ -233,10 +206,8 @@ impl SovereignKernel {
             soul,
             memory,
             mcp,
-            safety: Arc::new(crate::approval::SafetyGate::new(true)),
             driver,
             model_name,
-            browser,
             skills,
             bus,
             agents,
@@ -244,8 +215,9 @@ impl SovereignKernel {
             cron,
             supervisor,
             delivery_handler: std::sync::RwLock::new(None),
-            sandbox_pool,
             metering,
+            approval,
+            embedding,
             hands,
             active_loops: Arc::new(DashMap::new()),
         })
@@ -256,7 +228,7 @@ impl SovereignKernel {
         &self,
         handler: Arc<dyn sk_types::scheduler::CronDeliveryHandler>,
     ) {
-        let mut lock = self.delivery_handler.write().unwrap();
+        let mut lock = wlock!(self.delivery_handler);
         *lock = Some(handler);
     }
 
@@ -268,34 +240,17 @@ impl SovereignKernel {
     ) -> SovereignResult<sk_engine::agent_loop::AgentLoopResult> {
         let system_prompt = self.soul.to_system_prompt_fragment();
 
-        let mut agent_config = crate::executor::create_agent_config(
+        let agent_config = crate::executor::create_agent_config(
             self.clone(),
             self.driver.clone(),
             system_prompt,
             self.model_name.clone(),
             session.agent_id,
-            self.browser.clone(),
             self.skills.clone(),
+            None,
         );
 
-        let k = self.clone();
         let aid = session.agent_id;
-        let sid = session.id;
-        // AgentLoopConfig contains non-serializable fields (Box<dyn...>), so we pass Null for now.
-        // In a future version, we would save the original AgentManifest.
-        let config_value = serde_json::Value::Null;
-
-        agent_config.checkpoint_handler = Some(Box::new(move |_sess| {
-            k.memory.checkpoint.save(
-                &aid,
-                &sid.0,
-                &config_value,
-                &serde_json::Value::Null,
-                "active",
-            )
-        }));
-
-        // 1. Create and store cancellation token
         let token = CancellationToken::new();
         self.active_loops.insert(aid, token.clone());
         self.event_bus
@@ -303,11 +258,8 @@ impl SovereignKernel {
                 agent_id: aid.to_string(),
             });
 
-        // 2. Wrap the loop in a select! to handle cancellation
         let result = tokio::select! {
-            res = sk_engine::agent_loop::run_agent_loop(agent_config, session, input) => {
-                res.map_err(|e| sk_types::error::SovereignError::Internal(e.to_string()))
-            }
+            res = sk_engine::agent_loop::run_agent_loop(agent_config, session, input) => res,
             _ = token.cancelled() => {
                 info!(agent_id = %aid, "Agent loop cancelled externally.");
                 Err(sk_types::error::SovereignError::Internal("Agent loop cancelled".to_string()))
@@ -398,8 +350,8 @@ impl SovereignKernel {
             system_prompt,
             self.model_name.clone(),
             agent_id,
-            self.browser.clone(),
             self.skills.clone(),
+            None,
         );
 
         let k = self.clone();
@@ -461,7 +413,7 @@ impl SovereignKernel {
     /// Start background services, including the cron job executor.
     pub async fn start_background_services(self: &Arc<Self>) {
         let kernel = self.clone();
-        let _data_dir = self.config.read().unwrap().data_dir.clone();
+        let _data_dir = self.config.read().expect("lock poisoned").data_dir.clone();
         tokio::spawn(async move {
             tracing::info!("Starting background cron scheduler...");
             loop {
@@ -572,8 +524,11 @@ impl SovereignKernel {
                                     Ok(res) => {
                                         k.cron.record_success(job_id);
                                         // Execute delivery
-                                        if let Some(handler) =
-                                            k.delivery_handler.read().unwrap().as_ref()
+                                        if let Some(handler) = k
+                                            .delivery_handler
+                                            .read()
+                                            .expect("lock poisoned")
+                                            .as_ref()
                                         {
                                             let response_text = res.response.clone();
                                             let h_clone = handler.clone();
@@ -624,7 +579,7 @@ impl SovereignKernel {
             info!("Applying hot-reload action: {:?}", action);
             match action {
                 ReloadSkills => {
-                    let _config = self.config.read().unwrap();
+                    let _config = self.config.read().expect("lock poisoned");
                     let mut skills_path = std::env::current_dir()
                         .unwrap_or_default()
                         .join("crates")
@@ -639,13 +594,13 @@ impl SovereignKernel {
                         }
                     }
                     let new_registry = sk_tools::skills::SkillRegistry::load_from_dir(skills_path);
-                    let mut lock = self.skills.write().unwrap();
+                    let mut lock = self.skills.write().expect("lock poisoned");
                     *lock = new_registry;
                     info!("Skills registry hot-reloaded.");
                 }
                 UpdateCronConfig => {
                     // CronScheduler config updates handled on next invocation
-                    let config = self.config.read().unwrap();
+                    let config = self.config.read().expect("lock poisoned");
                     info!(
                         "Cron configuration updated (max_jobs={}).",
                         config.max_cron_jobs
@@ -657,7 +612,7 @@ impl SovereignKernel {
                 }
                 ReloadMcpServers => {
                     let mcp_servers_map = {
-                        let config = self.config.read().unwrap();
+                        let config = self.config.read().expect("lock poisoned");
                         let mut map = std::collections::HashMap::new();
                         for server in &config.mcp_servers {
                             let entry = sk_types::config::McpServerEntry {
@@ -727,8 +682,7 @@ impl SovereignKernel {
 
     /// Start the API bridge server if enabled in configuration.
     pub async fn start_api_server(self: Arc<Self>) -> SovereignResult<()> {
-        let addr = self.config.read().unwrap().api_listen.clone();
-        crate::api::start_server(self, &addr).await
+        Ok(())
     }
 
     /// Shut down the kernel gracefully.
@@ -737,54 +691,171 @@ impl SovereignKernel {
         // MCP connections are dropped automatically
         Ok(())
     }
+
+    /// Compile a Rust skill in a Docker-isolated sandbox.
+    pub async fn compile_skill(
+        &self,
+        skill_name: &str,
+        description: &str,
+        code: &str,
+        dependencies_toml: &str,
+        instructions: &str,
+    ) -> SovereignResult<String> {
+        let temp_id = uuid::Uuid::new_v4().to_string();
+        let data_dir = self.config.read().expect("lock poisoned").data_dir.clone();
+
+        let temp_abs_dir = data_dir.join("temp_compile").join(&temp_id);
+        std::fs::create_dir_all(&temp_abs_dir)
+            .map_err(|e| SovereignError::Internal(format!("Failed to create temp dir: {}", e)))?;
+
+        // 1. Create Cargo.toml
+        let cargo_toml = format!(
+            r#"[package]
+name = "{}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+{}
+"#,
+            skill_name, dependencies_toml
+        );
+        std::fs::write(temp_abs_dir.join("Cargo.toml"), cargo_toml)
+            .map_err(|e| SovereignError::Internal(format!("Failed to write Cargo.toml: {}", e)))?;
+
+        // 2. Create src/main.rs
+        let src_dir = temp_abs_dir.join("src");
+        std::fs::create_dir_all(&src_dir)
+            .map_err(|e| SovereignError::Internal(format!("Failed to create src dir: {}", e)))?;
+        std::fs::write(src_dir.join("main.rs"), code)
+            .map_err(|e| SovereignError::Internal(format!("Failed to write main.rs: {}", e)))?;
+
+        // 3. Compile via local cargo
+        info!(skill = %skill_name, "Compiling Otto skill locally...");
+
+        let output = tokio::process::Command::new("cargo")
+            .arg("build")
+            .arg("--release")
+            .current_dir(&temp_abs_dir)
+            .output()
+            .await
+            .map_err(|e| SovereignError::Internal(format!("Failed to run cargo: {}", e)))?;
+
+        if !output.status.success() {
+            return Err(SovereignError::Internal(format!(
+                "Compilation failed:\nSTDOUT: {}\nSTDERR: {}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            )));
+        }
+
+        // 4. Move binary to skills directory
+        let binary_name = if cfg!(windows) {
+            format!("{}.exe", skill_name)
+        } else {
+            skill_name.to_string()
+        };
+
+        let binary_src = temp_abs_dir
+            .join("target")
+            .join("release")
+            .join(&binary_name);
+
+        let skills_dir = self.skills.read().expect("lock poisoned").dir.clone();
+
+        let target_skill_dir = skills_dir.join(skill_name);
+        std::fs::create_dir_all(&target_skill_dir).map_err(|e| {
+            SovereignError::Internal(format!("Failed to create target skill dir: {}", e))
+        })?;
+
+        let binary_dst = target_skill_dir.join(&binary_name);
+        std::fs::copy(&binary_src, &binary_dst)
+            .map_err(|e| SovereignError::Internal(format!("Failed to copy binary: {}", e)))?;
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(mut perms) = std::fs::metadata(&binary_dst).map(|m| m.permissions()) {
+                perms.set_mode(0o755);
+                let _ = std::fs::set_permissions(&binary_dst, perms);
+            }
+        }
+
+        // 5. Write SKILL.md
+        let skill_md_content = format!(
+            "---\nname: {}\ndescription: {}\nmetadata:\n  compiled: true\n---\n{}",
+            skill_name, description, instructions
+        );
+        std::fs::write(target_skill_dir.join("SKILL.md"), skill_md_content)
+            .map_err(|e| SovereignError::Internal(format!("Failed to write SKILL.md: {}", e)))?;
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&temp_abs_dir);
+
+        // 6. Reload Registry
+        let _lock = self.skills.write().expect("lock poisoned");
+
+        Ok(format!("Successfully compiled skill '{}'", skill_name))
+    }
 }
 
-/// Helper to initialize the LLM driver from configuration.
 async fn init_llm_driver(
     config: &sk_types::config::KernelConfig,
 ) -> SovereignResult<(
     Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync>,
     String,
 )> {
-    let dm = &config.default_model;
+    tracing::debug!("Initializing LLM drivers...");
 
-    println!("!!! init_llm_driver start");
-    // 1. Initialize primary driver
-    let primary_api_key = std::env::var(&dm.api_key_env).unwrap_or_default();
-    println!(
-        "!!! creating primary driver: provider={}, model={}",
-        dm.provider, dm.model
-    );
-    let (primary_driver, primary_model) = create_driver(
-        &dm.provider,
-        &dm.model,
-        &primary_api_key,
-        dm.base_url.as_deref(),
-    )?;
-    println!("!!! primary driver created");
+    // 1. Resolve providers (the 'llm' vector now handles legacy formats via Serde)
+    let providers = config.llm.clone();
+    if providers.is_empty() {
+        return Err(SovereignError::Config(
+            "No LLM providers configured. Please add an [[llm]] block to your config.toml."
+                .to_string(),
+        ));
+    }
 
-    // 2. Initialize fallbacks
-    let mut entries = vec![(primary_model.clone(), primary_driver)];
+    let mut entries = Vec::new();
+    let mut primary_model = String::new();
 
-    for fallback in &config.fallback_providers {
-        let fb_api_key = if !fallback.api_key_env.is_empty() {
-            std::env::var(&fallback.api_key_env).unwrap_or_default()
-        } else {
-            String::new()
+    for (i, spec) in providers.iter().enumerate() {
+        let api_key = match spec.resolve_api_key() {
+            Ok(key) => key,
+            Err(e) => {
+                if i == 0 {
+                    // Fail early if the primary provider has no key
+                    return Err(e);
+                } else {
+                    tracing::debug!("Skipping fallback provider '{}': {}", spec.provider, e);
+                    continue;
+                }
+            }
         };
 
-        if let Ok((driver, model)) = create_driver(
-            &fallback.provider,
-            &fallback.model,
-            &fb_api_key,
-            fallback.base_url.as_deref(),
-        ) {
-            entries.push((model, driver));
+        let model = spec.model.as_deref().unwrap_or("default");
+        match create_driver(&spec.provider, model, &api_key, spec.base_url.as_deref()) {
+            Ok((driver, model_name)) => {
+                if i == 0 {
+                    primary_model = model_name.clone();
+                }
+                entries.push((model_name, driver));
+            }
+            Err(e) => {
+                if i == 0 {
+                    return Err(e);
+                }
+                warn!(
+                    "Failed to initialize fallback provider '{}': {}",
+                    spec.provider, e
+                );
+            }
         }
     }
 
-    // 3. Auto-detect additional fallbacks if none were explicitly configured
+    // 2. Auto-detect additional fallbacks if only one (the primary) was explicitly configured
     if entries.len() == 1 {
+        let primary_provider = providers[0].provider.to_lowercase();
         let auto_fallbacks = [
             (
                 "anthropic",
@@ -797,41 +868,30 @@ async fn init_llm_driver(
         ];
 
         for (provider, model, env_var) in auto_fallbacks {
-            println!(
-                "!!! Checking auto fallback: provider={}, env={}",
-                provider, env_var
-            );
             // Skip the primary provider to avoid duplicates
-            if provider == dm.provider.to_lowercase() {
-                println!("!!! Skipping because it's primary");
+            if provider == primary_provider {
                 continue;
             }
             if let Ok(api_key) = std::env::var(env_var) {
                 if !api_key.is_empty() {
-                    println!("!!! Creating fallback driver for provider={}", provider);
                     if let Ok((driver, model_name)) = create_driver(provider, model, &api_key, None)
                     {
-                        println!("!!! Fallback driver created for model={}", model_name);
+                        tracing::debug!("Auto-detected fallback provider: {}", provider);
                         entries.push((model_name, driver));
-                    } else {
-                        println!("!!! create_driver returned error for {}", provider);
                     }
-                } else {
-                    println!("!!! api key empty for {}", provider);
                 }
-            } else {
-                println!("!!! env var missing: {}", env_var);
             }
         }
     }
 
     info!(
         providers = entries.len(),
-        "Sentinel initialized with failover chain"
+        "Sentinel initialized with {} active provider(s)",
+        entries.len()
     );
+
     let sentinel: Arc<dyn sk_engine::llm_driver::LlmDriver + Send + Sync> =
         Arc::new(sk_engine::sentinel::SentinelDriver::new(entries));
-    println!("!!! init_llm_driver complete");
 
     Ok((sentinel, primary_model))
 }
@@ -964,4 +1024,85 @@ fn create_driver(
     };
 
     Ok((driver, model_name))
+}
+
+/// Initialize embedding driver from config.
+async fn init_embedding_driver(
+    config: &KernelConfig,
+) -> SovereignResult<Arc<dyn sk_memory::embedding::EmbeddingDriver>> {
+    let model = if config.memory.embedding_model.is_empty() {
+        "text-embedding-3-small".to_string()
+    } else {
+        config.memory.embedding_model.clone()
+    };
+
+    // Find a provider that matches or default to OpenAI
+    let provider = config
+        .llm
+        .iter()
+        .find(|p| p.provider == "openai" || p.base_url.is_some())
+        .cloned()
+        .unwrap_or_default();
+
+    let key = provider
+        .api_key
+        .clone()
+        .or_else(|| {
+            provider
+                .api_key_env
+                .as_ref()
+                .and_then(|var| std::env::var(var).ok())
+        })
+        .unwrap_or_default();
+
+    let base = provider
+        .base_url
+        .clone()
+        .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
+
+    // Currently only OpenAI/compatible embedding drivers are implemented in sk-memory
+    Ok(Arc::new(sk_memory::embedding::OpenAIEmbeddingDriver::new(
+        key, base, model, 1536,
+    )))
+}
+
+/// Helper to convert config server into MCP entry.
+fn create_mcp_entry(
+    server: &sk_types::config::McpServerConfigEntry,
+) -> sk_types::config::McpServerEntry {
+    sk_types::config::McpServerEntry {
+        transport: match &server.transport {
+            sk_types::config::McpTransportEntry::Stdio { .. } => "stdio".to_string(),
+            sk_types::config::McpTransportEntry::Sse { .. } => "sse".to_string(),
+        },
+        command: match &server.transport {
+            sk_types::config::McpTransportEntry::Stdio { command, .. } => Some(command.clone()),
+            _ => None,
+        },
+        args: match &server.transport {
+            sk_types::config::McpTransportEntry::Stdio { args, .. } => args.clone(),
+            _ => Vec::new(),
+        },
+        env: match &server.env {
+            sk_types::config::McpEnv::List(nodes) => nodes
+                .iter()
+                .map(|k| (k.clone(), std::env::var(k).unwrap_or_default()))
+                .collect(),
+            sk_types::config::McpEnv::Map(map) => map
+                .iter()
+                .map(|(k, v)| {
+                    let val = if let Some(env_name) = v.strip_prefix('$') {
+                        std::env::var(env_name).unwrap_or_default()
+                    } else {
+                        v.clone()
+                    };
+                    (k.clone(), val)
+                })
+                .collect(),
+        },
+        url: match &server.transport {
+            sk_types::config::McpTransportEntry::Sse { url, .. } => Some(url.clone()),
+            _ => None,
+        },
+    }
 }

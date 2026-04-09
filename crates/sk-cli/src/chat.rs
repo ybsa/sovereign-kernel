@@ -54,7 +54,7 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
 
         let mut input = String::new();
 
-        if kernel.safety.has_pending(&agent_id) {
+        if kernel.approval.has_blocked(&agent_id) {
             println!("  [⏱️ Waiting for approval... default deny in 60s]");
             let res = tokio::time::timeout(std::time::Duration::from_secs(60), async {
                 tokio::task::spawn_blocking(|| {
@@ -71,7 +71,7 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
                 Ok(s) => input = s,
                 Err(_) => {
                     println!("\n  [⏱️ Timeout reached! Auto-denying action.]\n");
-                    kernel.safety.deny_last_for_agent(&agent_id);
+                    kernel.approval.deny_last_for_agent(&agent_id);
                     input = "deny".to_string(); // Feed deny back to the loop
                 }
             }
@@ -96,12 +96,12 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
                 continue;
             }
             "approve" | "yes" | "y" => {
-                if kernel.safety.approve_last_for_agent(&agent_id) {
+                if kernel.approval.approve_last_for_agent(&agent_id) {
                     println!("🛡️ Action approved. Re-submitting to Sovereign...");
                 }
             }
             "deny" | "no" | "n" => {
-                if kernel.safety.deny_last_for_agent(&agent_id) {
+                if kernel.approval.deny_last_for_agent(&agent_id) {
                     println!("🛡️ Action denied. Blocked signature cleared.");
                 }
             }

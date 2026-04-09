@@ -13,6 +13,7 @@ pub enum KernelEvent {
     McpServerDisconnected { server_name: String },
     Presence { active_agents: Vec<String> },
     Error { message: String },
+    Broadcast { from: String, message: String },
 }
 
 /// Kernel event bus for internal pub/sub.

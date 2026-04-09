@@ -1,73 +1,90 @@
 # Getting Started with Sovereign Kernel 🚀
 
-Welcome to Sovereign Kernel, your local-first Agentic Operating System. This guide will help you install the kernel, configure your preferred LLM provider, and spawn your first background daemon.
+Welcome to Sovereign Kernel — a local-first Agentic Operating System built in Rust. This guide walks you through installation, configuration, and running your first agent.
 
 ## 1. Prerequisites
 
-Before installing the kernel, please ensure your system has the following:
-- **Rust (v1.75+)**: Installed via [rustup](https://rustup.rs/).
-- **SQLite3**: Required for The Archive (Memory Substrate).
-- **Supported OS**: Windows 10+, macOS 12+, or Linux (Kernel 5.13+ recommended for Landlock LSM security features).
+- **Rust 1.75+** — Install via [rustup](https://rustup.rs/)
+- **SQLite3** — Bundled automatically via `rusqlite`
+- **Supported OS**: Windows 10+, macOS 12+, or Linux
 
 ## 2. Installation
 
-Clone the repository and compile the highly optimized release binary using `cargo`:
-
 ```bash
-git clone https://github.com/your-org/sovereign-kernel.git
+git clone https://github.com/OpenEris/sovereign-kernel.git
 cd sovereign-kernel
-
-# Build the core workspace
 cargo build --release --workspace
-
-# Optional: Run the built-in system diagnostics script
-cargo run --release -- doctor
 ```
 
-## 3. Configuration & API Keys
+## 3. Configuration
 
-Sovereign Kernel supports over 50 LLM Providers (OpenAI, Anthropic, NVIDIA NIM, Groq, local Ollama). You define your keys using environment variables to keep them completely isolated from the source code.
+Sovereign Kernel uses two files for configuration:
 
-1. **Copy the environment template**:
-   ```bash
-   cp .env.example .env
-   ```
+### Step 1: Create your config file
 
-2. **Add your preferred API key** inside `.env`:
-   ```env
-   # Example for OpenAI
-   OPENAI_API_KEY="sk-proj-..."
-   
-   # Example for Anthropic
-   ANTHROPIC_API_KEY="sk-ant-..."
-   
-   # Example for NVIDIA NIM (Mistral/Llama)
-   NVIDIA_API_KEY="nvapi-..."
-   ```
-
-3. **Modify `config.toml`**: Ensure the kernel points to the correct provider loop.
-   ```toml
-   [default_model]
-   provider = "openai" # Or "anthropic", "nvidia"
-   model = "gpt-4o"
-   api_key_env = "OPENAI_API_KEY"
-   ```
-
-## 4. Launching the OS
-
-You can interact with Sovereign Kernel in two primary ways:
-
-### A) The CLI Terminal (Foreground)
-Launch the interactive terminal chat to directly converse with the Oracle.
 ```bash
-cargo run --release -- run "Hello Oracle, please generate a Python script that calculates fibonacci."
+cp config.toml.example config.toml
 ```
 
-### B) The Background Daemon (API Bridge)
-If you want to plug the OS into your own UI, Discord bot, or Web Application, launch the background daemon. 
-By default, this binds to `http://127.0.0.1:3030`.
+Edit `config.toml` to set your preferred LLM provider:
+
+```toml
+[[llm]]
+provider = "openai"           # anthropic, gemini, nvidia, ollama, groq, etc.
+api_key_env = "OPENAI_API_KEY"
+```
+
+> **Security note:** Never put API keys directly in `config.toml`. Always use `api_key_env` to reference environment variables.
+
+### Step 2: Set your API keys
+
 ```bash
-cargo run --release -- start --detach
+cp .env.example .env
 ```
 
-For advanced instructions on hitting the REST API or using Agentic Tools, please refer to the [USER_GUIDE.md](./USER_GUIDE.md).
+Add your API key(s) inside `.env`:
+
+```env
+OPENAI_API_KEY=sk-proj-...
+# Or for other providers:
+ANTHROPIC_API_KEY=sk-ant-...
+NVIDIA_API_KEY=nvapi-...
+GEMINI_API_KEY=AI...
+```
+
+### Supported Providers
+
+| Provider | Environment Variable | Config `provider` |
+| :--- | :--- | :--- |
+| OpenAI | `OPENAI_API_KEY` | `openai` |
+| Anthropic | `ANTHROPIC_API_KEY` | `anthropic` |
+| Google Gemini | `GEMINI_API_KEY` | `gemini` |
+| NVIDIA NIM | `NVIDIA_API_KEY` | `nvidia` |
+| Groq | `GROQ_API_KEY` | `groq` |
+| DeepSeek | `DEEPSEEK_API_KEY` | `deepseek` |
+| Ollama (local) | *(none needed)* | `ollama` |
+| OpenRouter | `OPENROUTER_API_KEY` | `openrouter` |
+| Mistral | `MISTRAL_API_KEY` | `mistral` |
+| xAI / Grok | `XAI_API_KEY` | `xai` |
+
+## 4. Running the Kernel
+
+### Interactive CLI
+```bash
+cargo run --release -- chat
+```
+
+### One-shot task execution
+```bash
+cargo run --release -- run "Analyze this project and summarize the architecture"
+```
+
+### Execution modes
+- **Sandbox** (default) — Dangerous operations require human approval
+- **Unrestricted** — Full host access (set `execution_mode = "unrestricted"` in `config.toml`)
+
+## 5. Next Steps
+
+- Read the [User Guide](USER_GUIDE.md) for API usage and tool reference
+- Explore [Architecture](docs/ARCHITECTURE.md) for the full crate breakdown
+- Check [docs/USAGE.md](docs/USAGE.md) for all CLI commands

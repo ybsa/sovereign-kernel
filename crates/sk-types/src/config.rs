@@ -1,6 +1,8 @@
 //! Configuration types for the Sovereign Kernel kernel.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+use crate::error::{SovereignError, SovereignResult};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -477,89 +479,6 @@ impl Default for TtsElevenLabsConfig {
     }
 }
 
-/// Docker container sandbox configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
-pub struct DockerSandboxConfig {
-    /// Enable Docker sandbox. Default: false.
-    pub enabled: bool,
-    /// Docker image for exec sandbox. Default: "python:3.12-slim".
-    pub image: String,
-    /// Container name prefix. Default: "Sovereign Kernel-sandbox".
-    pub container_prefix: String,
-    /// Working directory inside container. Default: "/workspace".
-    pub workdir: String,
-    /// Network mode: "none", "bridge", or custom. Default: "none".
-    pub network: String,
-    /// Memory limit (e.g., "256m", "1g"). Default: "512m".
-    pub memory_limit: String,
-    /// CPU limit (e.g., 0.5, 1.0, 2.0). Default: 1.0.
-    pub cpu_limit: f64,
-    /// Max execution time in seconds. Default: 60.
-    pub timeout_secs: u64,
-    /// Read-only root filesystem. Default: true.
-    pub read_only_root: bool,
-    /// Additional capabilities to add. Default: empty (drop all).
-    pub cap_add: Vec<String>,
-    /// tmpfs mounts. Default: ["/tmp:size=64m"].
-    pub tmpfs: Vec<String>,
-    /// PID limit. Default: 100.
-    pub pids_limit: u32,
-    /// Docker sandbox mode: off, non_main, all. Default: off.
-    #[serde(default)]
-    pub mode: DockerSandboxMode,
-    /// Container lifecycle scope. Default: session.
-    #[serde(default)]
-    pub scope: DockerScope,
-    /// Cooldown before reusing a released container (seconds). Default: 300.
-    #[serde(default = "default_reuse_cool_secs")]
-    pub reuse_cool_secs: u64,
-    /// Idle timeout — destroy containers after N seconds of inactivity. Default: 86400 (24h).
-    #[serde(default = "default_docker_idle_timeout")]
-    pub idle_timeout_secs: u64,
-    /// Maximum age before forced destruction (seconds). Default: 604800 (7 days).
-    #[serde(default = "default_docker_max_age")]
-    pub max_age_secs: u64,
-    /// Paths blocked from bind mounting.
-    #[serde(default)]
-    pub blocked_mounts: Vec<String>,
-}
-
-fn default_reuse_cool_secs() -> u64 {
-    300
-}
-fn default_docker_idle_timeout() -> u64 {
-    86400
-}
-fn default_docker_max_age() -> u64 {
-    604800
-}
-
-impl Default for DockerSandboxConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            image: "python:3.12-slim".to_string(),
-            container_prefix: "Sovereign Kernel-sandbox".to_string(),
-            workdir: "/workspace".to_string(),
-            network: "none".to_string(),
-            memory_limit: "512m".to_string(),
-            cpu_limit: 1.0,
-            timeout_secs: 60,
-            read_only_root: true,
-            cap_add: Vec::new(),
-            tmpfs: vec!["/tmp:size=64m".to_string()],
-            pids_limit: 100,
-            mode: DockerSandboxMode::Off,
-            scope: DockerScope::Session,
-            reuse_cool_secs: default_reuse_cool_secs(),
-            idle_timeout_secs: default_docker_idle_timeout(),
-            max_age_secs: default_docker_max_age(),
-            blocked_mounts: Vec::new(),
-        }
-    }
-}
-
 /// Device pairing configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -777,6 +696,9 @@ pub struct ExecPolicy {
     pub safe_bins: Vec<String>,
     /// Global command allowlist (when mode = allowlist).
     pub allowed_commands: Vec<String>,
+    /// Arguments that trigger an automatic block for safe_bins (e.g. ["/C", "-c"]).
+    #[serde(default = "default_blocked_args")]
+    pub blocked_args: Vec<String>,
     /// Max execution timeout in seconds. Default: 30.
     pub timeout_secs: u64,
     /// Max output size in bytes. Default: 100KB.
@@ -785,6 +707,10 @@ pub struct ExecPolicy {
     /// produce no stdout/stderr output for this duration. Default: 30.
     #[serde(default = "default_no_output_timeout")]
     pub no_output_timeout_secs: u64,
+}
+
+fn default_blocked_args() -> Vec<String> {
+    vec!["/C".into(), "-c".into(), "-Command".into()]
 }
 
 fn default_no_output_timeout() -> u64 {
@@ -796,13 +722,60 @@ impl Default for ExecPolicy {
         Self {
             mode: ExecSecurityMode::default(),
             safe_bins: vec![
-                "sleep", "true", "false", "cat", "sort", "uniq", "cut", "tr", "head", "tail", "wc",
-                "date", "echo", "printf", "basename", "dirname", "pwd", "env",
+                "sleep",
+                "true",
+                "false",
+                "cat",
+                "sort",
+                "uniq",
+                "cut",
+                "tr",
+                "head",
+                "tail",
+                "wc",
+                "date",
+                "echo",
+                "printf",
+                "basename",
+                "dirname",
+                "pwd",
+                "env",
+                "ls",
+                "dir",
+                "mkdir",
+                "cp",
+                "mv",
+                "rm",
+                "touch",
+                "chmod",
+                "grep",
+                "find",
+                "git",
+                "curl",
+                "wget",
+                "ssh",
+                "cargo",
+                "rustc",
+                "python",
+                "python3",
+                "pip",
+                "pip3",
+                "node",
+                "npm",
+                "npx",
+                "go",
+                "java",
+                "javac",
+                "docker",
+                "docker-compose",
+                "cmd",
+                "powershell",
             ]
             .into_iter()
             .map(String::from)
             .collect(),
             allowed_commands: Vec::new(),
+            blocked_args: default_blocked_args(),
             timeout_secs: 30,
             max_output_bytes: 100 * 1024,
             no_output_timeout_secs: default_no_output_timeout(),
@@ -878,36 +851,6 @@ impl std::fmt::Debug for AuthProfile {
 }
 
 // ---------------------------------------------------------------------------
-// Gap 5: Docker sandbox maturity
-// ---------------------------------------------------------------------------
-
-/// Docker sandbox activation mode.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DockerSandboxMode {
-    /// Docker sandbox disabled.
-    #[default]
-    Off,
-    /// Only use Docker for non-main agents.
-    NonMain,
-    /// Use Docker for all agents.
-    All,
-}
-
-/// Docker container lifecycle scope.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum DockerScope {
-    /// Container per session (destroyed when session ends).
-    #[default]
-    Session,
-    /// Container per agent (reused across sessions).
-    Agent,
-    /// Shared container pool.
-    Shared,
-}
-
-// ---------------------------------------------------------------------------
 // Gap 6: Typing indicator modes
 // ---------------------------------------------------------------------------
 
@@ -976,7 +919,7 @@ pub struct KernelConfig {
     /// Whether to enable the OFP network layer.
     pub network_enabled: bool,
     /// Default LLM provider configuration.
-    pub default_model: DefaultModelConfig,
+
     /// Memory substrate configuration.
     pub memory: MemoryConfig,
     /// Network configuration.
@@ -1011,10 +954,6 @@ pub struct KernelConfig {
     /// Web tools configuration (search + fetch).
     #[serde(default)]
     pub web: WebConfig,
-    /// Fallback providers tried in order if the primary fails.
-    /// Configure in config.toml as `[[fallback_providers]]`.
-    #[serde(default)]
-    pub fallback_providers: Vec<FallbackProviderConfig>,
     /// Browser automation configuration.
     #[serde(default)]
     pub browser: BrowserConfig,
@@ -1082,9 +1021,6 @@ pub struct KernelConfig {
     /// Text-to-speech configuration.
     #[serde(default)]
     pub tts: TtsConfig,
-    /// Docker container sandbox configuration.
-    #[serde(default)]
-    pub docker: DockerSandboxConfig,
     /// Device pairing configuration.
     #[serde(default)]
     pub pairing: PairingConfig,
@@ -1097,6 +1033,17 @@ pub struct KernelConfig {
     /// Global spending budget configuration.
     #[serde(default)]
     pub budget: BudgetConfig,
+    /// List of LLM providers.
+    #[serde(
+        default,
+        deserialize_with = "deserialize_llm_vec",
+        alias = "fallback_providers",
+        alias = "default_model"
+    )]
+    pub llm: Vec<LlmProviderSpec>,
+    /// Maximum tokens per individual turn/response (optional fallback).
+    #[serde(default)]
+    pub max_tokens_per_response: Option<usize>,
 }
 
 /// Global spending budget configuration.
@@ -1223,7 +1170,7 @@ impl Default for KernelConfig {
             log_level: "info".to_string(),
             api_listen: "127.0.0.1:50051".to_string(),
             network_enabled: false,
-            default_model: DefaultModelConfig::default(),
+
             memory: MemoryConfig::default(),
             network: NetworkConfig::default(),
             channels: ChannelsConfig::default(),
@@ -1236,7 +1183,6 @@ impl Default for KernelConfig {
             a2a: None,
             usage_footer: UsageFooterMode::default(),
             web: WebConfig::default(),
-            fallback_providers: Vec::new(),
             browser: BrowserConfig::default(),
             extensions: ExtensionsConfig::default(),
             vault: VaultConfig::default(),
@@ -1259,11 +1205,12 @@ impl Default for KernelConfig {
             auto_reply: AutoReplyConfig::default(),
             canvas: CanvasConfig::default(),
             tts: TtsConfig::default(),
-            docker: DockerSandboxConfig::default(),
             pairing: PairingConfig::default(),
             auth_profiles: HashMap::new(),
             thinking: None,
             budget: BudgetConfig::default(),
+            llm: Vec::new(),
+            max_tokens_per_response: None,
         }
     }
 }
@@ -1311,7 +1258,6 @@ impl std::fmt::Debug for KernelConfig {
             .field("log_level", &self.log_level)
             .field("api_listen", &self.api_listen)
             .field("network_enabled", &self.network_enabled)
-            .field("default_model", &self.default_model)
             .field("memory", &self.memory)
             .field("network", &self.network)
             .field("channels", &self.channels)
@@ -1334,10 +1280,6 @@ impl std::fmt::Debug for KernelConfig {
             .field("a2a", &self.a2a.as_ref().map(|a| a.enabled))
             .field("usage_footer", &self.usage_footer)
             .field("web", &self.web)
-            .field(
-                "fallback_providers",
-                &format!("{} provider(s)", self.fallback_providers.len()),
-            )
             .field("browser", &self.browser)
             .field("extensions", &self.extensions)
             .field("vault", &format!("enabled={}", self.vault.enabled))
@@ -1375,7 +1317,6 @@ impl std::fmt::Debug for KernelConfig {
             )
             .field("canvas", &format!("enabled={}", self.canvas.enabled))
             .field("tts", &format!("enabled={}", self.tts.enabled))
-            .field("docker", &format!("enabled={}", self.docker.enabled))
             .field("pairing", &format!("enabled={}", self.pairing.enabled))
             .field(
                 "auth_profiles",
@@ -1403,6 +1344,67 @@ pub struct DefaultModelConfig {
     pub api_key_env: String,
     /// Optional base URL override.
     pub base_url: Option<String>,
+}
+
+/// LLM provider specification.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct LlmProviderSpec {
+    /// The provider name – e.g. "openai", "anthropic", "nvidia"
+    pub provider: String,
+    /// Model identifier.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Name of the environment variable that stores the key.
+    pub api_key_env: Option<String>,
+    /// Raw API key string (overrides the env var if supplied).
+    pub api_key: Option<String>,
+    /// Optional override for the base HTTP endpoint.
+    pub base_url: Option<String>,
+}
+
+impl LlmProviderSpec {
+    /// Resolves the API key from either the literal `api_key` field
+    /// or the environment variable named in `api_key_env`.
+    pub fn resolve_api_key(&self) -> SovereignResult<String> {
+        if let Some(key) = &self.api_key {
+            if !key.is_empty() {
+                return Ok(key.clone());
+            }
+        }
+
+        let env_var = self.api_key_env.as_deref().unwrap_or("");
+        if !env_var.is_empty() {
+            if let Ok(val) = std::env::var(env_var) {
+                if !val.is_empty() {
+                    return Ok(val);
+                }
+            }
+        }
+
+        Err(SovereignError::MissingApiKey {
+            provider: self.provider.clone(),
+            env_var_name: env_var.to_string(),
+        })
+    }
+}
+
+/// Helper to deserialize either a single LlmProviderSpec or a Vec of them.
+pub fn deserialize_llm_vec<'de, D>(deserializer: D) -> Result<Vec<LlmProviderSpec>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum LlmInput {
+        Single(LlmProviderSpec),
+        Multiple(Vec<LlmProviderSpec>),
+    }
+
+    match LlmInput::deserialize(deserializer)? {
+        LlmInput::Single(spec) => Ok(vec![spec]),
+        LlmInput::Multiple(specs) => Ok(specs),
+    }
 }
 
 impl Default for DefaultModelConfig {
@@ -3581,43 +3583,43 @@ mod tests {
     }
 
     #[test]
-    fn test_fallback_config_serde_roundtrip() {
-        let fb = FallbackProviderConfig {
+    fn test_llm_spec_serde_roundtrip() {
+        let spec = LlmProviderSpec {
             provider: "ollama".to_string(),
-            model: "llama3.2:latest".to_string(),
-            api_key_env: String::new(),
+            model: Some("llama3.2:latest".to_string()),
+            api_key_env: None,
+            api_key: None,
             base_url: None,
         };
-        let json = serde_json::to_string(&fb).unwrap();
-        let back: FallbackProviderConfig = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&spec).unwrap();
+        let back: LlmProviderSpec = serde_json::from_str(&json).unwrap();
         assert_eq!(back.provider, "ollama");
-        assert_eq!(back.model, "llama3.2:latest");
-        assert!(back.api_key_env.is_empty());
-        assert!(back.base_url.is_none());
+        assert_eq!(back.model, Some("llama3.2:latest".to_string()));
+        assert!(back.api_key_env.is_none());
     }
 
     #[test]
-    fn test_fallback_config_default_empty() {
+    fn test_llm_config_default_empty() {
         let config = KernelConfig::default();
-        assert!(config.fallback_providers.is_empty());
+        assert!(config.llm.is_empty());
     }
 
     #[test]
-    fn test_fallback_config_in_toml() {
+    fn test_llm_config_in_toml() {
         let toml_str = r#"
-            [[fallback_providers]]
+            [[llm]]
             provider = "ollama"
             model = "llama3.2:latest"
 
-            [[fallback_providers]]
+            [[llm]]
             provider = "groq"
             model = "llama-3.3-70b-versatile"
             api_key_env = "GROQ_API_KEY"
         "#;
         let config: KernelConfig = toml::from_str(toml_str).unwrap();
-        assert_eq!(config.fallback_providers.len(), 2);
-        assert_eq!(config.fallback_providers[0].provider, "ollama");
-        assert_eq!(config.fallback_providers[1].provider, "groq");
+        assert_eq!(config.llm.len(), 2);
+        assert_eq!(config.llm[0].provider, "ollama");
+        assert_eq!(config.llm[1].provider, "groq");
     }
 
     #[test]

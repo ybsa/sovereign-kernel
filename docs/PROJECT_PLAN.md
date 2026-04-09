@@ -62,12 +62,12 @@ User (Ongoing): "What did you do yesterday?"
 
 ┌──────────────────────────────────────────────────────────────────┐
 │                    USER INTERFACES                                │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │ CLI/REPL     │  │ Web Dashboard│  │ Chat (Telegram,       │
-│  │ (terminal)   │  │ (browser)    │  │  Discord, Slack)      │
-│  └──────────────┘  └──────────────┘  └──────────────┘           │
-└────────────┬────────────────────────────────────────────┬─────────┘
-             │ HTTP/WebSocket API                         │
+│  ┌──────────────┐  ┌──────────────┐                             │
+│  │ CLI/REPL     │  │ Tool Runners │                             │
+│  │ (terminal)   │  │ (headless)   │                             │
+│  └──────────────┘  └──────────────┘                             │
+└────────────┬────────────────────────┬─────────────────────────────┘
+             │ Programmatic Execution │
 ┌────────────▼────────────────────────────────────────────▼─────────┐
 │               SOVEREIGN KERNEL (The OS for Agents)                 │
 │                                                                     │
@@ -140,9 +140,9 @@ User (Ongoing): "What did you do yesterday?"
 
 ```text
 
-User Input (CLI/Web/Chat)
+User Input (CLI / Headless)
          ↓
-   REST/WebSocket API
+   Terminal / Programmatic Runner
          ↓
    Kernel receives request
          ↓
@@ -165,7 +165,7 @@ Check Execution Mode (Sandbox vs Unrestricted)
          ↓
    Return results to User Interface
          ↓
-User sees results (Web UI / Chat / CLI)
+User sees results (Terminal Output)
 
 ```
 
@@ -1197,6 +1197,28 @@ sovereign run "Create agent that monitors CPU and alerts if >90%"
 
 ## 8. SUCCESS METRICS
 
+---
+
+## PHASE 25: THE LIBRARIAN & THE ADK (Week 29) ✅ COMPLETED
+
+#### Goal: Repository-wide autonomy through semantic mapping and a modular development kit.
+
+### 25.1: The Librarian (Semantic Indexer) ✅
+- [x] Background repository indexing using the Semantic Store.
+- [x] Automated logic retrieval during agent turns.
+- [x] Full codebase awareness for autonomous refactoring.
+
+### 25.2: Sovereign ADK (Agent Development Kit) ✅
+- [x] Modular `Strategy` trait for reasoning loops.
+- [x] `AdkRuntime` adapter for environment decoupling.
+- [x] Refactored legacy `run_agent_loop` into `ReActStrategy`.
+- [x] Default "Village Forge" capability to ADK-ready templates.
+
+#### Timeline:** 1 week
+#### Success Metric**: Agent can answer complex questions about its own codebase and reasoning can be hot-swapped in the kernel.
+
+---
+
 ### Overall Success Metric
 
 **User can do this end-to-end on ANY device:**
@@ -1220,7 +1242,7 @@ sovereign run "Create agent that monitors CPU and alerts if >90%"
 7. Work 24/7 on scheduled tasks without human supervision
 8. All while respecting the user's security boundaries
 
-**Total effort: ~350-450 hours**
-**Ending point: 30 weeks from execution start**
+**Total effort: ~500-600 hours**
+**Ending point: 32 weeks from execution start**
 **Final goal: Public release of production-ready Sovereign Kernel — runs on every device, does everything a human can do on a computer, privately and securely.**
 

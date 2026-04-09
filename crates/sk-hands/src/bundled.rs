@@ -35,11 +35,7 @@ pub fn bundled_hands() -> Vec<(&'static str, &'static str, &'static str)> {
             include_str!("../bundled/twitter/HAND.toml"),
             include_str!("../bundled/twitter/SKILL.md"),
         ),
-        (
-            "browser",
-            include_str!("../bundled/browser/HAND.toml"),
-            include_str!("../bundled/browser/SKILL.md"),
-        ),
+
         (
             "web-search",
             include_str!("../bundled/web-search/HAND.toml"),
@@ -77,7 +73,13 @@ pub fn parse_bundled(
     let mut def: HandDefinition =
         toml::from_str(toml_content).map_err(|e| HandError::TomlParse(e.to_string()))?;
     if !skill_content.is_empty() {
-        def.skill_content = Some(skill_content.to_string());
+        def.skill_content = Some(crate::SkillContent {
+            name: def.name.clone(),
+            description: def.description.clone(),
+            code: String::new(),
+            dependencies: String::new(),
+            instructions: skill_content.to_string(),
+        });
     }
     Ok(def)
 }
@@ -96,7 +98,7 @@ mod tests {
     #[test]
     fn bundled_hands_count() {
         let hands = bundled_hands();
-        assert_eq!(hands.len(), 12);
+        assert_eq!(hands.len(), 11);
     }
 
     #[test]
@@ -201,30 +203,6 @@ mod tests {
         assert!((def.agent.temperature - 0.7).abs() < f32::EPSILON);
     }
 
-    #[test]
-    fn parse_browser_hand() {
-        let (id, toml_content, skill_content) = bundled_hands()
-            .into_iter()
-            .find(|(id, _, _)| *id == "browser")
-            .unwrap();
-        let def = parse_bundled(id, toml_content, skill_content).unwrap();
-        assert_eq!(def.id, "browser");
-        assert_eq!(def.name, "Browser Hand");
-        assert_eq!(def.category, crate::HandCategory::Productivity);
-        assert!(def.skill_content.is_some());
-        assert!(!def.requires.is_empty()); // requires python3, playwright
-        assert_eq!(def.requires.len(), 2);
-        assert!(def.tools.contains(&"browser_navigate".to_string()));
-        assert!(def.tools.contains(&"browser_click".to_string()));
-        assert!(def.tools.contains(&"browser_type".to_string()));
-        assert!(def.tools.contains(&"browser_screenshot".to_string()));
-        assert!(def.tools.contains(&"browser_read_page".to_string()));
-        assert!(def.tools.contains(&"browser_close".to_string()));
-        assert!(!def.settings.is_empty());
-        assert!(!def.dashboard.metrics.is_empty());
-        assert!((def.agent.temperature - 0.3).abs() < f32::EPSILON);
-        assert_eq!(def.agent.max_iterations, Some(60));
-    }
 
     #[test]
     fn all_bundled_hands_parse() {

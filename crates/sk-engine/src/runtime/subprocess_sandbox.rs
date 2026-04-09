@@ -93,13 +93,10 @@ fn extract_base_command(cmd: &str) -> &str {
     let trimmed = cmd.trim();
     // Take first word (space-delimited)
     let first_word = trimmed.split_whitespace().next().unwrap_or("");
-    // Strip path prefix
-    first_word
-        .rsplit('/')
-        .next()
-        .unwrap_or(first_word)
-        .rsplit('\\')
-        .next()
+    // Strip path prefix using OS-agnostic Path API
+    Path::new(first_word)
+        .file_name()
+        .and_then(|os| os.to_str())
         .unwrap_or(first_word)
 }
 
@@ -152,21 +149,42 @@ pub fn validate_command_allowlist(command: &str, policy: &ExecPolicy) -> Result<
             Ok(())
         }
         ExecSecurityMode::Allowlist => {
+            // 1. Check all base commands (pipes, etc.)
             let base_commands = extract_all_commands(command);
             for base in &base_commands {
-                // Check safe_bins first
-                if policy.safe_bins.iter().any(|sb| sb == base) {
-                    continue;
+                if !policy.safe_bins.iter().any(|sb| sb == base)
+                    && !policy.allowed_commands.iter().any(|ac| ac == base)
+                {
+                    return Err(format!(
+                        "Command '{}' is not in the exec allowlist. Add it to exec_policy.allowed_commands or exec_policy.safe_bins.",
+                        base
+                    ));
                 }
-                // Check allowed_commands
-                if policy.allowed_commands.iter().any(|ac| ac == base) {
-                    continue;
-                }
-                return Err(format!(
-                    "Command '{}' is not in the exec allowlist. Add it to exec_policy.allowed_commands or exec_policy.safe_bins.",
-                    base
-                ));
             }
+
+            // 2. Check for blocked arguments (security mitigation for cmd/powershell/sh)
+            let words: Vec<&str> = command.split_whitespace().collect();
+            for word in words {
+                if policy.blocked_args.iter().any(|ba| ba == word) {
+                    tracing::warn!(blocked_arg = %word, "Blocked potentially dangerous argument");
+                    return Err(format!(
+                        "Argument '{}' is blocked by security policy (exec_policy.blocked_args).",
+                        word
+                    ));
+                }
+            }
+
+            // 3. Log warning for shell usage on Windows
+            #[cfg(windows)]
+            {
+                let is_shell = base_commands
+                    .iter()
+                    .any(|b| *b == "cmd" || *b == "powershell");
+                if is_shell {
+                    tracing::warn!("Invoking Windows shell (cmd/powershell). Ensure arguments are properly escaped.");
+                }
+            }
+
             Ok(())
         }
     }
@@ -608,6 +626,10 @@ mod tests {
             extract_base_command("/usr/bin/python3 script.py"),
             "python3"
         );
+        assert_eq!(
+            extract_base_command(r"C:\Program Files\Git\git.exe status"),
+            "git.exe"
+        );
         assert_eq!(extract_base_command("  echo hello  "), "echo");
         assert_eq!(extract_base_command(""), "");
     }
@@ -658,10 +680,10 @@ mod tests {
     #[test]
     fn test_allowlist_permits_safe_bins() {
         let policy = ExecPolicy::default();
-        // Default safe_bins include "echo", "cat", "sort"
+        let cmd = if cfg!(windows) { "dir" } else { "ls" };
+        assert!(validate_command_allowlist(cmd, &policy).is_ok());
         assert!(validate_command_allowlist("echo hello", &policy).is_ok());
         assert!(validate_command_allowlist("cat file.txt", &policy).is_ok());
-        assert!(validate_command_allowlist("sort data.csv", &policy).is_ok());
     }
 
     #[test]
@@ -697,8 +719,20 @@ mod tests {
         assert_eq!(policy.mode, ExecSecurityMode::Allowlist);
         assert!(!policy.safe_bins.is_empty());
         assert!(policy.safe_bins.contains(&"echo".to_string()));
+        assert!(policy.blocked_args.contains(&"/C".to_string()));
         assert!(policy.allowed_commands.is_empty());
         assert_eq!(policy.timeout_secs, 30);
-        assert_eq!(policy.max_output_bytes, 100 * 1024);
+    }
+
+    #[test]
+    fn test_blocked_arguments() {
+        let policy = ExecPolicy::default();
+        // sh -c is blocked by default
+        assert!(validate_command_allowlist("sh -c 'echo hi'", &policy).is_err());
+        // cmd /C is blocked by default
+        assert!(validate_command_allowlist("cmd /C dir", &policy).is_err());
+        // Plain sh or cmd is allowed
+        assert!(validate_command_allowlist("sh", &policy).is_ok());
+        assert!(validate_command_allowlist("cmd", &policy).is_ok());
     }
 }

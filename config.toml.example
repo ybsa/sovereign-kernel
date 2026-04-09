@@ -1,0 +1,50 @@
+# Sovereign Kernel Configuration
+# Copy this file to config.toml and customize for your system.
+#
+# See docs/USAGE.md for full configuration reference.
+
+log_level = "info"
+execution_mode = "sandbox"   # "sandbox" (default, safe) or "unrestricted"
+
+# Workspace directory for agent file operations.
+# Defaults to ~/.sovereign_kernel/workspaces if not set.
+# workspaces_dir = "/path/to/your/workspaces"
+
+# --- LLM Provider Configuration ---
+# At least one provider is required. Add your preferred provider below.
+# API keys are loaded from environment variables (never put keys directly here).
+
+[[llm]]
+provider = "openai"          # anthropic, openai, gemini, groq, deepseek, nvidia, ollama, etc.
+api_key_env = "OPENAI_API_KEY"
+# model = "gpt-4o"           # Optional: override default model
+# base_url = "https://api.openai.com/v1"  # Optional: custom endpoint
+
+# Example: Add a second provider
+# [[llm]]
+# provider = "anthropic"
+# api_key_env = "ANTHROPIC_API_KEY"
+
+# --- Execution Policy ---
+[exec_policy]
+mode = "full"                # "full" or "restricted"
+
+# --- Memory ---
+[memory]
+decay_rate = 0.1
+# embedding_model = "text-embedding-3-small"  # Optional
+
+# --- API Security ---
+# api_key = ""               # Set to require Bearer auth on API endpoints
+
+# --- Browser Automation ---
+# [browser]
+# headless = true
+
+# --- MCP Server Integration ---
+# [[mcp_servers]]
+# name = "example-server"
+# [mcp_servers.transport]
+# type = "stdio"
+# command = "npx"
+# args = ["-y", "@example/mcp-server"]

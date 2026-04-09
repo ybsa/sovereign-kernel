@@ -180,6 +180,7 @@ impl LlmDriver for OpenAICompatDriver {
 
         if !tools.is_empty() {
             body["tools"] = serde_json::Value::Array(tools);
+            body["parallel_tool_calls"] = serde_json::Value::Bool(false);
         }
 
         let url = format!(
