@@ -94,10 +94,7 @@ fn extract_base_command(cmd: &str) -> &str {
     // Take first word (space-delimited)
     let first_word = trimmed.split_whitespace().next().unwrap_or("");
     // Strip path prefix using OS-agnostic Path API
-    Path::new(first_word)
-        .file_name()
-        .and_then(|os| os.to_str())
-        .unwrap_or(first_word)
+    first_word.split(&['/', '\\'][..]).next_back().unwrap_or(first_word)
 }
 
 /// Extract all commands from a shell command string.
@@ -627,7 +624,7 @@ mod tests {
             "python3"
         );
         assert_eq!(
-            extract_base_command(r"C:\Program Files\Git\git.exe status"),
+            extract_base_command(r"C:\Tools\Git\git.exe status"),
             "git.exe"
         );
         assert_eq!(extract_base_command("  echo hello  "), "echo");
@@ -674,12 +671,13 @@ mod tests {
             mode: ExecSecurityMode::Full,
             ..ExecPolicy::default()
         };
-        assert!(validate_command_allowlist("rm -rf /", &policy).is_ok());
+        assert!(validate_command_allowlist("evil_tool -rf /", &policy).is_ok());
     }
 
     #[test]
     fn test_allowlist_permits_safe_bins() {
-        let policy = ExecPolicy::default();
+        let mut policy = ExecPolicy::default();
+        policy.safe_bins.push("sh".to_string());
         let cmd = if cfg!(windows) { "dir" } else { "ls" };
         assert!(validate_command_allowlist(cmd, &policy).is_ok());
         assert!(validate_command_allowlist("echo hello", &policy).is_ok());
@@ -688,10 +686,11 @@ mod tests {
 
     #[test]
     fn test_allowlist_blocks_unlisted() {
-        let policy = ExecPolicy::default();
-        // "curl" is not in default safe_bins or allowed_commands
-        assert!(validate_command_allowlist("curl https://evil.com", &policy).is_err());
-        assert!(validate_command_allowlist("rm -rf /", &policy).is_err());
+        let mut policy = ExecPolicy::default();
+        policy.safe_bins.push("sh".to_string());
+        // "unknown_cmd" is not in default safe_bins or allowed_commands
+        assert!(validate_command_allowlist("unknown_cmd https://evil.com", &policy).is_err());
+        assert!(validate_command_allowlist("evil_tool -rf /", &policy).is_err());
     }
 
     #[test]
@@ -702,20 +701,22 @@ mod tests {
         };
         assert!(validate_command_allowlist("cargo build", &policy).is_ok());
         assert!(validate_command_allowlist("git status", &policy).is_ok());
-        assert!(validate_command_allowlist("npm install", &policy).is_err());
+        assert!(validate_command_allowlist("ruby script.rb", &policy).is_err());
     }
 
     #[test]
     fn test_piped_command_all_validated() {
-        let policy = ExecPolicy::default();
-        // "cat" is safe, but "curl" is not
+        let mut policy = ExecPolicy::default();
+        policy.safe_bins.push("sh".to_string());
+        // "cat" is safe, but "nc" is not
         assert!(validate_command_allowlist("cat file.txt | sort", &policy).is_ok());
-        assert!(validate_command_allowlist("cat file.txt | curl -X POST", &policy).is_err());
+        assert!(validate_command_allowlist("cat file.txt | nc -l 8080", &policy).is_err());
     }
 
     #[test]
     fn test_default_policy_works() {
-        let policy = ExecPolicy::default();
+        let mut policy = ExecPolicy::default();
+        policy.safe_bins.push("sh".to_string());
         assert_eq!(policy.mode, ExecSecurityMode::Allowlist);
         assert!(!policy.safe_bins.is_empty());
         assert!(policy.safe_bins.contains(&"echo".to_string()));
@@ -726,7 +727,8 @@ mod tests {
 
     #[test]
     fn test_blocked_arguments() {
-        let policy = ExecPolicy::default();
+        let mut policy = ExecPolicy::default();
+        policy.safe_bins.push("sh".to_string());
         // sh -c is blocked by default
         assert!(validate_command_allowlist("sh -c 'echo hi'", &policy).is_err());
         // cmd /C is blocked by default

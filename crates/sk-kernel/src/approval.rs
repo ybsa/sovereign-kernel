@@ -168,7 +168,7 @@ impl ApprovalManager {
                 format!("🛡️ **Safety Block**: The agent wants to execute a command: `{}`.\nReply with **'approve'** to allow, or **'deny'** to block.", cmd)
             }
             "code_exec" => {
-                format!("🛡️ **Safety Block**: The agent wants to execute raw code.\nReply with **'approve'** to allow, or **'deny'** to block.")
+                "🛡️ **Safety Block**: The agent wants to execute raw code.\nReply with **'approve'** to allow, or **'deny'** to block.".to_string()
             }
             _ => {
                 format!("🛡️ **Safety Block**: The agent wants to use tool '{}' which is risky.\nReply with **'approve'** to allow, or **'deny'** to block.", tool_name)
