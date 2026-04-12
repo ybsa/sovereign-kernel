@@ -202,5 +202,27 @@ pub fn default_catalog() -> Vec<ModelCapability> {
         ),
         ModelCapability::new("mistral:latest", "local", ModelTier::LocalLight, 8192, true),
         ModelCapability::new("phi3:latest", "local", ModelTier::LocalLight, 4096, true),
+        // ── NVIDIA NIM ─────────────────────────────────────────────
+        ModelCapability::new(
+            "meta/llama-3.1-405b-instruct",
+            "nvidia",
+            ModelTier::CloudFrontier,
+            128000,
+            true,
+        ),
+        ModelCapability::new(
+            "meta/llama-3.1-70b-instruct",
+            "nvidia",
+            ModelTier::CloudReasoning,
+            128000,
+            true,
+        ),
+        ModelCapability::new(
+            "meta/llama-3.1-8b-instruct",
+            "nvidia",
+            ModelTier::CloudFast,
+            128000,
+            true,
+        ),
     ]
 }

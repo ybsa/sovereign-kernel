@@ -40,33 +40,22 @@ pub fn create_agent_config(
     agent_id: AgentId,
     _skill_registry: Arc<std::sync::RwLock<sk_tools::skills::SkillRegistry>>,
     stream_handler: Option<sk_engine::agent_loop::StreamHandler>,
+    intent: Option<crate::wizard::AgentIntent>,
 ) -> AgentLoopConfig {
     let small_model = is_small_model(&model_name);
 
-    // Core tool set
-    let mut tools = vec![
-        sk_tools::memory_tools::remember_tool(),
-        sk_tools::memory_tools::recall_tool(),
-        sk_tools::file_ops::read_file_tool(),
-        sk_tools::file_ops::write_file_tool(),
-        sk_tools::file_ops::list_dir_tool(),
-        sk_tools::shell::shell_exec_tool(),
-        sk_tools::web_search::web_search_tool(),
-        sk_tools::web_fetch::web_fetch_tool(),
-    ];
-
-    if !small_model {
-        tools.push(sk_tools::memory_tools::forget_tool());
-        tools.push(sk_tools::file_ops::delete_file_tool());
-        tools.push(sk_tools::file_ops::move_file_tool());
-        tools.push(sk_tools::file_ops::copy_file_tool());
-        tools.push(sk_tools::code_exec::code_exec_tool());
-        tools.push(sk_tools::shared_memory::shared_memory_store_tool());
-        tools.push(sk_tools::shared_memory::shared_memory_recall_tool());
-        tools.extend(sk_tools::host::host_tools());
-        tools.push(sk_tools::skills::get_skill_tool());
-        tools.push(sk_tools::skills::list_skills_tool());
+    // Map CLI capabilities if present
+    let mut caps = intent
+        .as_ref()
+        .map(|i| i.capabilities.clone())
+        .unwrap_or_else(|| vec!["file_read".into(), "web".into(), "shell".into()]);
+    if intent.as_ref().map(|i| i.is_otto).unwrap_or(false)
+        && !caps.iter().any(|cap| cap.eq_ignore_ascii_case("otto"))
+    {
+        caps.push("otto".into());
     }
+
+    let mut tools = crate::tools::available_tool_definitions(&caps, small_model);
 
     // Pull in MCP tools
     if let Ok(mcp_lock) = kernel.mcp.try_read() {
@@ -81,7 +70,19 @@ pub fn create_agent_config(
     let max_tok = cfg_snap.max_tokens_per_task;
     let step_dump = cfg_snap.step_dump_enabled;
     let forensics = cfg_snap.effective_workspaces_dir();
-    let default_mode = cfg_snap.execution_mode;
+
+    // Wire the intentional CLI mode fallback
+    let mut default_mode = cfg_snap.execution_mode;
+    if let Some(i) = &intent {
+        if let Some(m) = &i.mode {
+            if m.eq_ignore_ascii_case("unrestricted") {
+                default_mode = sk_types::config::ExecutionMode::Unrestricted;
+            } else if m.eq_ignore_ascii_case("sandbox") {
+                default_mode = sk_types::config::ExecutionMode::Sandbox;
+            }
+        }
+    }
+
     drop(cfg_snap);
 
     let mut final_prompt = system_prompt;
@@ -90,6 +91,10 @@ pub fn create_agent_config(
     } else {
         final_prompt.push_str("\n\n[SANDBOX AUTHORIZATION]\nYou are running in a strictly controlled sandbox. Actions are audited.\n");
     }
+
+    let intent_clone = intent.clone();
+    let registry = Arc::new(ToolRegistry::new().register_all());
+    let intent_ctx = intent_clone.clone();
 
     AgentLoopConfig {
         driver,
@@ -121,16 +126,27 @@ pub fn create_agent_config(
         tool_executor: Box::new(move |tool_call: ToolCall| {
             let kernel = k.clone();
             let aid = aid;
-            let registry = ToolRegistry::new().register_all();
+            let registry = registry.clone();
+            let intent_ctx = intent_ctx.clone();
 
             Box::pin(async move {
-                let (default_mode, workspace_dir, exec_policy) = {
+                let (mut default_mode, workspace_dir, exec_policy) = {
                     let config_snap = crate::rlock!(kernel.config);
                     let dm = config_snap.execution_mode;
                     let ws = config_snap.effective_workspaces_dir();
                     let ep = config_snap.exec_policy.clone();
                     (dm, ws, ep)
                 };
+
+                if let Some(i) = &intent_ctx {
+                    if let Some(m) = &i.mode {
+                        if m.eq_ignore_ascii_case("unrestricted") {
+                            default_mode = sk_types::config::ExecutionMode::Unrestricted;
+                        } else if m.eq_ignore_ascii_case("sandbox") {
+                            default_mode = sk_types::config::ExecutionMode::Sandbox;
+                        }
+                    }
+                }
 
                 let force_sandbox = kernel
                     .memory

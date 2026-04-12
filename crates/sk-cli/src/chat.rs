@@ -108,9 +108,19 @@ pub async fn run(config: KernelConfig) -> anyhow::Result<()> {
             _ => {}
         }
 
-        match kernel.run_agent(&mut session, input).await {
-            Ok(result) => {
-                println!("\nSovereign: {}\n", result.response);
+        let stream_handler: Option<sk_engine::agent_loop::StreamHandler> =
+            Some(Box::new(move |chunk| {
+                print!("{}", chunk);
+                use std::io::Write;
+                let _ = std::io::stdout().flush();
+            }));
+
+        print!("\nSovereign: ");
+        let _ = std::io::stdout().flush();
+
+        match kernel.run_agent(&mut session, input, stream_handler).await {
+            Ok(_result) => {
+                println!("\n"); // Just add newline after streamed output
             }
             Err(e) => {
                 println!("\nSovereign Error: {}\n", e);

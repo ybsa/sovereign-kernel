@@ -4,7 +4,7 @@ use std::process::Command;
 
 pub fn app_installer_tool() -> ToolDefinition {
     ToolDefinition {
-        name: "host_install_app".into(),
+        name: "app_installer".into(),
         description:
             "Install applications on the host system using winget. Requires Unrestricted mode."
                 .into(),

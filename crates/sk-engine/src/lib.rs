@@ -18,7 +18,6 @@ pub mod prompt_builder;
 pub mod retry;
 pub mod routing;
 pub mod sentinel;
-pub mod tool_runner;
 
 pub mod a2a;
 pub mod host_functions;

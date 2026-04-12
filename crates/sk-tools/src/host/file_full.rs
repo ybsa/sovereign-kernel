@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 pub fn host_read_file_tool() -> ToolDefinition {
     ToolDefinition {
-        name: "host_read_file".into(),
+        name: "read_file".into(),
         description:
             "Read a file's contents from ANYWHERE on the host system. Requires Unrestricted mode."
                 .into(),
@@ -19,7 +19,7 @@ pub fn host_read_file_tool() -> ToolDefinition {
 
 pub fn host_write_file_tool() -> ToolDefinition {
     ToolDefinition {
-        name: "host_write_file".into(),
+        name: "write_file".into(),
         description:
             "Write content to ANY file on the host system. Requires Unrestricted mode. Supports append=true.".into(),
         input_schema: serde_json::json!({"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"},"append":{"type":"boolean"}},"required":["path","content"]}),
@@ -28,7 +28,7 @@ pub fn host_write_file_tool() -> ToolDefinition {
 
 pub fn host_list_dir_tool() -> ToolDefinition {
     ToolDefinition {
-        name: "host_list_dir".into(),
+        name: "list_dir".into(),
         description: "List contents of ANY directory on the host system with rich metadata.".into(),
         input_schema: serde_json::json!({"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}),
     }

@@ -35,7 +35,6 @@ pub fn bundled_hands() -> Vec<(&'static str, &'static str, &'static str)> {
             include_str!("../bundled/twitter/HAND.toml"),
             include_str!("../bundled/twitter/SKILL.md"),
         ),
-
         (
             "web-search",
             include_str!("../bundled/web-search/HAND.toml"),
@@ -202,7 +201,6 @@ mod tests {
         assert!(!def.dashboard.metrics.is_empty());
         assert!((def.agent.temperature - 0.7).abs() < f32::EPSILON);
     }
-
 
     #[test]
     fn all_bundled_hands_parse() {

@@ -4,7 +4,7 @@ use std::process::Command;
 
 pub fn desktop_control_tool() -> ToolDefinition {
     ToolDefinition {
-        name: "host_desktop_control".into(),
+        name: "desktop_control".into(),
         description: "Control desktop settings like wallpaper, dark mode, and system notifications. Windows only.".into(),
         input_schema: serde_json::json!({
             "type": "object",

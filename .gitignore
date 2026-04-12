@@ -37,3 +37,14 @@ desktop.ini
 # Antigravity/AI assistant data
 brain/
 .gemini/
+.antigravityignore
+
+# Runtime session files (never commit these)
+browser_session.json
+metering.json
+cron_jobs.json
+vault.enc
+
+# Agent workspaces (user data)
+workspaces/
+agent_test/

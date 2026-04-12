@@ -167,7 +167,9 @@ pub async fn run_agent_loop(
             }
         };
 
-        total_tokens += response.usage.total_tokens;
+        let turn_tokens = response.usage.total_tokens;
+        total_tokens = total_tokens.saturating_add(turn_tokens);
+        debug!(turn_tokens, total_tokens, "Accumulated token usage");
 
         if let Some(ref handler) = config.on_usage {
             handler(response.usage.clone())?;

@@ -247,7 +247,7 @@ impl LlmDriver for OpenAIDriver {
             );
         }
 
-        let max_retries = 3;
+        let max_retries = 8;
         for attempt in 0..=max_retries {
             let url = format!("{}/chat/completions", self.base_url);
             debug!(url = %url, attempt, "Sending OpenAI API request");
@@ -271,7 +271,7 @@ impl LlmDriver for OpenAIDriver {
             let status = resp.status().as_u16();
             if status == 429 {
                 if attempt < max_retries {
-                    let retry_ms = (attempt + 1) as u64 * 2000;
+                    let retry_ms = (attempt + 1) as u64 * 5000;
                     warn!(status, retry_ms, "Rate limited, retrying");
                     tokio::time::sleep(std::time::Duration::from_millis(retry_ms)).await;
                     continue;
@@ -399,7 +399,7 @@ impl LlmDriver for OpenAIDriver {
                 .map(|u| TokenUsage {
                     prompt_tokens: u.prompt_tokens as u32,
                     completion_tokens: u.completion_tokens as u32,
-                    total_tokens: 0,
+                    total_tokens: (u.prompt_tokens + u.completion_tokens) as u32,
                 })
                 .unwrap_or_default();
 

@@ -62,7 +62,8 @@ impl RiskLevel {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ApprovalDecision {
-    Approved,
+    ApprovedFull,
+    ApprovedSandboxed,
     Denied,
     TimedOut,
 }
@@ -293,7 +294,8 @@ mod tests {
     #[test]
     fn decision_serde_roundtrip() {
         for decision in [
-            ApprovalDecision::Approved,
+            ApprovalDecision::ApprovedFull,
+            ApprovalDecision::ApprovedSandboxed,
             ApprovalDecision::Denied,
             ApprovalDecision::TimedOut,
         ] {
@@ -449,14 +451,14 @@ mod tests {
     fn response_serde_roundtrip() {
         let resp = ApprovalResponse {
             request_id: Uuid::new_v4(),
-            decision: ApprovalDecision::Approved,
+            decision: ApprovalDecision::ApprovedFull,
             decided_at: Utc::now(),
             decided_by: Some("admin@example.com".into()),
         };
         let json = serde_json::to_string(&resp).unwrap();
         let back: ApprovalResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(back.request_id, resp.request_id);
-        assert_eq!(back.decision, ApprovalDecision::Approved);
+        assert_eq!(back.decision, ApprovalDecision::ApprovedFull);
         assert_eq!(back.decided_by, Some("admin@example.com".into()));
     }
 

@@ -45,6 +45,16 @@ impl ApprovalManager {
         }
     }
 
+    /// Subscribe to new approval requests.
+    pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<Uuid> {
+        self.notifier.subscribe()
+    }
+
+    /// Retrieve the details of a pending request by ID.
+    pub fn get_request(&self, id: Uuid) -> Option<ApprovalRequest> {
+        self.pending.get(&id).map(|p| p.request.clone())
+    }
+
     /// Check if a tool requires approval based on current policy.
     pub fn requires_approval(&self, tool_name: &str) -> bool {
         let policy = self.policy.read().unwrap_or_else(|e| e.into_inner());

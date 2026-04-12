@@ -237,6 +237,7 @@ impl SovereignKernel {
         self: &Arc<Self>,
         session: &mut sk_types::Session,
         input: &str,
+        stream_handler: Option<sk_engine::agent_loop::StreamHandler>,
     ) -> SovereignResult<sk_engine::agent_loop::AgentLoopResult> {
         let system_prompt = self.soul.to_system_prompt_fragment();
 
@@ -247,6 +248,7 @@ impl SovereignKernel {
             self.model_name.clone(),
             session.agent_id,
             self.skills.clone(),
+            stream_handler,
             None,
         );
 
@@ -351,6 +353,7 @@ impl SovereignKernel {
             self.model_name.clone(),
             agent_id,
             self.skills.clone(),
+            None,
             None,
         );
 
@@ -520,7 +523,7 @@ impl SovereignKernel {
                                     new_s
                                 });
 
-                                match k.run_agent(&mut s, &msg).await {
+                                match k.run_agent(&mut s, &msg, None).await {
                                     Ok(res) => {
                                         k.cron.record_success(job_id);
                                         // Execute delivery

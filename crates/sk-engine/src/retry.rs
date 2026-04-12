@@ -2,8 +2,8 @@
 
 use std::time::Duration;
 
-const BASE_DELAY_MS: u64 = 1000;
-const MAX_RETRIES: u32 = 3;
+const BASE_DELAY_MS: u64 = 3000;
+const MAX_RETRIES: u32 = 8;
 
 /// Calculate backoff delay for a retry attempt.
 pub fn backoff_delay(attempt: u32) -> Duration {

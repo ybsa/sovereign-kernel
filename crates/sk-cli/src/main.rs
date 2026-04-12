@@ -12,6 +12,8 @@ mod init;
 mod mcp;
 mod memory;
 mod run;
+mod setup_wizard;
+mod soul_wizard;
 mod status;
 mod treasury;
 
@@ -38,8 +40,15 @@ struct Cli {
 enum Commands {
     /// Interactive chat with the kernel
     Chat(ChatArgs),
-    /// First-run setup wizard
+    /// First-run setup wizard (Legacy)
     Init,
+    /// Interactive setup wizard for non-developers
+    Setup,
+    /// Create and manage agent personas (Souls)
+    Soul {
+        #[command(subcommand)]
+        command: soul_wizard::SoulCommands,
+    },
     /// Start the kernel as a background daemon
     Start(StartArgs),
     /// Run a task autonomously
@@ -103,6 +112,9 @@ struct RunArgs {
     /// Optional schedule (cron expression)
     #[arg(short, long)]
     schedule: Option<String>,
+    /// Optional Soul name (persona) to use for this task
+    #[arg(long)]
+    soul: Option<String>,
     /// Maximum LLM loop iterations for this task
     #[arg(long)]
     max_iterations: Option<u32>,
@@ -158,7 +170,6 @@ struct McpArgs {
     #[arg(trailing_var_arg = true)]
     args: Vec<String>,
 }
-
 
 fn main() {
     // Spawn a thread with a larger stack size for the CLI
@@ -267,6 +278,8 @@ async fn async_main() -> anyhow::Result<()> {
             chat::run(cfg).await?
         }
         Commands::Init => init::run().await?,
+        Commands::Setup => setup_wizard::run().await?,
+        Commands::Soul { command } => soul_wizard::run(command).await?,
         Commands::Start(args) => daemon::start(config, args.detach).await?,
         Commands::Run(args) => {
             let mut cfg = config;
@@ -279,7 +292,7 @@ async fn async_main() -> anyhow::Result<()> {
             if let Some(b) = args.budget_usd {
                 cfg.total_token_budget_usd_cents = Some((b * 100.0) as u64);
             }
-            run::execute(cfg, &args.task, &args.mode, args.schedule).await?
+            run::execute(cfg, &args.task, &args.mode, args.schedule, args.soul).await?
         }
         Commands::Status => status::print_status().await?,
         Commands::Kill(args) => {

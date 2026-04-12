@@ -371,7 +371,7 @@ mod tests {
     fn load_bundled_hands() {
         let mut reg = HandRegistry::new();
         let count = reg.load_bundled();
-        assert_eq!(count, 12);
+        assert_eq!(count, 11);
         assert!(!reg.list_definitions().is_empty());
 
         // Clip hand should be loaded
@@ -387,10 +387,7 @@ mod tests {
         assert!(reg.get_definition("researcher").is_some());
         assert!(reg.get_definition("twitter").is_some());
 
-        // Browser hand should be loaded
-        assert!(reg.get_definition("browser").is_some());
-
-        // New Phase 14 hands should be loaded
+        // Phase 14 hands should be loaded
         assert!(reg.get_definition("web-search").is_some());
         assert!(reg.get_definition("email").is_some());
     }

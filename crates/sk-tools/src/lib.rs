@@ -2,6 +2,7 @@
 //!
 //! Subset of Sovereign Kernel's 53 tools, focused on essentials.
 
+pub mod browser;
 pub mod code_exec;
 pub mod file_ops;
 pub mod host;
@@ -35,6 +36,13 @@ pub fn builtin_tools() -> Vec<ToolDefinition> {
     ];
     tools.push(skills::get_skill_tool());
     tools.push(skills::list_skills_tool());
+    tools.push(browser::browser_navigate_tool());
+    tools.push(browser::browser_read_page_tool());
+    tools.push(browser::browser_screenshot_tool());
+    tools.push(browser::browser_click_tool());
+    tools.push(browser::browser_type_tool());
+    tools.push(browser::browser_scroll_tool());
+    tools.push(browser::browser_get_dom_tool());
     tools.push(ottos_outpost::ottos_outpost_tool());
     tools.push(otto::compile_rust_skill_tool());
     tools

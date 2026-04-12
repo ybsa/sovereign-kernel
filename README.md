@@ -6,7 +6,7 @@
 
 > **A local-first, memory-safe AI Operating System. Single Rust binary. Runs everywhere.**
 
-Sovereign Kernel is a production-grade Agentic Operating System and **Agent Development Kit (ADK)** built entirely in Rust. It provides a modular, strategy-based framework for building autonomous agents with deep repository awareness via **The Librarian** (background semantic indexing).
+Sovereign Kernel is a production-grade **Agentic Operating System** built entirely in Rust. It turns any LLM into an autonomous agent that can search the web, manipulate files, execute shell commands, and manage long-running background tasks — all from a single binary with built-in security sandboxing.
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
@@ -14,16 +14,29 @@ Sovereign Kernel is a production-grade Agentic Operating System and **Agent Deve
 │               The Agentic Operating System                  │
 │                                                             │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │ 50+ LLM  │  │ Terminal │  │  100+    │  │ Security │   │
-│  │ Providers│  │   CLI    │  │  Skills  │  │ Sandbox  │   │
+│  │ 10+ LLM  │  │ Terminal │  │ Modular  │  │ Security │   │
+│  │ Providers│  │   CLI    │  │  Tools   │  │ Sandbox  │   │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
 │                                                             │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │  Memory  │  │  Agent   │  │ Modular  │  │   MCP    │   │
-│  │ Substrate│  │ Registry │  │  Tools   │  │ Protocol │   │
+│  │  Memory  │  │  Agent   │  │  Hands   │  │  Cron    │   │
+│  │ Substrate│  │ Registry │  │ Packages │  │Scheduler │   │
 │  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## ✨ Key Features
+
+- **Real-time Web Search** — Direct HTTP search with structured result extraction (DuckDuckGo + Google fallback)
+- **File & Shell Operations** — Create, read, write, delete files and execute commands autonomously
+- **Browser Bridge** — Full Playwright-based browser automation for multi-step web navigation
+- **Token Streaming** — Real-time response streaming in the terminal for instant feedback
+- **Security Sandbox** — Allowlist-based command execution with human-in-the-loop approval
+- **Persistent Memory** — SQLite-backed memory substrate with session management
+- **Multi-Agent Architecture** — "Hands" system for pre-built agent capability packages
+- **Cron Scheduler** — Background autonomous task execution on schedule
 
 ---
 
@@ -35,12 +48,12 @@ A 9-crate Rust workspace with clean separation of concerns:
 | :--- | :--- |
 | **sk-types** | Shared types, errors, capabilities, configuration schema |
 | **sk-soul** | Agent identity parser (SOUL.md, IDENTITY.md) |
-| **sk-memory** | SQLite-backed memory substrate (structured KV, semantic vectors, BM25, sessions, audit) |
+| **sk-memory** | SQLite-backed memory substrate (structured KV, sessions, audit) |
 | **sk-engine** | LLM orchestration, agent loops, driver catalog, sandboxing |
 | **sk-mcp** | Model Context Protocol server/client integration |
 | **sk-kernel** | Core daemon: security, approval gates, event bus, cron, supervisor, tool registry |
-| **sk-tools** | Tool implementations (shell, file ops, browser, code exec, skills) |
-| **sk-hands** | Pre-built agent capability packages |
+| **sk-tools** | Tool implementations (shell, file ops, browser, web search, code exec) |
+| **sk-hands** | Pre-built agent capability packages (Researcher, Clip, Email, etc.) |
 | **sk-cli** | CLI surface and interactive terminal |
 
 ---
@@ -49,10 +62,10 @@ A 9-crate Rust workspace with clean separation of concerns:
 
 | Provider | Status | Notes |
 | :--- | :--- | :--- |
+| **NVIDIA NIM** | ✅ Verified | Llama 3.3 70B (Default), Mistral |
 | **OpenAI** | ✅ Verified | GPT-4o, o1-preview |
 | **Anthropic** | ✅ Verified | Claude 3.5/4 Sonnet (Native Tool Use) |
 | **Google Gemini** | ✅ Verified | Gemini 2.5 Flash/Pro |
-| **NVIDIA NIM** | ✅ Verified | Mistral, Llama via NIM API |
 | **Ollama** | ✅ Verified | Any local model (OpenAI-compatible) |
 | **Groq** | ✅ Verified | Ultra-fast inference |
 | **DeepSeek** | ✅ Verified | DeepSeek-V2/V3 |
@@ -69,8 +82,38 @@ Sovereign Kernel provides multi-layered protection for LLM-driven agent operatio
 - **Unified Approval Manager** — Risk-based gating (Low → Medium → High → Critical) with human-in-the-loop for dangerous operations
 - **Modular Tool Registry** — All tools dispatched through a type-safe `ToolHandler` trait with per-tool risk classification
 - **Filesystem Sandbox** — Agents operate in isolated workspace directories
+- **Allowlist Execution** — Shell commands restricted to approved binaries only
 - **Audit Trail** — Merkle chain of every agent action for forensic analysis
 - **Budget Enforcement** — Real-time cost tracking with hard-kill on overspend
+
+---
+
+## ⚙️ Quick Start
+
+```bash
+# Clone and setup
+git clone https://github.com/OpenEris/sovereign-kernel.git
+cd sovereign-kernel
+cp config.toml.example config.toml   # Edit with your provider
+cp .env.example .env                  # Add your API keys
+
+# Build
+cargo build --release --workspace
+
+# Interactive Chat (with real-time streaming)
+cargo run --release -- chat
+
+# Autonomous Task Execution
+cargo run --release -- run "Search the web for the latest AI news and summarize it"
+```
+
+### Environment Variables
+
+At minimum, you need one LLM provider key. Example with NVIDIA NIM (free tier available):
+
+```bash
+NVIDIA_API_KEY=nvapi-your-key-here
+```
 
 ---
 
@@ -87,21 +130,13 @@ Sovereign Kernel provides multi-layered protection for LLM-driven agent operatio
 
 ---
 
-## ⚙️ Quick Start
-
-```bash
-git clone https://github.com/OpenEris/sovereign-kernel.git
-cd sovereign-kernel
-cp config.toml.example config.toml   # Edit with your provider
-cp .env.example .env                  # Add your API keys
-cargo build --release --workspace
-cargo run --release -- run "Hello, what can you do?"
-```
-
 ## ⚙️ Requirements
+
 - **Rust 1.75+** (Required)
 - **SQLite3** (Bundled via rusqlite)
+- **Python 3.8+** (Optional, for Browser Bridge)
 - Windows 10+, macOS, or Linux
 
 ## 📜 License
+
 Licensed under the [MIT License](LICENSE).

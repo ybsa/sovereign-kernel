@@ -32,15 +32,12 @@ impl SentinelDriver {
 
 #[async_trait]
 impl LlmDriver for SentinelDriver {
-    async fn complete(
-        &self,
-        mut request: CompletionRequest,
-    ) -> Result<CompletionResponse, LlmError> {
+    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
         for (i, (model_name, driver)) in self.entries.iter().enumerate() {
             let mut last_err = None;
 
-            // Update request with this driver's specific model name
-            request.model = model_name.clone();
+            let mut local_request = request.clone();
+            local_request.model = model_name.clone();
 
             for attempt in 0..=self.max_retries {
                 if attempt > 0 {
@@ -55,7 +52,7 @@ impl LlmDriver for SentinelDriver {
                     tokio::time::sleep(delay).await;
                 }
 
-                match driver.complete(request.clone()).await {
+                match driver.complete(local_request.clone()).await {
                     Ok(resp) => {
                         if i > 0 {
                             info!(

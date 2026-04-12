@@ -15,6 +15,7 @@ pub async fn execute(
     task: &str,
     mode_hint: &str,
     schedule: Option<String>,
+    soul_override: Option<String>,
 ) -> anyhow::Result<()> {
     println!("⚡ Initializing Sovereign Agent...");
 
@@ -118,7 +119,7 @@ pub async fn execute(
                 is_otto: false,
             },
             None,
-            None,
+            soul_override.clone(),
         )
     };
 
@@ -138,6 +139,57 @@ pub async fn execute(
             }
         }));
 
+    // Spawn the Interactive Approval UI
+    let approval_kernel = kernel.clone();
+    let mut approval_rx = approval_kernel.approval.subscribe();
+
+    tokio::spawn(async move {
+        while let Ok(request_id) = approval_rx.recv().await {
+            if let Some(req) = approval_kernel.approval.get_request(request_id) {
+                println!("\n{}", "=".repeat(60).bright_red());
+                println!(
+                    "{} {}",
+                    "🚨 SECURITY ALERT:".bright_red().bold(),
+                    "Action requires your approval!".yellow()
+                );
+                println!("{} {}", "Agent:".bright_blue(), req.agent_id);
+                println!("{} {}", "Tool:".bright_blue(), req.tool_name);
+                println!("{} {}", "Action:".bright_blue(), req.action_summary);
+                println!("{}\n", "=".repeat(60).bright_red());
+
+                let options = &[
+                    "Approve (Unrestricted - completely bypass sandbox)",
+                    "Approve (Sandboxed - strictly enforce blocked_args)",
+                    "Deny (Block execution)",
+                ];
+
+                let selection = tokio::task::spawn_blocking(move || {
+                    dialoguer::Select::new()
+                        .with_prompt("Choose an execution mode")
+                        .items(options)
+                        .default(1)
+                        .interact()
+                })
+                .await
+                .unwrap();
+
+                let decision = match selection {
+                    Ok(0) => sk_types::approval::ApprovalDecision::ApprovedFull,
+                    Ok(1) => sk_types::approval::ApprovalDecision::ApprovedSandboxed,
+                    _ => sk_types::approval::ApprovalDecision::Denied,
+                };
+
+                let _ =
+                    approval_kernel
+                        .approval
+                        .resolve(request_id, decision, Some("cli-user".into()));
+                // Re-print the agent cursor since dialoguer clears the line
+                print!("\n{} ", "▶".bright_green());
+                let _ = std::io::stdout().flush();
+            }
+        }
+    });
+
     let mut system_prompt = kernel.soul.to_system_prompt_fragment();
     if let Some(soul) = custom_soul {
         system_prompt = format!("{}\n\n{}", system_prompt, soul);
@@ -151,6 +203,7 @@ pub async fn execute(
         agent_id,
         kernel.skills.clone(),
         stream_handler,
+        Some(intent.clone()),
     );
 
     let mut session = sk_types::Session::new(agent_id);

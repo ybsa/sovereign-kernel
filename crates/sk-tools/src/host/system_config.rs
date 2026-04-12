@@ -4,7 +4,7 @@ use std::process::Command;
 
 pub fn system_config_tool() -> ToolDefinition {
     ToolDefinition {
-        name: "host_system_config".into(),
+        name: "system_config".into(),
         description: "Manage system configurations like services, environment variables, and view system information. Windows only.".into(),
         input_schema: serde_json::json!({
             "type": "object",
