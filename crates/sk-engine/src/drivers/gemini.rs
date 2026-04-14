@@ -12,6 +12,10 @@ pub struct GeminiDriver {
     api_key: String,
     base_url: String,
     client: reqwest::Client,
+    /// Gemini context cache: maps sha256(system_prompt) → (cache_name, expires_at_unix_secs)
+    /// Gemini requires you to POST a cachedContents object first, then reference it by name.
+    /// Min cacheable tokens: 4,096 (Flash) / 32,768 (Pro). TTL default: 1 hour.
+    cache: std::sync::Mutex<std::collections::HashMap<String, (String, u64)>>,
 }
 
 impl GeminiDriver {
@@ -21,7 +25,85 @@ impl GeminiDriver {
             api_key,
             base_url,
             client: reqwest::Client::new(),
+            cache: std::sync::Mutex::new(std::collections::HashMap::new()),
         }
+    }
+
+    /// Hash a system prompt for use as a cache key.
+    fn cache_key(system_text: &str) -> String {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        system_text.hash(&mut h);
+        format!("{:x}", h.finish())
+    }
+
+    /// Look up an existing live cache entry for this system prompt.
+    fn get_cached(&self, key: &str) -> Option<String> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let cache = self.cache.lock().unwrap();
+        cache.get(key).and_then(|(name, expires)| {
+            // Keep a 60s safety margin before expiry
+            if *expires > now + 60 { Some(name.clone()) } else { None }
+        })
+    }
+
+    /// Store a new cache entry.
+    fn store_cached(&self, key: String, name: String, ttl_secs: u64) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let mut cache = self.cache.lock().unwrap();
+        cache.insert(key, (name, now + ttl_secs));
+    }
+
+    /// Try to create a Gemini cached content object for a system prompt.
+    /// Returns the cache name on success. Silently returns None on failure
+    /// (caching is an optimisation — we always fall back to uncached).
+    async fn ensure_cache(&self, model: &str, system_text: &str) -> Option<String> {
+        // Gemini only caches if the content is large enough (≥4K tokens ≈ 16K chars rough estimate)
+        if system_text.len() < 4096 {
+            return None;
+        }
+        let key = Self::cache_key(system_text);
+        if let Some(name) = self.get_cached(&key) {
+            return Some(name);
+        }
+
+        let url = format!(
+            "{}/v1beta/cachedContents",
+            self.base_url.trim_end_matches('/')
+        );
+
+        // TTL: 1 hour
+        let body = serde_json::json!({
+            "model": format!("models/{}", model),
+            "systemInstruction": {
+                "parts": [{ "text": system_text }]
+            },
+            "ttl": "3600s"
+        });
+
+        let resp = self.client
+            .post(&url)
+            .header("x-goog-api-key", &self.api_key)
+            .json(&body)
+            .send()
+            .await
+            .ok()?;
+
+        if !resp.status().is_success() {
+            return None;
+        }
+
+        let json: serde_json::Value = resp.json().await.ok()?;
+        let name = json["name"].as_str()?.to_string();
+        tracing::debug!(cache_name = %name, "Gemini context cache created");
+        self.store_cached(key, name.clone(), 3600);
+        Some(name)
     }
 }
 
@@ -118,6 +200,8 @@ struct GeminiUsageMetadata {
     prompt_token_count: u32,
     #[serde(default)]
     candidates_token_count: u32,
+    #[serde(default)]
+    cached_content_token_count: u32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -213,7 +297,16 @@ impl LlmDriver for GeminiDriver {
             }
         }
 
-        let system_instruction = if !system_text.is_empty() {
+        // Try to use Gemini context caching for large system prompts.
+        // If caching succeeds, the system_instruction is omitted from the request
+        // and the cached content name is passed instead (cheaper on all subsequent calls).
+        let cache_name = if !system_text.is_empty() {
+            self.ensure_cache(&request.model, &system_text).await
+        } else {
+            None
+        };
+
+        let system_instruction = if cache_name.is_none() && !system_text.is_empty() {
             Some(GeminiContent {
                 role: None,
                 parts: vec![GeminiPart::Text { text: system_text }],
@@ -248,9 +341,18 @@ impl LlmDriver for GeminiDriver {
             }),
         };
 
-        // DEBUG LOGGING THE EXACT JSON PAYLOAD
-        let payload_json = serde_json::to_string_pretty(&gemini_request).unwrap_or_default();
-        tracing::debug!("GEMINI REQUEST PAYLOAD:\n{}", payload_json);
+        // Attach the cache name if we got one — Gemini serves the cached system
+        // prompt at a significant discount instead of re-processing it every call.
+        let gemini_request_value = if let Some(ref name) = cache_name {
+            let mut v = serde_json::to_value(&gemini_request)
+                .unwrap_or(serde_json::Value::Object(Default::default()));
+            v["cachedContent"] = serde_json::Value::String(name.clone());
+            v
+        } else {
+            serde_json::to_value(&gemini_request)
+                .unwrap_or(serde_json::Value::Object(Default::default()))
+        };
+        let _ = gemini_request; // consumed into gemini_request_value
 
         for attempt in 0..=5 {
             let url = format!(
@@ -262,7 +364,7 @@ impl LlmDriver for GeminiDriver {
                 .client
                 .post(&url)
                 .header("x-goog-api-key", &self.api_key)
-                .json(&gemini_request)
+                .json(&gemini_request_value)
                 .send()
                 .await
                 .map_err(|e| LlmError::NetworkError(e.to_string()))?;
@@ -341,10 +443,19 @@ impl LlmDriver for GeminiDriver {
 
             let usage = gemini_resp
                 .usage_metadata
-                .map(|u| TokenUsage {
-                    prompt_tokens: u.prompt_token_count,
-                    completion_tokens: u.candidates_token_count,
-                    total_tokens: u.prompt_token_count + u.candidates_token_count,
+                .map(|u| {
+                    if u.cached_content_token_count > 0 {
+                        tracing::debug!(
+                            cached = u.cached_content_token_count,
+                            "Gemini context cache hit"
+                        );
+                    }
+                    TokenUsage {
+                        prompt_tokens: u.prompt_token_count,
+                        completion_tokens: u.candidates_token_count,
+                        total_tokens: u.prompt_token_count + u.candidates_token_count,
+                        cached_tokens: u.cached_content_token_count,
+                    }
                 })
                 .unwrap_or_default();
 
@@ -355,7 +466,15 @@ impl LlmDriver for GeminiDriver {
                 usage,
             });
         }
-
         Err(LlmError::NetworkError("Max retries exceeded".to_string()))
+    }
+
+    async fn complete_stream(
+        &self,
+        request: CompletionRequest,
+        _handler: &crate::llm_driver::StreamHandler,
+    ) -> Result<CompletionResponse, LlmError> {
+        // Fallback to non-streaming for now
+        self.complete(request).await
     }
 }

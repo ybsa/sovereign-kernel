@@ -14,6 +14,7 @@ pub enum KernelEvent {
     Presence { active_agents: Vec<String> },
     Error { message: String },
     Broadcast { from: String, message: String },
+    Custom { event_type: String, payload: serde_json::Value, source_agent: Option<String> },
 }
 
 /// Kernel event bus for internal pub/sub.

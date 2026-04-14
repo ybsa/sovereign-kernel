@@ -7,6 +7,9 @@ use async_trait::async_trait;
 use serde_json::Value;
 use sk_types::config::ExecutionMode;
 use sk_types::{AgentId, SovereignResult, ToolCall, ToolDefinition, ToolResult};
+pub mod discovery;
+
+use discovery::DiscoveryEngine;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -329,6 +332,65 @@ fn tool_catalog() -> Vec<ToolCatalogEntry> {
             definition: sk_tools::ottos_outpost::ottos_outpost_tool,
             handler: || Box::new(OttosOutpostHandler),
         },
+        // ── Scheduler ───────────────────────────────────────────────
+        ToolCatalogEntry {
+            runtime_name: "schedule_create",
+            aliases: &["scheduler_create"],
+            availability: ToolAvailability::OnAny(&["schedule", "scheduler"]),
+            definition: sk_tools::scheduler::schedule_create_tool,
+            handler: || Box::new(ScheduleCreateHandler),
+        },
+        ToolCatalogEntry {
+            runtime_name: "schedule_list",
+            aliases: &["scheduler_list"],
+            availability: ToolAvailability::OnAny(&["schedule", "scheduler"]),
+            definition: sk_tools::scheduler::schedule_list_tool,
+            handler: || Box::new(ScheduleListHandler),
+        },
+        ToolCatalogEntry {
+            runtime_name: "schedule_delete",
+            aliases: &["scheduler_delete"],
+            availability: ToolAvailability::OnAny(&["schedule", "scheduler"]),
+            definition: sk_tools::scheduler::schedule_delete_tool,
+            handler: || Box::new(ScheduleDeleteHandler),
+        },
+        // ── Knowledge Graph ─────────────────────────────────────────
+        ToolCatalogEntry {
+            runtime_name: "knowledge_add_entity",
+            aliases: &[],
+            availability: ToolAvailability::OnAny(&["knowledge", "graph"]),
+            definition: sk_tools::knowledge::knowledge_add_entity_tool,
+            handler: || Box::new(KnowledgeAddEntityHandler),
+        },
+        ToolCatalogEntry {
+            runtime_name: "knowledge_add_relation",
+            aliases: &[],
+            availability: ToolAvailability::OnAny(&["knowledge", "graph"]),
+            definition: sk_tools::knowledge::knowledge_add_relation_tool,
+            handler: || Box::new(KnowledgeAddRelationHandler),
+        },
+        ToolCatalogEntry {
+            runtime_name: "knowledge_query",
+            aliases: &[],
+            availability: ToolAvailability::OnAny(&["knowledge", "graph"]),
+            definition: sk_tools::knowledge::knowledge_query_tool,
+            handler: || Box::new(KnowledgeQueryHandler),
+        },
+        // ── Events & Process ────────────────────────────────────────
+        ToolCatalogEntry {
+            runtime_name: "event_publish",
+            aliases: &[],
+            availability: ToolAvailability::OnAny(&["events", "event"]),
+            definition: sk_tools::events::event_publish_tool,
+            handler: || Box::new(EventPublishHandler),
+        },
+        ToolCatalogEntry {
+            runtime_name: "process_list",
+            aliases: &[],
+            availability: ToolAvailability::WhenNotSmall,
+            definition: sk_tools::events::process_list_tool,
+            handler: || Box::new(ProcessListHandler),
+        },
         ToolCatalogEntry {
             runtime_name: "compile_rust_skill",
             aliases: &[],
@@ -402,14 +464,48 @@ fn requested_tool_set(requested: &[String]) -> HashSet<String> {
     set
 }
 
-pub fn available_tool_definitions(requested: &[String], small_model: bool) -> Vec<ToolDefinition> {
-    let requested = requested_tool_set(requested);
+pub fn available_tool_definitions(
+    requested: &[String],
+    small_model: bool,
+    query: Option<&str>,
+) -> Vec<ToolDefinition> {
+    let requested_set = requested_tool_set(requested);
+    let catalog = tool_catalog();
 
-    tool_catalog()
-        .into_iter()
-        .filter(|entry| entry.is_enabled(&requested, small_model))
+    // 1. Load tools enabled by capabilities/requested set
+    let mut tools: Vec<ToolDefinition> = catalog
+        .iter()
+        .filter(|entry| entry.is_enabled(&requested_set, small_model))
         .map(|entry| (entry.definition)())
-        .collect()
+        .collect();
+
+    // 2. Load tools dynamically via Discovery (The Librarian)
+    if let Some(q) = query {
+        let core_set = discovery::core_tool_names();
+        let discovery_catalog = catalog
+            .iter()
+            .map(|e| {
+                (
+                    e.runtime_name.to_string(),
+                    e.aliases.iter().map(|s| s.to_string()).collect(),
+                    (e.definition)(),
+                )
+            })
+            .collect();
+
+        let engine = DiscoveryEngine::new(discovery_catalog);
+        let discovered = engine.discover(q, 8); // Top 8 relevant tools
+
+        let existing_names: HashSet<String> = tools.iter().map(|t| t.name.clone()).collect();
+
+        for tool in discovered {
+            if !existing_names.contains(&tool.name) && !core_set.contains(&tool.name) {
+                tools.push(tool);
+            }
+        }
+    }
+
+    tools
 }
 
 // ---------------------------------------------------------------------------
@@ -1212,6 +1308,7 @@ mod tests {
                 "memory_recall".to_string(),
             ],
             false,
+            None,
         );
         let names: Vec<String> = defs.into_iter().map(|tool| tool.name).collect();
 
@@ -1222,7 +1319,7 @@ mod tests {
 
     #[test]
     fn catalog_honors_explicit_high_power_tools_when_requested() {
-        let defs = available_tool_definitions(&["ottos_outpost".to_string()], false);
+        let defs = available_tool_definitions(&["ottos_outpost".to_string()], false, None);
         let names: Vec<String> = defs.into_iter().map(|tool| tool.name).collect();
 
         assert!(names.contains(&"ottos_outpost".to_string()));
@@ -1230,7 +1327,7 @@ mod tests {
 
     #[test]
     fn catalog_keeps_high_power_tools_off_for_small_models() {
-        let defs = available_tool_definitions(&["ottos_outpost".to_string()], true);
+        let defs = available_tool_definitions(&["ottos_outpost".to_string()], true, None);
         let names: Vec<String> = defs.into_iter().map(|tool| tool.name).collect();
 
         assert!(!names.contains(&"ottos_outpost".to_string()));
@@ -1241,5 +1338,218 @@ mod tests {
         assert_eq!(resolve_registered_tool_name("file_list"), "list_dir");
         assert_eq!(resolve_registered_tool_name("memory_store"), "remember");
         assert_eq!(resolve_registered_tool_name("Bash"), "shell_exec");
+    }
+
+    #[test]
+    fn schedule_tools_reachable_by_explicit_name() {
+        let defs = available_tool_definitions(&["schedule_create".to_string()], false, None);
+        let names: Vec<String> = defs.iter().map(|t| t.name.clone()).collect();
+        assert!(names.contains(&"schedule_create".to_string()));
+    }
+}
+
+// ── Scheduler Handlers ────────────────────────────────────────────────────────
+
+struct ScheduleCreateHandler;
+#[async_trait]
+impl ToolHandler for ScheduleCreateHandler {
+    fn name(&self) -> &str { "schedule_create" }
+    async fn handle(&self, ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
+        let name = input.get("name").and_then(|v| v.as_str()).unwrap_or("unnamed-job");
+        let task = input.get("task_description").and_then(|v| v.as_str()).unwrap_or("");
+        let schedule_type = input.get("schedule_type").and_then(|v| v.as_str()).unwrap_or("every");
+
+        let schedule = if schedule_type == "cron" {
+            let expr = input.get("cron_expr").and_then(|v| v.as_str()).unwrap_or("0 * * * *");
+            sk_types::CronSchedule::Cron { expr: expr.to_string(), tz: None }
+        } else {
+            let secs = input.get("every_secs").and_then(|v| v.as_u64()).unwrap_or(3600);
+            sk_types::CronSchedule::Every { every_secs: secs.max(60).min(86400) }
+        };
+
+        let job = sk_types::CronJob {
+            id: sk_types::CronJobId::new(),
+            agent_id: ctx.agent_id,
+            name: name.to_string(),
+            enabled: true,
+            schedule,
+            action: sk_types::CronAction::AgentTurn {
+                message: task.to_string(),
+                model_override: None,
+                timeout_secs: Some(300),
+            },
+            delivery: sk_types::CronDelivery::None,
+            created_at: chrono::Utc::now(),
+            last_run: None,
+            next_run: None,
+        };
+
+        let job_id = job.id.to_string();
+        match ctx.kernel.cron.add_job(job, false) {
+            Ok(_) => Ok(healer_result("schedule_create", format!("Job created. ID: {job_id}"), false)),
+            Err(e) => Ok(healer_result("schedule_create", format!("Error: {e}"), true)),
+        }
+    }
+}
+
+struct ScheduleListHandler;
+#[async_trait]
+impl ToolHandler for ScheduleListHandler {
+    fn name(&self) -> &str { "schedule_list" }
+    async fn handle(&self, ctx: ToolContext, _input: Value) -> SovereignResult<ToolResult> {
+        let jobs = ctx.kernel.cron.list_jobs(ctx.agent_id);
+        if jobs.is_empty() {
+            return Ok(healer_result("schedule_list", "No scheduled jobs.".into(), false));
+        }
+        let mut out = format!("{} scheduled job(s):\n", jobs.len());
+        for job in jobs {
+            out.push_str(&format!(
+                "- [{}] {} | schedule: {:?} | enabled: {}\n",
+                job.id, job.name, job.schedule, job.enabled
+            ));
+        }
+        Ok(healer_result("schedule_list", out, false))
+    }
+}
+
+struct ScheduleDeleteHandler;
+#[async_trait]
+impl ToolHandler for ScheduleDeleteHandler {
+    fn name(&self) -> &str { "schedule_delete" }
+    async fn handle(&self, ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
+        let job_id_str = input.get("job_id").and_then(|v| v.as_str()).unwrap_or("");
+        let job_id: sk_types::CronJobId = match job_id_str.parse() {
+            Ok(id) => id,
+            Err(_) => return Ok(healer_result("schedule_delete", format!("Invalid job_id: {job_id_str}"), true)),
+        };
+        match ctx.kernel.cron.remove_job(job_id) {
+            Ok(_) => Ok(healer_result("schedule_delete", format!("Job {job_id_str} deleted."), false)),
+            Err(e) => Ok(healer_result("schedule_delete", format!("Error: {e}"), true)),
+        }
+    }
+}
+
+// ── Knowledge Graph Handlers ──────────────────────────────────────────────────
+
+struct KnowledgeAddEntityHandler;
+#[async_trait]
+impl ToolHandler for KnowledgeAddEntityHandler {
+    fn name(&self) -> &str { "knowledge_add_entity" }
+    async fn handle(&self, ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
+        let name = input.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let entity_type = input.get("entity_type").and_then(|v| v.as_str()).unwrap_or("unknown");
+        let properties = input.get("properties").cloned().unwrap_or(serde_json::json!({}));
+        match ctx.kernel.memory.knowledge.add_entity(ctx.agent_id, name, entity_type, properties) {
+            Ok(id) => Ok(healer_result("knowledge_add_entity", format!("Entity '{name}' added. ID: {id}"), false)),
+            Err(e) => Ok(healer_result("knowledge_add_entity", format!("Error: {e}"), true)),
+        }
+    }
+}
+
+struct KnowledgeAddRelationHandler;
+#[async_trait]
+impl ToolHandler for KnowledgeAddRelationHandler {
+    fn name(&self) -> &str { "knowledge_add_relation" }
+    async fn handle(&self, ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
+        let from = input.get("from_entity").and_then(|v| v.as_str()).unwrap_or("");
+        let relation = input.get("relation").and_then(|v| v.as_str()).unwrap_or("");
+        let to = input.get("to_entity").and_then(|v| v.as_str()).unwrap_or("");
+        let weight = input.get("weight").and_then(|v| v.as_f64()).unwrap_or(1.0);
+        match ctx.kernel.memory.knowledge.add_relation(ctx.agent_id, from, relation, to, weight) {
+            Ok(id) => Ok(healer_result("knowledge_add_relation", format!("Relation '{from}' --[{relation}]--> '{to}' added. ID: {id}"), false)),
+            Err(e) => Ok(healer_result("knowledge_add_relation", format!("Error: {e}"), true)),
+        }
+    }
+}
+
+struct KnowledgeQueryHandler;
+#[async_trait]
+impl ToolHandler for KnowledgeQueryHandler {
+    fn name(&self) -> &str { "knowledge_query" }
+    async fn handle(&self, ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
+        let query = input.get("query").and_then(|v| v.as_str()).unwrap_or("");
+        let limit = input.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
+        match ctx.kernel.memory.knowledge.find_entities(ctx.agent_id, query) {
+            Ok(entities) => {
+                if entities.is_empty() {
+                    return Ok(healer_result("knowledge_query", "No entities found.".into(), false));
+                }
+                let mut out = format!("{} entity/entities found:\n", entities.len().min(limit));
+                for entity in entities.into_iter().take(limit) {
+                    out.push_str(&format!(
+                        "- [{}] {} (type: {}) props: {}\n",
+                        entity.id, entity.name, entity.entity_type, entity.properties
+                    ));
+                    if let Ok(relations) = ctx.kernel.memory.knowledge.get_relations(&entity.id) {
+                        for rel in relations {
+                            out.push_str(&format!("    --[{}]--> {}\n", rel.relation, rel.to_entity));
+                        }
+                    }
+                }
+                Ok(healer_result("knowledge_query", out, false))
+            }
+            Err(e) => Ok(healer_result("knowledge_query", format!("Error: {e}"), true)),
+        }
+    }
+}
+
+// ── Event & Process Handlers ──────────────────────────────────────────────────
+
+struct EventPublishHandler;
+#[async_trait]
+impl ToolHandler for EventPublishHandler {
+    fn name(&self) -> &str { "event_publish" }
+    async fn handle(&self, ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
+        let event_type = input.get("event_type").and_then(|v| v.as_str()).unwrap_or("generic");
+        let payload = input.get("payload").cloned().unwrap_or(serde_json::json!({}));
+        let event = crate::event_bus::KernelEvent::Custom {
+            event_type: event_type.to_string(),
+            payload,
+            source_agent: Some(ctx.agent_id.to_string()),
+        };
+        ctx.kernel.event_bus.publish(event);
+        Ok(healer_result("event_publish", format!("Event '{event_type}' published."), false))
+    }
+}
+
+struct ProcessListHandler;
+#[async_trait]
+impl ToolHandler for ProcessListHandler {
+    fn name(&self) -> &str { "process_list" }
+    async fn handle(&self, _ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
+        let filter = input.get("filter").and_then(|v| v.as_str()).unwrap_or("").to_lowercase();
+
+        #[cfg(target_os = "windows")]
+        let output = tokio::process::Command::new("powershell")
+            .args(["-Command", "Get-Process | Select-Object Name,Id,CPU,WorkingSet | ConvertTo-Csv -NoTypeInformation | Select-Object -First 51"])
+            .output()
+            .await;
+
+        #[cfg(not(target_os = "windows"))]
+        let output = tokio::process::Command::new("ps")
+            .args(["aux", "--sort=-%cpu"])
+            .output()
+            .await;
+
+        match output {
+            Ok(out) => {
+                let text = String::from_utf8_lossy(&out.stdout).to_string();
+                let filtered = if filter.is_empty() {
+                    text
+                } else {
+                    text.lines()
+                        .filter(|l| l.to_lowercase().contains(&filter))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
+                let result = if filtered.is_empty() {
+                    format!("No processes matching '{filter}'.")
+                } else {
+                    filtered
+                };
+                Ok(healer_result("process_list", result, false))
+            }
+            Err(e) => Ok(healer_result("process_list", format!("Error: {e}"), true)),
+        }
     }
 }

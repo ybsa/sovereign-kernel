@@ -26,11 +26,33 @@ impl AnthropicDriver {
 }
 
 #[derive(Debug, Serialize)]
+struct CacheControl {
+    #[serde(rename = "type")]
+    kind: String,
+}
+
+impl CacheControl {
+    fn ephemeral() -> Self {
+        Self { kind: "ephemeral".into() }
+    }
+}
+
+#[derive(Debug, Serialize)]
+struct SystemBlock {
+    #[serde(rename = "type")]
+    kind: String,
+    text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_control: Option<CacheControl>,
+}
+
+#[derive(Debug, Serialize)]
 struct ApiRequest {
     model: String,
     max_tokens: u32,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    system: Option<String>,
+    /// System prompt as a structured block list so we can attach cache_control.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    system: Vec<SystemBlock>,
     messages: Vec<ApiMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tools: Vec<ApiTool>,
@@ -79,6 +101,8 @@ struct ApiTool {
     name: String,
     description: String,
     input_schema: serde_json::Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_control: Option<CacheControl>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -107,6 +131,10 @@ enum ResponseContentBlock {
 struct ApiUsage {
     input_tokens: u32,
     output_tokens: u32,
+    #[serde(default)]
+    cache_read_input_tokens: u32,
+    #[serde(default)]
+    cache_creation_input_tokens: u32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -126,12 +154,22 @@ impl LlmDriver for AnthropicDriver {
     }
 
     async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
-        // Find system prompt
-        let system = request
+        // Extract system prompt and mark it for caching — the system prompt + tool schemas
+        // are static per agent session, so Anthropic caches them at ~10% of normal token cost.
+        let system_text = request
             .messages
             .iter()
             .find(|m| m.role == Role::System)
             .map(|m| m.content.text_content());
+
+        let system: Vec<SystemBlock> = match system_text {
+            Some(text) if !text.is_empty() => vec![SystemBlock {
+                kind: "text".into(),
+                text,
+                cache_control: Some(CacheControl::ephemeral()),
+            }],
+            _ => vec![],
+        };
 
         // Map messages
         let mut api_messages = Vec::new();
@@ -239,15 +277,22 @@ impl LlmDriver for AnthropicDriver {
             }
         }
 
-        let api_tools: Vec<ApiTool> = request
+        // Mark the last tool in the list for caching too — tool schemas are also static
+        // per agent and expensive. Caching them saves tokens on every subsequent call.
+        let mut api_tools: Vec<ApiTool> = request
             .tools
             .iter()
             .map(|t| ApiTool {
                 name: t.name.clone(),
                 description: t.description.clone(),
                 input_schema: t.input_schema.clone(),
+                cache_control: None,
             })
             .collect();
+        // Mark the last tool for caching (Anthropic caches everything up to this point)
+        if let Some(last) = api_tools.last_mut() {
+            last.cache_control = Some(CacheControl::ephemeral());
+        }
 
         let api_request = ApiRequest {
             model: request.model.clone(),
@@ -333,18 +378,37 @@ impl LlmDriver for AnthropicDriver {
                 _ => StopReason::EndTurn, // fallback
             };
 
+            let u = &api_resp.usage;
+            if u.cache_read_input_tokens > 0 || u.cache_creation_input_tokens > 0 {
+                tracing::debug!(
+                    cache_read = u.cache_read_input_tokens,
+                    cache_write = u.cache_creation_input_tokens,
+                    billed_input = u.input_tokens,
+                    "Anthropic prompt cache active"
+                );
+            }
+
             return Ok(CompletionResponse {
                 content: final_content,
                 tool_calls,
                 stop_reason,
                 usage: TokenUsage {
-                    prompt_tokens: api_resp.usage.input_tokens,
-                    completion_tokens: api_resp.usage.output_tokens,
-                    total_tokens: api_resp.usage.input_tokens + api_resp.usage.output_tokens,
+                    prompt_tokens: u.input_tokens,
+                    completion_tokens: u.output_tokens,
+                    total_tokens: u.input_tokens + u.output_tokens,
+                    cached_tokens: u.cache_read_input_tokens,
                 },
             });
         }
-
         Err(LlmError::NetworkError("Max retries exceeded".to_string()))
+    }
+
+    async fn complete_stream(
+        &self,
+        request: CompletionRequest,
+        _handler: &crate::llm_driver::StreamHandler,
+    ) -> Result<CompletionResponse, LlmError> {
+        // Fallback to non-streaming for now
+        self.complete(request).await
     }
 }

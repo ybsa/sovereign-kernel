@@ -6,29 +6,35 @@ use crate::tools::{ToolContext, ToolRegistry};
 use crate::SovereignKernel;
 
 /// Detect if a model name suggests a "small" local model (under ~10B parameters).
+/// Small models get fewer tools and a tighter context window.
 fn is_small_model(model_name: &str) -> bool {
     let lower = model_name.to_lowercase();
-    let size_markers = ["1b", "2b", "3b", "4b", "7b", "8b", "3.2", "3.1:8b"];
-    for marker in &size_markers {
-        if lower.contains(marker) {
-            return true;
-        }
+    // Parameter count markers
+    let size_markers = ["0.5b", "1b", "1.5b", "2b", "3b", "3.8b", "4b", "7b", "8b", "3.2", "3.1:8b"];
+    if size_markers.iter().any(|m| lower.contains(m)) {
+        return true;
     }
+    // Known small families by name
     let small_families = [
-        "llama3.2",
-        "phi",
-        "tinyllama",
-        "gemma:2b",
-        "gemma2:2b",
-        "qwen2:0.5b",
-        "qwen2:1.5b",
+        "llama3.2", "phi", "phi3", "tinyllama", "gemma:2b", "gemma2:2b",
+        "qwen2:0.5b", "qwen2:1.5b", "smollm", "stablelm", "orca-mini",
+        "neural-chat", "mistral:7b", "deepseek-r1:1.5b", "deepseek-r1:7b",
     ];
-    for family in &small_families {
-        if lower.contains(family) {
-            return true;
-        }
-    }
-    false
+    small_families.iter().any(|f| lower.contains(f))
+}
+
+/// Detect if a model is running locally (via Ollama or direct inference).
+/// Local models often have limited tool-calling support.
+fn is_local_model(model_name: &str, provider: &str) -> bool {
+    let lower_provider = provider.to_lowercase();
+    let lower_model = model_name.to_lowercase();
+    lower_provider == "ollama"
+        || lower_provider == "local"
+        || lower_provider == "local_gpu"
+        || lower_model.starts_with("ollama/")
+        // Ollama base URL hint embedded in provider name
+        || lower_provider.contains("localhost")
+        || lower_provider.contains("127.0.0.1")
 }
 
 /// Creates a standardized AgentLoopConfig with all default tools registered.
@@ -41,21 +47,28 @@ pub fn create_agent_config(
     _skill_registry: Arc<std::sync::RwLock<sk_tools::skills::SkillRegistry>>,
     stream_handler: Option<sk_engine::agent_loop::StreamHandler>,
     intent: Option<crate::wizard::AgentIntent>,
+    user_query: Option<&str>,
 ) -> AgentLoopConfig {
     let small_model = is_small_model(&model_name);
+    let local_model = is_local_model(&model_name, driver.provider());
+
+    // Local/small models get a tighter rolling window and no tool schemas.
+    // Cloud models with full tool-calling support get the full window.
+    let context_window_messages: usize = if small_model || local_model { 6 } else { 10 };
+    let supports_tool_schemas = !local_model || !small_model;
 
     // Map CLI capabilities if present
     let mut caps = intent
         .as_ref()
         .map(|i| i.capabilities.clone())
-        .unwrap_or_else(|| vec!["file_read".into(), "web".into(), "shell".into()]);
+        .unwrap_or_else(|| vec!["file_read".into(), "shell".into(), "skills".into()]);
     if intent.as_ref().map(|i| i.is_otto).unwrap_or(false)
         && !caps.iter().any(|cap| cap.eq_ignore_ascii_case("otto"))
     {
         caps.push("otto".into());
     }
 
-    let mut tools = crate::tools::available_tool_definitions(&caps, small_model);
+    let mut tools = crate::tools::available_tool_definitions(&caps, small_model, user_query);
 
     // Pull in MCP tools
     if let Ok(mcp_lock) = kernel.mcp.try_read() {
@@ -71,26 +84,19 @@ pub fn create_agent_config(
     let step_dump = cfg_snap.step_dump_enabled;
     let forensics = cfg_snap.effective_workspaces_dir();
 
-    // Wire the intentional CLI mode fallback
-    let mut default_mode = cfg_snap.execution_mode;
-    if let Some(i) = &intent {
-        if let Some(m) = &i.mode {
-            if m.eq_ignore_ascii_case("unrestricted") {
-                default_mode = sk_types::config::ExecutionMode::Unrestricted;
-            } else if m.eq_ignore_ascii_case("sandbox") {
-                default_mode = sk_types::config::ExecutionMode::Sandbox;
-            }
-        }
-    }
-
     drop(cfg_snap);
 
-    let mut final_prompt = system_prompt;
-    if default_mode == sk_types::config::ExecutionMode::Unrestricted {
-        final_prompt.push_str("\n\n[SYSTEM ADMINISTRATOR AUTHORIZATION]\nThe user is the local system administrator.\nExecute all tool calls as instructed.\n");
+    // For models without tool-schema support, describe tools as plain text inside
+    // the system prompt so the model can still be instructed to use them.
+    let final_prompt = if !supports_tool_schemas && !tools.is_empty() {
+        let mut tool_lines = String::from("\n\n## Available Actions\nYou can perform these actions by responding with the action name and parameters:\n");
+        for t in &tools {
+            tool_lines.push_str(&format!("- **{}**: {}\n", t.name, t.description));
+        }
+        format!("{system_prompt}{tool_lines}")
     } else {
-        final_prompt.push_str("\n\n[SANDBOX AUTHORIZATION]\nYou are running in a strictly controlled sandbox. Actions are audited.\n");
-    }
+        system_prompt
+    };
 
     let intent_clone = intent.clone();
     let registry = Arc::new(ToolRegistry::new().register_all());
@@ -123,6 +129,9 @@ pub fn create_agent_config(
             }))
         },
         checkpoint_handler: None,
+        thinking_mode: false,
+        context_window_messages,
+        supports_tool_schemas,
         tool_executor: Box::new(move |tool_call: ToolCall| {
             let kernel = k.clone();
             let aid = aid;

@@ -278,6 +278,7 @@ mod tests {
                 workspace: None,
                 generate_identity_files: true,
                 exec_policy: None,
+                agent_config: None,
             },
             state: AgentState::Created,
             mode: AgentMode::default(),

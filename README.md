@@ -29,14 +29,18 @@ Sovereign Kernel is a production-grade **Agentic Operating System** built entire
 
 ## ✨ Key Features
 
-- **Real-time Web Search** — Direct HTTP search with structured result extraction (DuckDuckGo + Google fallback)
+- **Real-time Web Search** — Direct HTTP search with structured result extraction (DuckDuckGo + fallback)
 - **File & Shell Operations** — Create, read, write, delete files and execute commands autonomously
 - **Browser Bridge** — Full Playwright-based browser automation for multi-step web navigation
 - **Token Streaming** — Real-time response streaming in the terminal for instant feedback
-- **Security Sandbox** — Allowlist-based command execution with human-in-the-loop approval
+- **Security Sandbox** — Allowlist-based command execution with human-in-the-loop approval prompts
 - **Persistent Memory** — SQLite-backed memory substrate with session management
-- **Multi-Agent Architecture** — "Hands" system for pre-built agent capability packages
-- **Cron Scheduler** — Background autonomous task execution on schedule
+- **Hands System** — 11 bundled agent capability packages (Researcher, Otto, Clip, Lead, Email, Collector, Predictor, Twitter, Web-Search, MySQL-Reporter, Artificer)
+- **Cron Scheduler** — Background autonomous task execution on a cron or interval schedule
+- **Knowledge Graph** — SQLite-backed entity-relation graph; agents can store and query structured facts
+- **Prompt Caching** — Saves tokens by caching the system prompt across turns on Anthropic, OpenAI, and Gemini
+- **Local Model Support** — Auto-detects Ollama, local GGUF, and localhost endpoints; adjusts context window and skips JSON schemas for small models
+- **Rolling Context Window** — Sends only the last N messages to the LLM (10 standard / 6 for small/local), keeping costs low on long tasks
 
 ---
 
@@ -63,15 +67,41 @@ A 9-crate Rust workspace with clean separation of concerns:
 | Provider | Status | Notes |
 | :--- | :--- | :--- |
 | **NVIDIA NIM** | ✅ Verified | Llama 3.3 70B (Default), Mistral |
-| **OpenAI** | ✅ Verified | GPT-4o, o1-preview |
-| **Anthropic** | ✅ Verified | Claude 3.5/4 Sonnet (Native Tool Use) |
-| **Google Gemini** | ✅ Verified | Gemini 2.5 Flash/Pro |
-| **Ollama** | ✅ Verified | Any local model (OpenAI-compatible) |
+| **OpenAI** | ✅ Verified | GPT-4o, o1, o3 |
+| **Anthropic** | ✅ Verified | Claude 4 Opus/Sonnet, Claude 3.5 Sonnet — native tool use + prompt caching |
+| **Google Gemini** | ✅ Verified | Gemini 2.5 Pro/Flash, 2.0 Flash — prompt caching via cachedContents API |
+| **Ollama** | ✅ Verified | Any local model — auto-detected, compact context window |
 | **Groq** | ✅ Verified | Ultra-fast inference |
 | **DeepSeek** | ✅ Verified | DeepSeek-V2/V3 |
 | **OpenRouter** | ✅ Verified | Multi-model routing |
 | **xAI / Grok** | ✅ Verified | Grok models |
 | **Mistral** | ✅ Verified | Mistral Large/Small |
+
+---
+
+## 🤝 Bundled Hands (Agent Packages)
+
+Run any Hand by prefixing your task with its ID:
+
+```bash
+sovereign run "researcher what are the best Rust async runtimes"
+sovereign run "otto build me a CLI tool in Rust that converts CSV to JSON"
+sovereign run "clip summarize this article https://..."
+```
+
+| Hand ID | Name | What it does |
+| :--- | :--- | :--- |
+| `researcher` | Researcher | Web search + browser verification, saves markdown reports |
+| `otto` | Otto | Autonomous Rust/Python software builder via Otto's Outpost |
+| `clip` | Clip | Content clipper: fetch, summarize, and store web articles |
+| `lead` | Lead Intel | Lead research, knowledge graph for contacts and companies |
+| `email` | Email Hand | SMTP/IMAP email manager with draft-mode safety |
+| `collector` | Collector | Data collection pipeline with scheduling and knowledge graph |
+| `predictor` | Predictor | Trend analysis and forecasting with scheduled data pulls |
+| `twitter` | Twitter Hand | Tweet drafting, scheduling, and engagement tracking |
+| `web-search` | Web Search | Multi-phase research pipeline with structured reports |
+| `mysql-reporter` | MySQL Reporter | Daily sales reports from MySQL → email via Himalaya |
+| `peka` | Artificer | System-level tool: process monitor, file ops, shell tasks |
 
 ---
 

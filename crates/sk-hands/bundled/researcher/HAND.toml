@@ -1,32 +1,138 @@
 id = "researcher"
 name = "Researcher Hand"
-description = "A hybrid research agent that uses web search for fast discovery and browser for verification."
+description = "Autonomous research agent — web search, browser verification, knowledge graph, and scheduled intelligence reports"
 category = "productivity"
+icon = "🔬"
 tools = [
     "shell_exec",
-    "read_file",
-    "write_file",
-    "list_dir",
-    "web_search",
-    "web_fetch",
-    "browser_navigate",
-    "browser_read_page",
-    "browser_screenshot",
+    "read_file", "write_file", "list_dir",
+    "web_search", "web_fetch",
+    "browser_navigate", "browser_read_page", "browser_screenshot",
+    "memory_store", "memory_recall",
+    "schedule_create", "schedule_list", "schedule_delete",
+    "knowledge_add_entity", "knowledge_add_relation", "knowledge_query",
+    "event_publish",
 ]
+
+# ─── Settings ─────────────────────────────────────────────────────────────────
+
+[[settings]]
+key = "search_depth"
+label = "Search Depth"
+description = "How many sources to verify before writing a report"
+setting_type = "select"
+default = "standard"
+
+[[settings.options]]
+value = "quick"
+label = "Quick (3 sources)"
+
+[[settings.options]]
+value = "standard"
+label = "Standard (7 sources)"
+
+[[settings.options]]
+value = "deep"
+label = "Deep (15+ sources)"
+
+[[settings]]
+key = "output_format"
+label = "Report Format"
+description = "Format for research output files"
+setting_type = "select"
+default = "markdown"
+
+[[settings.options]]
+value = "markdown"
+label = "Markdown (.md)"
+
+[[settings.options]]
+value = "json"
+label = "JSON (.json)"
+
+[[settings]]
+key = "auto_save"
+label = "Auto-Save Reports"
+description = "Automatically save reports to disk after each research task"
+setting_type = "toggle"
+default = "true"
+
+# ─── Agent ────────────────────────────────────────────────────────────────────
 
 [agent]
 name = "researcher-agent"
-description = "Autonomous researcher using hybrid search + browser verification."
-system_prompt = """You are the Researcher, a high-integrity research agent.
+description = "Autonomous researcher using hybrid search + browser verification"
+module = "builtin:chat"
+provider = "default"
+model = "default"
+max_tokens = 16384
+temperature = 0.3
+max_iterations = 80
+system_prompt = """You are the Researcher — a high-integrity autonomous research agent.
 
-1. Use `web_search` for fast initial data retrieval.
-2. Use the Browser Bridge (`browser_navigate`, `browser_read_page`) for verification.
-3. Write findings to a markdown file using `write_file` before ending your turn.
-4. Always cite your sources."""
+## Core Mission
 
-[[requires]]
-key = "llm"
-label = "LLM Provider"
-requirement_type = "api_key"
-check_value = "NVIDIA_API_KEY"
-description = "Requires an LLM API key for reasoning."
+Search the web with precision, verify claims via browser, synthesize multiple sources, and deliver accurate structured reports. You are thorough, skeptical, and always cite your sources.
+
+## Research Pipeline
+
+### Phase 1 — Query Planning
+Break the task into 3-8 specific search queries. Cover different angles: definitions, recent news, expert opinions, statistics. Order broad to specific.
+
+### Phase 2 — Search & Fetch
+For each query:
+1. `web_search` with a precise query
+2. `web_fetch` the most promising URLs for full content
+3. `browser_navigate` + `browser_read_page` for JavaScript-heavy sites or verification
+
+### Phase 3 — Synthesis
+- Identify main themes and contradictions
+- Assess source credibility (academic > news > blog)
+- Build a coherent narrative from evidence
+
+### Phase 4 — Knowledge Graph
+Store key findings:
+- `knowledge_add_entity` for each important person, company, or concept
+- `knowledge_add_relation` to link entities
+- `knowledge_query` to recall prior research before starting
+
+### Phase 5 — Report
+Structure output:
+
+## [Topic] — Research Report
+**Date**: YYYY-MM-DD | **Queries**: N | **Sources**: N
+
+### Executive Summary
+2-3 sentences with the key answer.
+
+### Key Findings
+- Finding 1 [source](url)
+
+### Sources
+1. [Title](url) — credibility note
+
+## Memory Updates
+After each session update:
+- `researcher_queries_run` — total queries executed
+- `researcher_reports_created` — total reports written
+- `researcher_last_topic` — most recent research topic
+"""
+
+# ─── Dashboard ────────────────────────────────────────────────────────────────
+
+[dashboard]
+
+[[dashboard.metrics]]
+label = "Queries Run"
+memory_key = "researcher_queries_run"
+format = "number"
+
+[[dashboard.metrics]]
+label = "Reports Created"
+memory_key = "researcher_reports_created"
+format = "number"
+
+[[dashboard.metrics]]
+label = "Last Topic"
+memory_key = "researcher_last_topic"
+format = "text"

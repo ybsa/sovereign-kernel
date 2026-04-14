@@ -3687,3 +3687,277 @@ mod tests {
         assert_eq!(config.web.fetch.timeout_secs, fetch_timeout);
     }
 }
+
+/// Granular agent configuration for context, behavior, and cost control.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct AgentConfig {
+    /// Layer identifiers - role instructions for the agent.
+    pub role_prompt: String,
+    /// Context injection parameters.
+    pub context: AgentContextConfig,
+    /// Behavioral parameters.
+    pub behavior: AgentBehaviorConfig,
+    /// Cost and performance control.
+    pub cost: AgentCostConfig,
+    /// System and tool access permissions.
+    pub access: AgentAccessConfig,
+    /// Memory persistence and scope.
+    pub memory: AgentMemoryConfig,
+    /// Resilience and fallback policy.
+    pub fallback: AgentFallbackConfig,
+}
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            role_prompt: String::new(),
+            context: AgentContextConfig::default(),
+            behavior: AgentBehaviorConfig::default(),
+            cost: AgentCostConfig::default(),
+            access: AgentAccessConfig::default(),
+            memory: AgentMemoryConfig::default(),
+            fallback: AgentFallbackConfig::default(),
+        }
+    }
+}
+
+/// Context injection parameters.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct AgentContextConfig {
+    /// Number of RAG chunks to retrieve.
+    pub rag_chunks: u32,
+    /// Number of past turns to include.
+    pub memory_depth: u32,
+    /// Whether to inject tool definitions automatically.
+    pub inject_tools: bool,
+}
+
+impl Default for AgentContextConfig {
+    fn default() -> Self {
+        Self {
+            rag_chunks: 3,
+            memory_depth: 5,
+            inject_tools: true,
+        }
+    }
+}
+
+/// Behavioral parameters.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct AgentBehaviorConfig {
+    /// LLM sampling temperature.
+    pub temperature: f32,
+    /// Verbosity level: concise, normal, detailed.
+    pub verbosity: String,
+    /// Whether to stream tokens.
+    pub stream: bool,
+}
+
+impl Default for AgentBehaviorConfig {
+    fn default() -> Self {
+        Self {
+            temperature: 0.7,
+            verbosity: "normal".to_string(),
+            stream: true,
+        }
+    }
+}
+
+/// Cost and performance control.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct AgentCostConfig {
+    /// Maximum tokens for completion.
+    pub max_tokens: u32,
+    /// Primary model identifier.
+    pub model: String,
+    /// Request timeout in milliseconds.
+    pub timeout_ms: u64,
+}
+
+impl Default for AgentCostConfig {
+    fn default() -> Self {
+        Self {
+            max_tokens: 500,
+            model: "gemma3".to_string(),
+            timeout_ms: 10000,
+        }
+    }
+}
+
+/// System and tool access permissions.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct AgentAccessConfig {
+    /// List of allowed tool names.
+    pub tool_access: Vec<String>,
+    /// Maximum tool calls per turn.
+    pub max_tool_calls: u32,
+    /// Whether to run in a strict sandbox.
+    pub sandbox: bool,
+}
+
+impl Default for AgentAccessConfig {
+    fn default() -> Self {
+        Self {
+            tool_access: Vec::new(),
+            max_tool_calls: 5,
+            sandbox: true,
+        }
+    }
+}
+
+/// Memory persistence and scope.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct AgentMemoryConfig {
+    /// Whether to persist session data.
+    pub persist: bool,
+    /// Scope of memory: task, user, global.
+    pub session_scope: String,
+    /// Compress history after N messages.
+    pub summarize_at: u32,
+}
+
+impl Default for AgentMemoryConfig {
+    fn default() -> Self {
+        Self {
+            persist: true,
+            session_scope: "task".to_string(),
+            summarize_at: 20,
+        }
+    }
+}
+
+/// Resilience and fallback policy.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct AgentFallbackConfig {
+    /// Model to use if primary fails.
+    pub fallback_model: String,
+    /// Number of retries on failure.
+    pub retry_count: u32,
+    /// Backoff duration between retries in milliseconds.
+    pub backoff_ms: u64,
+}
+
+impl Default for AgentFallbackConfig {
+    fn default() -> Self {
+        Self {
+            fallback_model: "gemma3".to_string(),
+            retry_count: 2,
+            backoff_ms: 1000,
+        }
+    }
+}
+
+impl AgentConfig {
+    /// Preset for a shell agent.
+    pub fn shell() -> Self {
+        Self {
+            role_prompt: "Run shell commands. Be precise and careful.".to_string(),
+            context: AgentContextConfig {
+                rag_chunks: 1,
+                ..Default::default()
+            },
+            behavior: AgentBehaviorConfig {
+                temperature: 0.1,
+                ..Default::default()
+            },
+            cost: AgentCostConfig {
+                max_tokens: 200,
+                ..Default::default()
+            },
+            access: AgentAccessConfig {
+                tool_access: vec!["shell".to_string()],
+                max_tool_calls: 3,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    /// Preset for a browser agent.
+    pub fn browser() -> Self {
+        Self {
+            role_prompt: "Control the browser. Navigate, click, extract.".to_string(),
+            context: AgentContextConfig {
+                rag_chunks: 2,
+                ..Default::default()
+            },
+            behavior: AgentBehaviorConfig {
+                temperature: 0.3,
+                ..Default::default()
+            },
+            cost: AgentCostConfig {
+                max_tokens: 400,
+                ..Default::default()
+            },
+            access: AgentAccessConfig {
+                tool_access: vec!["browser".to_string()],
+                max_tool_calls: 10,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    /// Preset for a research agent.
+    pub fn research() -> Self {
+        Self {
+            role_prompt: "Search and summarize. Be thorough.".to_string(),
+            context: AgentContextConfig {
+                rag_chunks: 6,
+                memory_depth: 10,
+                ..Default::default()
+            },
+            behavior: AgentBehaviorConfig {
+                temperature: 0.7,
+                ..Default::default()
+            },
+            cost: AgentCostConfig {
+                max_tokens: 1000,
+                model: "claude-haiku-4-5".to_string(),
+                ..Default::default()
+            },
+            access: AgentAccessConfig {
+                tool_access: vec!["browser".to_string(), "files".to_string()],
+                ..Default::default()
+            },
+            memory: AgentMemoryConfig {
+                session_scope: "user".to_string(),
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    /// Preset for a file agent.
+    pub fn file() -> Self {
+        Self {
+            role_prompt: "Manage files. Read, write, organize.".to_string(),
+            context: AgentContextConfig {
+                rag_chunks: 2,
+                ..Default::default()
+            },
+            behavior: AgentBehaviorConfig {
+                temperature: 0.2,
+                ..Default::default()
+            },
+            cost: AgentCostConfig {
+                max_tokens: 300,
+                ..Default::default()
+            },
+            access: AgentAccessConfig {
+                tool_access: vec!["files".to_string()],
+                max_tool_calls: 5,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+}
+

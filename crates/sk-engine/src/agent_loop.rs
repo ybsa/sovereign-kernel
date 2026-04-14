@@ -67,6 +67,15 @@ pub struct AgentLoopConfig {
     pub on_usage: Option<UsageHandler>,
     /// Optional callback to save state checkpoints for recovery.
     pub checkpoint_handler: Option<CheckpointHandler>,
+    /// Whether to enable 'The Mind' — a mandatory planning phase before tool use.
+    pub thinking_mode: bool,
+    /// How many recent messages to keep in the rolling context window.
+    /// Default: 10. Set lower (e.g. 4–6) for local models with small context windows.
+    pub context_window_messages: usize,
+    /// Whether the model supports structured tool/function calling.
+    /// Set false for local models that don't understand JSON schemas — tools are then
+    /// described in plain text inside the system prompt instead.
+    pub supports_tool_schemas: bool,
 }
 
 use crate::loop_guard::LoopGuard;
@@ -94,10 +103,26 @@ pub async fn run_agent_loop(
     // 1. Add user message to session
     session.push_message(Message::user(user_message));
 
-    // 2. Build initial messages array with system prompt
-    let mut messages = vec![Message::system(&config.system_prompt)];
-    messages.extend(session.messages.iter().cloned());
-
+    // 2. Build messages with rolling window.
+    // We never send the full history — only the last N messages (configurable per model).
+    // Small/local models use a tighter window since their context is only 4K–8K tokens.
+    // If a session summary exists it is prepended so the agent remembers earlier context.
+    let window = config.context_window_messages.max(2);
+    let build_messages = |sess: &Session, system: &str| -> Vec<Message> {
+        let mut out = vec![Message::system(system)];
+        if let Some(ref summary) = sess.summary {
+            // Inject as a single system-style note rather than fake user/assistant pair,
+            // which confuses some local models.
+            out.push(Message::user(format!(
+                "[Context from earlier in this conversation]\n{summary}"
+            )));
+            out.push(Message::assistant("Got it."));
+        }
+        let history = &sess.messages;
+        let start = history.len().saturating_sub(window);
+        out.extend_from_slice(&history[start..]);
+        out
+    };
     let mut total_tokens = 0u32;
     let mut tool_calls_made = 0u32;
     let mut iterations = 0u32;
@@ -121,6 +146,10 @@ pub async fn run_agent_loop(
             }
         }
 
+        // Rebuild from rolling window on every iteration so accumulated tool results
+        // from this task don't balloon the context beyond WINDOW_SIZE messages.
+        let mut messages = build_messages(session, &config.system_prompt);
+
         iterations += 1;
         if iterations > config.max_iterations_per_task {
             warn!(
@@ -136,19 +165,34 @@ pub async fn run_agent_loop(
 
         debug!(iteration = iterations, "Agent loop iteration");
 
-        // Call LLM with retry backoff
+        // Call LLM with retry backoff.
+        // For models that don't support tool schemas (e.g. many local/small models),
+        // we send an empty tools list — the tool descriptions were already injected
+        // as plain text into the system prompt by executor.rs when it detected this flag.
+        let effective_tools = if config.supports_tool_schemas {
+            config.tools.clone()
+        } else {
+            vec![]
+        };
+
         let mut attempt = 0;
         let response = loop {
             let request = CompletionRequest {
                 model: config.model.clone(),
                 messages: messages.clone(),
-                tools: config.tools.clone(),
+                tools: effective_tools.clone(),
                 max_tokens: config.max_tokens,
                 temperature: config.temperature,
-                stream: false,
+                stream: config.stream_handler.is_some(),
             };
 
-            match config.driver.complete(request).await {
+            let llm_res = if let Some(ref handler) = config.stream_handler {
+                config.driver.complete_stream(request, handler).await
+            } else {
+                config.driver.complete(request).await
+            };
+
+            match llm_res {
                 Ok(resp) => break resp,
                 Err(e) if e.is_retryable() || attempt < retry::max_retries() => {
                     attempt += 1;
@@ -156,11 +200,6 @@ pub async fn run_agent_loop(
                         return Err(e.into());
                     }
                     let delay = retry::backoff_delay(attempt);
-                    warn!(
-                        "LLM error: {e}. Retrying ({attempt}/{}) in {:?}",
-                        retry::max_retries(),
-                        delay
-                    );
                     sleep(delay).await;
                 }
                 Err(e) => return Err(e.into()),

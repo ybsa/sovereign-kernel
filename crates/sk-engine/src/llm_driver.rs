@@ -57,6 +57,9 @@ pub struct TokenUsage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
+    /// Tokens served from the provider's prompt cache (Anthropic, OpenAI).
+    /// These cost significantly less — ~10% (Anthropic) or 50% (OpenAI) of normal price.
+    pub cached_tokens: u32,
 }
 
 /// LLM driver error types.
@@ -100,11 +103,23 @@ impl From<LlmError> for SovereignError {
     }
 }
 
+/// A handler for streaming tokens.
+pub type StreamHandler = Box<dyn Fn(&str) + Send + Sync>;
+
 /// Trait for LLM drivers.
 #[async_trait]
 pub trait LlmDriver: Send + Sync {
     /// Send a completion request.
     async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError>;
+
+    /// Send a completion request with streaming support.
+    async fn complete_stream(
+        &self,
+        request: CompletionRequest,
+        _handler: &StreamHandler,
+    ) -> Result<CompletionResponse, LlmError> {
+        self.complete(request).await
+    }
 
     /// Get the driver's provider name.
     fn provider(&self) -> &str;
@@ -264,12 +279,27 @@ impl LlmDriver for OpenAICompatDriver {
             }
         };
 
+        // OpenAI caches prompt prefixes automatically (≥1024 tokens) at 50% cost.
+        // cached_tokens lives at usage.prompt_tokens_details.cached_tokens
+        let cached_tokens = resp_json["usage"]["prompt_tokens_details"]["cached_tokens"]
+            .as_u64()
+            .unwrap_or(0) as u32;
+
+        if cached_tokens > 0 {
+            tracing::debug!(
+                cached_tokens,
+                billed_input = resp_json["usage"]["prompt_tokens"].as_u64().unwrap_or(0),
+                "OpenAI prompt cache hit"
+            );
+        }
+
         let usage = TokenUsage {
             prompt_tokens: resp_json["usage"]["prompt_tokens"].as_u64().unwrap_or(0) as u32,
             completion_tokens: resp_json["usage"]["completion_tokens"]
                 .as_u64()
                 .unwrap_or(0) as u32,
             total_tokens: resp_json["usage"]["total_tokens"].as_u64().unwrap_or(0) as u32,
+            cached_tokens,
         };
 
         Ok(CompletionResponse {

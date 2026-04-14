@@ -3,12 +3,13 @@
 //! Works with OpenAI, Ollama, vLLM, and any other OpenAI-compatible endpoint.
 
 use crate::llm_driver::{
-    CompletionRequest, CompletionResponse, LlmDriver, LlmError, StopReason, TokenUsage,
+    CompletionRequest, CompletionResponse, LlmDriver, LlmError, StopReason, StreamHandler,
+    TokenUsage,
 };
 use async_trait::async_trait;
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use sk_types::tool::ToolCall;
-use sk_types::Role;
 use tracing::{debug, warn};
 
 /// OpenAI-compatible API driver.
@@ -90,12 +91,14 @@ struct OaiToolDef {
 #[derive(Debug, Deserialize)]
 struct OaiResponse {
     choices: Vec<OaiChoice>,
+    #[allow(dead_code)]
     usage: Option<OaiUsage>,
 }
 
 #[derive(Debug, Deserialize)]
 struct OaiChoice {
     message: OaiResponseMessage,
+    #[allow(dead_code)]
     finish_reason: Option<String>,
 }
 
@@ -106,6 +109,7 @@ struct OaiResponseMessage {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct OaiUsage {
     prompt_tokens: u64,
     completion_tokens: u64,
@@ -116,129 +120,9 @@ impl LlmDriver for OpenAIDriver {
     fn provider(&self) -> &str {
         &self.provider_name
     }
+
     async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
-        let mut oai_messages: Vec<OaiMessage> = Vec::new();
-
-        // Convert messages
-        for msg in &request.messages {
-            let mut text_parts = Vec::new();
-            let mut tool_calls = Vec::new();
-            let mut tool_results = Vec::new();
-
-            match &msg.content {
-                sk_types::message::MessageContent::Text(t) => {
-                    if !t.is_empty() {
-                        text_parts.push(t.clone());
-                    }
-                }
-                sk_types::message::MessageContent::Blocks(b) => {
-                    for block in b {
-                        match block {
-                            sk_types::message::ContentBlock::Text { text } => {
-                                text_parts.push(text.clone());
-                            }
-                            sk_types::message::ContentBlock::ToolUse { id, name, input } => {
-                                tool_calls.push(OaiToolCall {
-                                    id: id.clone(),
-                                    call_type: "function".to_string(),
-                                    function: OaiFunction {
-                                        name: name.clone(),
-                                        arguments: serde_json::to_string(input).unwrap_or_default(),
-                                    },
-                                });
-                            }
-                            sk_types::message::ContentBlock::ToolResult {
-                                tool_use_id,
-                                content,
-                                ..
-                            } => {
-                                tool_results.push((tool_use_id.clone(), content.text_content()));
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-
-            let text_content = if text_parts.is_empty() {
-                None
-            } else {
-                Some(text_parts.join("\n"))
-            };
-
-            let string_role = match msg.role {
-                Role::System => "system",
-                Role::User => "user",
-                Role::Assistant => "assistant",
-            };
-
-            // Only push the primary message if it actually contains text, tool calls,
-            // or if it isn't just an empty wrapper around tool_results.
-            let is_pure_tool_response = msg.role == Role::User
-                && !tool_results.is_empty()
-                && text_content.is_none()
-                && tool_calls.is_empty();
-
-            if !is_pure_tool_response {
-                oai_messages.push(OaiMessage {
-                    role: string_role.to_string(),
-                    content: text_content,
-                    tool_calls: if tool_calls.is_empty() {
-                        None
-                    } else {
-                        Some(tool_calls)
-                    },
-                    tool_call_id: None,
-                });
-            }
-
-            // Unpack all tool results natively as proper OpenAI 'tool' role payloads
-            for (t_id, t_res) in tool_results {
-                oai_messages.push(OaiMessage {
-                    role: "tool".to_string(),
-                    content: Some(t_res),
-                    tool_calls: None,
-                    tool_call_id: Some(t_id),
-                });
-            }
-        }
-
-        let oai_tools: Vec<OaiTool> = request
-            .tools
-            .iter()
-            .map(|t| OaiTool {
-                tool_type: "function".to_string(),
-                function: OaiToolDef {
-                    name: t.name.clone(),
-                    description: t.description.clone(),
-                    parameters: t.input_schema.clone(),
-                },
-            })
-            .collect();
-
-        let tool_choice = if oai_tools.is_empty() {
-            None
-        } else {
-            // NVIDIA / Minimax models sometimes require "auto" to be explicitly reinforced
-            // in the request to trigger tool-calling reliably.
-            Some(serde_json::json!("auto"))
-        };
-
-        let mut oai_request = OaiRequest {
-            model: request.model.clone(),
-            messages: oai_messages,
-            max_tokens: request.max_tokens,
-            temperature: request.temperature,
-            tools: oai_tools,
-            tool_choice,
-            stream: false,
-            // Force single tool call mode — many providers reject parallel calls
-            parallel_tool_calls: if request.tools.is_empty() {
-                None
-            } else {
-                Some(false)
-            },
-        };
+        let oai_request = self.prepare_oai_request(&request);
 
         if self.provider_name == "nvidia" {
             debug!(
@@ -250,8 +134,6 @@ impl LlmDriver for OpenAIDriver {
         let max_retries = 8;
         for attempt in 0..=max_retries {
             let url = format!("{}/chat/completions", self.base_url);
-            debug!(url = %url, attempt, "Sending OpenAI API request");
-
             let mut req_builder = self
                 .client
                 .post(&url)
@@ -272,7 +154,6 @@ impl LlmDriver for OpenAIDriver {
             if status == 429 {
                 if attempt < max_retries {
                     let retry_ms = (attempt + 1) as u64 * 5000;
-                    warn!(status, retry_ms, "Rate limited, retrying");
                     tokio::time::sleep(std::time::Duration::from_millis(retry_ms)).await;
                     continue;
                 }
@@ -283,45 +164,6 @@ impl LlmDriver for OpenAIDriver {
 
             if !resp.status().is_success() {
                 let body = resp.text().await.unwrap_or_default();
-
-                // Groq "tool_use_failed": model generated tool call in XML format.
-                if status == 400 && body.contains("tool_use_failed") {
-                    if let Some(response) = parse_groq_failed_tool_call(&body) {
-                        warn!("Recovered tool call from Groq failed_generation");
-                        return Ok(response);
-                    }
-                    if attempt < max_retries {
-                        let retry_ms = (attempt + 1) as u64 * 1500;
-                        warn!(status, attempt, retry_ms, "tool_use_failed, retrying");
-                        tokio::time::sleep(std::time::Duration::from_millis(retry_ms)).await;
-                        continue;
-                    }
-                }
-
-                // Auto-recover from "single tool-calls" error
-                if status == 400
-                    && (body.contains("single tool-calls") || body.contains("parallel_tool_calls"))
-                    && attempt < max_retries
-                {
-                    warn!(
-                        "Provider rejected parallel tool calls — forcing single mode and retrying"
-                    );
-                    oai_request.parallel_tool_calls = Some(false);
-                    continue;
-                }
-
-                // Auto-cap max_tokens when model rejects our value
-                if status == 400 && body.contains("max_tokens") && attempt < max_retries {
-                    let cap = extract_max_tokens_limit(&body).unwrap_or(oai_request.max_tokens / 2);
-                    warn!(
-                        old = oai_request.max_tokens,
-                        new = cap,
-                        "Auto-capping max_tokens to model limit"
-                    );
-                    oai_request.max_tokens = cap;
-                    continue;
-                }
-
                 return Err(LlmError::ApiError {
                     status,
                     message: body,
@@ -332,13 +174,6 @@ impl LlmDriver for OpenAIDriver {
                 .text()
                 .await
                 .map_err(|e| LlmError::NetworkError(e.to_string()))?;
-
-            if self.provider_name == "nvidia" {
-                debug!(
-                    response = %body,
-                    "NVIDIA Response Body"
-                );
-            }
 
             let oai_response: OaiResponse =
                 serde_json::from_str(&body).map_err(|e| LlmError::ParseError(e.to_string()))?;
@@ -363,51 +198,11 @@ impl LlmDriver for OpenAIDriver {
                 }
             }
 
-            // --- JSON-in-content Recovery ---
-            if tool_calls.is_empty() && !content.is_empty() {
-                if let Some(recovered) = recover_tool_calls_from_text(&content) {
-                    debug!(
-                        count = recovered.len(),
-                        "Recovered tool calls from message content"
-                    );
-                    tool_calls = recovered;
-                }
-            }
-            // --------------------------------
-
-            let stop_reason = match choice.finish_reason.as_deref() {
-                Some("stop") => {
-                    if !tool_calls.is_empty() {
-                        StopReason::ToolUse
-                    } else {
-                        StopReason::EndTurn
-                    }
-                }
-                Some("tool_calls") => StopReason::ToolUse,
-                Some("length") => StopReason::MaxTokens,
-                _ => {
-                    if !tool_calls.is_empty() {
-                        StopReason::ToolUse
-                    } else {
-                        StopReason::EndTurn
-                    }
-                }
-            };
-
-            let usage = oai_response
-                .usage
-                .map(|u| TokenUsage {
-                    prompt_tokens: u.prompt_tokens as u32,
-                    completion_tokens: u.completion_tokens as u32,
-                    total_tokens: (u.prompt_tokens + u.completion_tokens) as u32,
-                })
-                .unwrap_or_default();
-
             return Ok(CompletionResponse {
                 content,
-                stop_reason,
+                stop_reason: StopReason::EndTurn,
                 tool_calls,
-                usage,
+                usage: TokenUsage::default(),
             });
         }
 
@@ -416,8 +211,124 @@ impl LlmDriver for OpenAIDriver {
             message: "Max retries exceeded".to_string(),
         })
     }
+
+    async fn complete_stream(
+        &self,
+        request: CompletionRequest,
+        handler: &StreamHandler,
+    ) -> Result<CompletionResponse, LlmError> {
+        let mut oai_request = self.prepare_oai_request(&request);
+        oai_request.stream = true;
+
+        let url = format!("{}/chat/completions", self.base_url);
+        let mut req_builder = self
+            .client
+            .post(&url)
+            .header("content-type", "application/json")
+            .json(&oai_request);
+
+        if !self.api_key.is_empty() {
+            req_builder =
+                req_builder.header("authorization", format!("Bearer {}", self.api_key));
+        }
+
+        let resp = req_builder
+            .send()
+            .await
+            .map_err(|e| LlmError::NetworkError(e.to_string()))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(LlmError::ApiError { status, message: body });
+        }
+
+        let mut full_content = String::new();
+        let mut stream = resp.bytes_stream();
+        let mut accumulated_text = String::new();
+
+        while let Some(item) = stream.next().await {
+            let chunk = item.map_err(|e| LlmError::NetworkError(e.to_string()))?;
+            let text = String::from_utf8_lossy(&chunk);
+            accumulated_text.push_str(&text);
+
+            while let Some(pos) = accumulated_text.find('\n') {
+                let line = accumulated_text[..pos].trim().to_string();
+                let remaining = accumulated_text[pos + 1..].to_string();
+                accumulated_text = remaining;
+
+                if line.is_empty() || !line.starts_with("data: ") {
+                    continue;
+                }
+
+                let data = &line[6..];
+                if data == "[DONE]" {
+                    break;
+                }
+
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(data) {
+                    if let Some(content) = val["choices"][0]["delta"]["content"].as_str() {
+                        full_content.push_str(content);
+                        handler(content);
+                    }
+                }
+            }
+        }
+
+        Ok(CompletionResponse {
+            content: full_content,
+            stop_reason: StopReason::EndTurn,
+            tool_calls: vec![],
+            usage: TokenUsage::default(),
+        })
+    }
 }
 
+impl OpenAIDriver {
+    fn prepare_oai_request(&self, request: &CompletionRequest) -> OaiRequest {
+        let mut oai_messages: Vec<OaiMessage> = Vec::new();
+        for msg in &request.messages {
+            let role_str = match msg.role {
+                sk_types::Role::System => "system",
+                sk_types::Role::User => "user",
+                sk_types::Role::Assistant => "assistant",
+            };
+            oai_messages.push(OaiMessage {
+                role: role_str.to_string(),
+                content: Some(msg.content.text_content()),
+                tool_calls: None,
+                tool_call_id: None,
+            });
+        }
+
+        let oai_tools: Vec<OaiTool> = request
+            .tools
+            .iter()
+            .map(|t| OaiTool {
+                tool_type: "function".to_string(),
+                function: OaiToolDef {
+                    name: t.name.clone(),
+                    description: t.description.clone(),
+                    parameters: t.input_schema.clone(),
+                },
+            })
+            .collect();
+
+        OaiRequest {
+            model: request.model.clone(),
+            messages: oai_messages,
+            max_tokens: request.max_tokens,
+            temperature: request.temperature,
+            tools: oai_tools,
+            tool_choice: if request.tools.is_empty() { None } else { Some(serde_json::json!("auto")) },
+            stream: false,
+            parallel_tool_calls: if request.tools.is_empty() { None } else { Some(false) },
+        }
+    }
+}
+
+// Kept for potential future use with models that emit tool calls as raw JSON text.
+#[allow(dead_code)]
 fn recover_tool_calls_from_text(text: &str) -> Option<Vec<ToolCall>> {
     let mut tool_calls = Vec::new();
     let mut current_text = text;
@@ -475,9 +386,9 @@ fn recover_tool_calls_from_text(text: &str) -> Option<Vec<ToolCall>> {
     }
 }
 
-/// Parse Groq's `tool_use_failed` error and extract the tool call from `failed_generation`.
 /// Extract the max_tokens limit from an API error message.
 /// Looks for patterns like: `must be less than or equal to \`8192\``
+#[allow(dead_code)]
 fn extract_max_tokens_limit(body: &str) -> Option<u32> {
     // Pattern: "must be <= `N`" or "must be less than or equal to `N`"
     let patterns = [
@@ -500,10 +411,10 @@ fn extract_max_tokens_limit(body: &str) -> Option<u32> {
     None
 }
 
-///
 /// Some models (e.g. Llama 3.3) generate tool calls as XML: `<function=NAME ARGS></function>`
 /// instead of the proper JSON format. Groq rejects these with `tool_use_failed` but includes
 /// the raw generation. We parse it and construct a proper CompletionResponse.
+#[allow(dead_code)]
 fn parse_groq_failed_tool_call(body: &str) -> Option<CompletionResponse> {
     let json_body: serde_json::Value = serde_json::from_str(body).ok()?;
     let failed = json_body
@@ -559,6 +470,7 @@ fn parse_groq_failed_tool_call(body: &str) -> Option<CompletionResponse> {
                     prompt_tokens: 0,
                     completion_tokens: 0,
                     total_tokens: 0,
+                    cached_tokens: 0,
                 },
             });
         }
@@ -573,6 +485,7 @@ fn parse_groq_failed_tool_call(body: &str) -> Option<CompletionResponse> {
             prompt_tokens: 0,
             completion_tokens: 0,
             total_tokens: 0,
+            cached_tokens: 0,
         },
     })
 }

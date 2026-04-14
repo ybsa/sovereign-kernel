@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sovereign Agent Config Schema</title>
+    <link rel="stylesheet" href="config.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <div class="background-glow"></div>
+    
+    <div class="container">
+        <header>
+            <h1 class="title">Agent Config Schema</h1>
+            <p class="subtitle">Sovereign Kernel &mdash; Layered Parameters per Agent</p>
+        </header>
+
+        <section class="layer-pipeline">
+            <div class="layer layer-global" id="layer-1">
+                <div class="layer-content">
+                    <h2 class="layer-title">Layer 1 &mdash; Global Core</h2>
+                    <p class="layer-desc">Sent to every agent &bull; never changes &bull; ~30 tokens</p>
+                </div>
+            </div>
+
+            <div class="arrow-down"></div>
+
+            <div class="layer layer-role" id="layer-2">
+                <div class="layer-content">
+                    <h2 class="layer-title">Layer 2 &mdash; Agent Role</h2>
+                    <p class="layer-desc">Loaded only for this agent &bull; static per agent type &bull; ~50 tokens</p>
+                </div>
+            </div>
+
+            <div class="arrow-down"></div>
+
+            <div class="layer layer-dynamic" id="layer-3">
+                <div class="layer-content">
+                    <h2 class="layer-title">Layer 3 &mdash; Dynamic Context</h2>
+                    <p class="layer-desc">Vector search per task &bull; top-k chunks only &bull; ~300-500 tokens</p>
+                </div>
+            </div>
+        </section>
+
+        <div class="section-divider">
+            <div class="arrow-down-thick"></div>
+            <h3 class="divider-text">Agent Parameters</h3>
+            <p class="divider-sub">Tunable per agent &bull; controls cost, behavior, access</p>
+        </div>
+
+        <section class="param-grid">
+            <!-- Context Card -->
+            <div class="card card-context" onclick="exploreField('context')">
+                <h4 class="card-title">Context</h4>
+                <div class="card-fields">
+                    <div class="field">rag_chunks: <span class="val" id="val-rag_chunks">3</span></div>
+                    <div class="field">memory_depth: <span class="val" id="val-memory_depth">5</span></div>
+                    <div class="field">inject_tools: <span class="val" id="val-inject_tools">True</span></div>
+                </div>
+            </div>
+
+            <!-- Behavior Card -->
+            <div class="card card-behavior" onclick="exploreField('behavior')">
+                <h4 class="card-title">Behavior</h4>
+                <div class="card-fields">
+                    <div class="field">temperature: <span class="val" id="val-temperature">0.7</span></div>
+                    <div class="field">verbosity: <span class="val" id="val-verbosity">concise</span></div>
+                    <div class="field">stream: <span class="val" id="val-stream">True</span></div>
+                </div>
+            </div>
+
+            <!-- Cost Control Card -->
+            <div class="card card-cost" onclick="exploreField('cost')">
+                <h4 class="card-title">Cost Control</h4>
+                <div class="card-fields">
+                    <div class="field">max_tokens: <span class="val" id="val-max_tokens">500</span></div>
+                    <div class="field">model: <span class="val" id="val-model">gemma3</span></div>
+                    <div class="field">timeout_ms: <span class="val" id="val-timeout_ms">10000</span></div>
+                </div>
+            </div>
+
+            <!-- Access Card -->
+            <div class="card card-access" onclick="exploreField('access')">
+                <h4 class="card-title">Access</h4>
+                <div class="card-fields">
+                    <div class="field">tool_access: <span class="val" id="val-tool_access">[]</span></div>
+                    <div class="field">max_tool_calls: <span class="val" id="val-max_tool_calls">5</span></div>
+                    <div class="field">sandbox: <span class="val" id="val-sandbox">True</span></div>
+                </div>
+            </div>
+
+            <!-- Memory Card -->
+            <div class="card card-memory" onclick="exploreField('memory')">
+                <h4 class="card-title">Memory</h4>
+                <div class="card-fields">
+                    <div class="field">persist: <span class="val" id="val-persist">True</span></div>
+                    <div class="field">session_scope: <span class="val" id="val-session_scope">task</span></div>
+                    <div class="field">summarize_at: <span class="val" id="val-summarize_at">20</span></div>
+                </div>
+            </div>
+
+            <!-- Fallback Card -->
+            <div class="card card-fallback" onclick="exploreField('fallback')">
+                <h4 class="card-title">Fallback</h4>
+                <div class="card-fields">
+                    <div class="field">fallback_model: <span class="val" id="val-fallback_model">gemma3</span></div>
+                    <div class="field">retry_count: <span class="val" id="val-retry_count">2</span></div>
+                    <div class="field">backoff_ms: <span class="val" id="val-backoff_ms">1000</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="final-assembly">
+            <div class="assembly-banner">
+                <h3 class="assembly-title">Final Prompt Assembly</h3>
+                <p class="assembly-stats">global (~30) + role (~50) + context (~400) = <span class="highlight">~480 tokens total</span></p>
+            </div>
+        </section>
+
+        <section class="example-configs">
+            <h3 class="example-title">Example Configs</h3>
+            <div class="agent-buttons">
+                <button class="agent-btn" onclick="selectAgent('shell_agent')">shell_agent</button>
+                <button class="agent-btn" onclick="selectAgent('browser_agent')">browser_agent</button>
+                <button class="agent-btn" onclick="selectAgent('research_agent')">research_agent</button>
+                <button class="agent-btn" onclick="selectAgent('file_agent')">file_agent</button>
+            </div>
+            <p class="instruction">Click any card to explore it deeper.</p>
+        </section>
+    </div>
+
+    <!-- Modal for Deep Exploration -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <script src="schema.js"></script>
+</body>
+</html>

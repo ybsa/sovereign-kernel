@@ -772,6 +772,7 @@ mod tests {
                         prompt_tokens: 100,
                         completion_tokens: 50,
                         total_tokens: 150,
+                        cached_tokens: 0,
                     },
                 })
             }
@@ -831,6 +832,7 @@ mod tests {
                         prompt_tokens: 100,
                         completion_tokens: 50,
                         total_tokens: 150,
+                        cached_tokens: 0,
                     },
                 })
             }
@@ -919,6 +921,7 @@ mod tests {
                         prompt_tokens: 500,
                         completion_tokens: 100,
                         total_tokens: 600,
+                        cached_tokens: 0,
                     },
                 })
             }
@@ -1111,6 +1114,7 @@ mod tests {
                         prompt_tokens: 50,
                         completion_tokens: 20,
                         total_tokens: 70,
+                        cached_tokens: 0,
                     },
                 })
             }

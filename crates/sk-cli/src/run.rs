@@ -64,7 +64,9 @@ pub async fn execute(
     let agent_dir = std::path::PathBuf::from("agents").join(first_word);
     let manifest_path = agent_dir.join("manifest.toml");
 
-    let (intent, _skill_def, custom_soul) = if manifest_path.exists() {
+    // (intent, skill, custom_soul, hand_system_prompt)
+    // hand_system_prompt bypasses the SOUL wrapper — used raw as the entire system prompt.
+    let (intent, _skill_def, custom_soul, hand_system_prompt) = if manifest_path.exists() {
         println!(
             "📂 Loading agent from library: {}",
             first_word.bright_cyan().bold()
@@ -94,6 +96,36 @@ pub async fn execute(
             },
             None,
             soul,
+            None,
+        )
+    } else if let Some(hand) = kernel.hands.read().unwrap().get_definition(first_word) {
+        // --- Bundled Hand matched by name ---
+        println!(
+            "🤝 Loading hand: {} — {}",
+            hand.name.bright_cyan().bold(),
+            hand.description
+        );
+        let is_otto = hand.id == "otto";
+        let hand_prompt = hand.agent.system_prompt.clone();
+        let hand_tools = hand.tools.clone();
+        let hand_name = hand.agent.name.clone();
+        let hand_desc = hand.description.clone();
+        (
+            sk_kernel::wizard::AgentIntent {
+                name: hand_name,
+                description: hand_desc,
+                task: remaining_task.to_string(),
+                skills: vec![],
+                model_tier: "default".into(),
+                scheduled: false,
+                schedule: None,
+                capabilities: hand_tools,
+                mode: Some(mode_hint.to_string()),
+                is_otto,
+            },
+            None,
+            None,
+            Some(hand_prompt),
         )
     } else if mode_hint == "auto" {
         println!("🔍 Analyzing task intent...");
@@ -103,7 +135,7 @@ pub async fn execute(
             task,
         )
         .await?;
-        (intent, skill, None)
+        (intent, skill, None, None)
     } else {
         (
             sk_kernel::wizard::AgentIntent {
@@ -114,12 +146,13 @@ pub async fn execute(
                 model_tier: "default".into(),
                 scheduled: false,
                 schedule: None,
-                capabilities: vec!["file_read".into(), "web".into(), "shell".into()],
+                capabilities: vec!["file_read".into(), "web_search".into(), "shell".into()],
                 mode: Some(mode_hint.to_string()),
                 is_otto: false,
             },
             None,
             soul_override.clone(),
+            None,
         )
     };
 
@@ -190,10 +223,20 @@ pub async fn execute(
         }
     });
 
-    let mut system_prompt = kernel.soul.to_system_prompt_fragment();
-    if let Some(soul) = custom_soul {
-        system_prompt = format!("{}\n\n{}", system_prompt, soul);
-    }
+    // Build system prompt.
+    // Hands: use their own system_prompt directly — no SOUL wrapper, no boilerplate.
+    // Everything else: SOUL identity fragment + optional custom soul.
+    let system_prompt = if let Some(hand_prompt) = hand_system_prompt {
+        let now = chrono::Local::now();
+        let date_str = now.format("%Y-%m-%d %H:%M").to_string();
+        format!("{hand_prompt}\n\nCurrent date/time: {date_str}")
+    } else {
+        let mut s = kernel.soul.to_system_prompt_fragment();
+        if let Some(soul) = custom_soul {
+            s = format!("{s}\n\n{soul}");
+        }
+        s
+    };
 
     let agent_config = sk_kernel::executor::create_agent_config(
         kernel.clone(),
@@ -204,6 +247,7 @@ pub async fn execute(
         kernel.skills.clone(),
         stream_handler,
         Some(intent.clone()),
+        Some(&task),
     );
 
     let mut session = sk_types::Session::new(agent_id);

@@ -169,6 +169,9 @@ async fn test_agent_successful_tool_call() {
         stream_handler: None,
         on_usage: None,
         checkpoint_handler: None,
+        thinking_mode: false,
+        context_window_messages: 10,
+        supports_tool_schemas: true,
     };
 
     let mut session = Session::new(AgentId::new());
@@ -274,6 +277,9 @@ async fn test_agent_security_sandbox_blocked_command() {
         stream_handler: None,
         on_usage: None,
         checkpoint_handler: None,
+        thinking_mode: false,
+        context_window_messages: 10,
+        supports_tool_schemas: true,
     };
 
     let mut session = Session::new(AgentId::new());

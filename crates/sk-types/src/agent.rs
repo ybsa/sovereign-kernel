@@ -498,6 +498,9 @@ pub struct AgentManifest {
     /// Per-agent exec policy override. If None, uses global exec_policy.
     #[serde(default)]
     pub exec_policy: Option<crate::config::ExecPolicy>,
+    /// Granular configuration for context, behavior, and cost.
+    #[serde(default)]
+    pub agent_config: Option<crate::config::AgentConfig>,
 }
 
 fn default_true() -> bool {
@@ -530,6 +533,7 @@ impl Default for AgentManifest {
             workspace: None,
             generate_identity_files: true,
             exec_policy: None,
+            agent_config: None,
         }
     }
 }
@@ -785,6 +789,7 @@ mod tests {
             workspace: None,
             generate_identity_files: true,
             exec_policy: None,
+            agent_config: None,
         };
         let json = serde_json::to_string(&manifest).unwrap();
         let deserialized: AgentManifest = serde_json::from_str(&json).unwrap();
@@ -806,7 +811,7 @@ mod tests {
         assert!(tools.contains(&"file_read".to_string()));
         assert!(tools.contains(&"shell_exec".to_string()));
         assert!(tools.contains(&"web_fetch".to_string()));
-        assert_eq!(tools.len(), 5);
+        assert_eq!(tools.len(), 6);
     }
 
     #[test]
@@ -814,7 +819,7 @@ mod tests {
         let tools = ToolProfile::Research.tools();
         assert!(tools.contains(&"web_fetch".to_string()));
         assert!(tools.contains(&"web_search".to_string()));
-        assert_eq!(tools.len(), 4);
+        assert_eq!(tools.len(), 8);
     }
 
     #[test]
@@ -828,7 +833,7 @@ mod tests {
     #[test]
     fn test_tool_profile_automation() {
         let tools = ToolProfile::Automation.tools();
-        assert_eq!(tools.len(), 10);
+        assert_eq!(tools.len(), 16);
     }
 
     #[test]

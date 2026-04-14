@@ -4,8 +4,10 @@
 
 pub mod browser;
 pub mod code_exec;
+pub mod events;
 pub mod file_ops;
 pub mod host;
+pub mod knowledge;
 pub mod memory_tools;
 pub mod otto;
 pub mod ottos_outpost;

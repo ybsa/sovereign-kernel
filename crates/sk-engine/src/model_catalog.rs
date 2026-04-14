@@ -68,38 +68,14 @@ impl ModelCapability {
 pub fn default_catalog() -> Vec<ModelCapability> {
     vec![
         // ── Anthropic ──────────────────────────────────────────────
-        ModelCapability::new(
-            "claude-3-5-sonnet-20241022",
-            "anthropic",
-            ModelTier::CloudReasoning,
-            200000,
-            true,
-        )
-        .with_computer_use(),
-        ModelCapability::new(
-            "claude-3-5-haiku-20241022",
-            "anthropic",
-            ModelTier::CloudFast,
-            200000,
-            true,
-        )
-        .with_vision(),
-        ModelCapability::new(
-            "claude-3-haiku-20240307",
-            "anthropic",
-            ModelTier::CloudFast,
-            200000,
-            true,
-        )
-        .with_vision(),
-        ModelCapability::new(
-            "claude-3-opus-20240229",
-            "anthropic",
-            ModelTier::CloudFrontier,
-            200000,
-            true,
-        )
-        .with_vision(),
+        ModelCapability::new("claude-opus-4-6", "anthropic", ModelTier::CloudFrontier, 200000, true).with_computer_use(),
+        ModelCapability::new("claude-sonnet-4-6", "anthropic", ModelTier::CloudReasoning, 200000, true).with_computer_use(),
+        ModelCapability::new("claude-haiku-4-5-20251001", "anthropic", ModelTier::CloudFast, 200000, true).with_vision(),
+        ModelCapability::new("claude-sonnet-4-20250514", "anthropic", ModelTier::CloudReasoning, 200000, true).with_computer_use(),
+        ModelCapability::new("claude-3-5-sonnet-20241022", "anthropic", ModelTier::CloudReasoning, 200000, true).with_computer_use(),
+        ModelCapability::new("claude-3-5-haiku-20241022", "anthropic", ModelTier::CloudFast, 200000, true).with_vision(),
+        ModelCapability::new("claude-3-haiku-20240307", "anthropic", ModelTier::CloudFast, 200000, true).with_vision(),
+        ModelCapability::new("claude-3-opus-20240229", "anthropic", ModelTier::CloudFrontier, 200000, true).with_vision(),
         // ── OpenAI ─────────────────────────────────────────────────
         ModelCapability::new("gpt-4o", "openai", ModelTier::CloudReasoning, 128000, true)
             .with_vision(),
@@ -122,30 +98,12 @@ pub fn default_catalog() -> Vec<ModelCapability> {
         )
         .with_vision(),
         // ── Google Gemini ──────────────────────────────────────────
-        ModelCapability::new(
-            "gemini-2.0-flash-exp",
-            "gemini",
-            ModelTier::CloudFast,
-            1000000,
-            true,
-        )
-        .with_vision(),
-        ModelCapability::new(
-            "gemini-1.5-pro",
-            "gemini",
-            ModelTier::CloudReasoning,
-            2000000,
-            true,
-        )
-        .with_vision(),
-        ModelCapability::new(
-            "gemini-1.5-flash",
-            "gemini",
-            ModelTier::CloudFast,
-            1000000,
-            true,
-        )
-        .with_vision(),
+        ModelCapability::new("gemini-2.5-pro", "gemini", ModelTier::CloudFrontier, 1048576, true).with_vision(),
+        ModelCapability::new("gemini-2.5-flash", "gemini", ModelTier::CloudReasoning, 1048576, true).with_vision(),
+        ModelCapability::new("gemini-2.0-flash", "gemini", ModelTier::CloudFast, 1048576, true).with_vision(),
+        ModelCapability::new("gemini-2.0-flash-exp", "gemini", ModelTier::CloudFast, 1000000, true).with_vision(),
+        ModelCapability::new("gemini-1.5-pro", "gemini", ModelTier::CloudReasoning, 2000000, true).with_vision(),
+        ModelCapability::new("gemini-1.5-flash", "gemini", ModelTier::CloudFast, 1000000, true).with_vision(),
         // ── DeepSeek ───────────────────────────────────────────────
         ModelCapability::new(
             "deepseek-chat",
@@ -222,6 +180,13 @@ pub fn default_catalog() -> Vec<ModelCapability> {
             "nvidia",
             ModelTier::CloudFast,
             128000,
+            true,
+        ),
+        ModelCapability::new(
+            "minimaxai/minimax-m2.5",
+            "nvidia",
+            ModelTier::CloudReasoning,
+            64000,
             true,
         ),
     ]

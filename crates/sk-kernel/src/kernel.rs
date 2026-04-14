@@ -250,6 +250,7 @@ impl SovereignKernel {
             self.skills.clone(),
             stream_handler,
             None,
+            Some(input),
         );
 
         let aid = session.agent_id;
@@ -353,6 +354,7 @@ impl SovereignKernel {
             self.model_name.clone(),
             agent_id,
             self.skills.clone(),
+            None,
             None,
             None,
         );
