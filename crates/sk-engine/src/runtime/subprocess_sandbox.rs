@@ -88,15 +88,17 @@ pub fn validate_executable_path(path: &str) -> Result<(), String> {
 use sk_types::config::{ExecPolicy, ExecSecurityMode};
 
 /// Extract the base command name from a command string.
-/// Handles paths (e.g., "/usr/bin/python3" → "python3").
+/// Handles both Unix and Windows paths (e.g., "/usr/bin/python3" → "python3",
+/// "C:\Git\git.exe" → "git.exe") by splitting on both `/` and `\`.
 fn extract_base_command(cmd: &str) -> &str {
     let trimmed = cmd.trim();
     // Take first word (space-delimited)
     let first_word = trimmed.split_whitespace().next().unwrap_or("");
-    // Strip path prefix using OS-agnostic Path API
-    Path::new(first_word)
-        .file_name()
-        .and_then(|os| os.to_str())
+    // Strip path prefix using explicit separator handling so Windows paths
+    // parse correctly on Linux CI (where Path treats '\' as a regular char).
+    first_word
+        .rsplit(|c| c == '/' || c == '\\')
+        .next()
         .unwrap_or(first_word)
 }
 
@@ -626,8 +628,7 @@ mod tests {
             extract_base_command("/usr/bin/python3 script.py"),
             "python3"
         );
-        // Use a path without spaces — split_whitespace breaks on
-        // paths that contain spaces (e.g. "C:\Program Files\...").
+        // Windows-style paths work on all platforms since we split on both separators.
         assert_eq!(extract_base_command(r"C:\Git\git.exe status"), "git.exe");
         assert_eq!(extract_base_command("  echo hello  "), "echo");
         assert_eq!(extract_base_command(""), "");
