@@ -1,6 +1,8 @@
 //! Sovereign Kernel CLI — the single entry point.
 
 use clap::{Args, Parser, Subcommand};
+use colored::Colorize;
+use dialoguer::{theme::ColorfulTheme, Select};
 
 mod agents;
 mod audit;
@@ -18,10 +20,16 @@ mod status;
 mod treasury;
 
 #[derive(Parser, Debug)]
-#[command(name = "sovereign", version, about = "Sovereign Kernel — Agentic OS")]
+#[command(
+    name = "sovereign",
+    version,
+    about = "Sovereign Kernel — Agentic OS",
+    subcommand_required = false,
+    arg_required_else_help = false
+)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 
     /// Config file path
     #[arg(short, long)]
@@ -171,6 +179,80 @@ struct McpArgs {
     args: Vec<String>,
 }
 
+async fn show_menu(config: sk_types::KernelConfig) -> anyhow::Result<()> {
+    // Banner
+    println!();
+    println!(
+        "{}",
+        "╔═══════════════════════════════════════════════════════╗".bright_cyan()
+    );
+    println!(
+        "{}  {}  {}",
+        "║".bright_cyan(),
+        "  ⚡  Sovereign Kernel — Agentic OS  ".bright_white().bold(),
+        "║".bright_cyan()
+    );
+    println!(
+        "{}",
+        "╚═══════════════════════════════════════════════════════╝".bright_cyan()
+    );
+    println!(
+        "  {}  {}",
+        "Version:".dimmed(),
+        env!("CARGO_PKG_VERSION").bright_white()
+    );
+    println!();
+
+    let items = vec![
+        "  Chat          — Interactive conversation with the AI",
+        "  Run a task    — Give the AI an autonomous task to complete",
+        "  Hands         — Manage background autonomous agents",
+        "  Status        — Check what's running",
+        "  Setup         — Configure API keys and preferences",
+        "  Doctor        — Health check (API keys, tools, config)",
+        "  Treasury      — View token spend and budgets",
+        "  Memory        — Browse and export agent memory",
+        "  Quit",
+    ];
+
+    let selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("What would you like to do?")
+        .default(0)
+        .items(&items)
+        .interact()?;
+
+    println!();
+
+    match selection {
+        0 => chat::run(config).await?,
+        1 => {
+            use dialoguer::Input;
+            let task: String = Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("Describe the task")
+                .interact_text()?;
+            run::execute(config, &task, "auto", None, None).await?
+        }
+        2 => hands::run(config, "list", &[]).await?,
+        3 => status::print_status().await?,
+        4 => setup_wizard::run().await?,
+        5 => doctor::run(&config).await?,
+        6 => {
+            let api_url = config.api_listen.clone();
+            let api_key = std::env::var("SOVEREIGN_API_KEY").ok();
+            let args = treasury::TreasuryArgs {
+                command: treasury::TreasuryCommands::Status,
+            };
+            treasury::run(args, &format!("http://{}", api_url), api_key.as_deref()).await?;
+        }
+        7 => memory::handle_memory_command(memory::MemoryCommands::Stats).await?,
+        _ => {
+            println!("Goodbye!");
+        }
+    }
+
+    Ok(())
+}
+
 fn main() {
     // Spawn a thread with a larger stack size for the CLI
     // This is a workaround for STATUS_STACK_OVERFLOW on Windows due to deep clap recursion
@@ -264,7 +346,8 @@ async fn async_main() -> anyhow::Result<()> {
     };
 
     match cli.command {
-        Commands::Chat(args) => {
+        None => show_menu(config).await?,
+        Some(Commands::Chat(args)) => {
             let mut cfg = config;
             if let Some(i) = args.max_iterations {
                 cfg.max_iterations_per_task = i;
@@ -277,11 +360,11 @@ async fn async_main() -> anyhow::Result<()> {
             }
             chat::run(cfg).await?
         }
-        Commands::Init => init::run().await?,
-        Commands::Setup => setup_wizard::run().await?,
-        Commands::Soul { command } => soul_wizard::run(command).await?,
-        Commands::Start(args) => daemon::start(config, args.detach).await?,
-        Commands::Run(args) => {
+        Some(Commands::Init) => init::run().await?,
+        Some(Commands::Setup) => setup_wizard::run().await?,
+        Some(Commands::Soul { command }) => soul_wizard::run(command).await?,
+        Some(Commands::Start(args)) => daemon::start(config, args.detach).await?,
+        Some(Commands::Run(args)) => {
             let mut cfg = config;
             if let Some(i) = args.max_iterations {
                 cfg.max_iterations_per_task = i;
@@ -294,27 +377,27 @@ async fn async_main() -> anyhow::Result<()> {
             }
             run::execute(cfg, &args.task, &args.mode, args.schedule, args.soul).await?
         }
-        Commands::Status => status::print_status().await?,
-        Commands::Kill(args) => {
+        Some(Commands::Status) => status::print_status().await?,
+        Some(Commands::Kill(args)) => {
             if let Some(agent_id) = args.id {
                 println!("Killing agent {}...", agent_id);
             } else {
                 daemon::stop().await?;
             }
         }
-        Commands::Stop => daemon::stop().await?,
-        Commands::Hands(args) => hands::run(config, &args.action, &args.args).await?,
-        Commands::Audit(args) => audit::run(config, &args.action, &args.args).await?,
-        Commands::Agents(args) => agents::run(config, &args.action, args.id).await?,
-        Commands::Mcp(args) => mcp::run(config, &args.action, &args.args).await?,
-        Commands::Doctor => doctor::run(&config).await?,
-        Commands::Treasury { command } => {
+        Some(Commands::Stop) => daemon::stop().await?,
+        Some(Commands::Hands(args)) => hands::run(config, &args.action, &args.args).await?,
+        Some(Commands::Audit(args)) => audit::run(config, &args.action, &args.args).await?,
+        Some(Commands::Agents(args)) => agents::run(config, &args.action, args.id).await?,
+        Some(Commands::Mcp(args)) => mcp::run(config, &args.action, &args.args).await?,
+        Some(Commands::Doctor) => doctor::run(&config).await?,
+        Some(Commands::Treasury { command }) => {
             let api_url = config.api_listen.clone();
             let api_key = std::env::var("SOVEREIGN_API_KEY").ok();
             let args = treasury::TreasuryArgs { command };
             treasury::run(args, &format!("http://{}", api_url), api_key.as_deref()).await?;
         }
-        Commands::Memory { command } => {
+        Some(Commands::Memory { command }) => {
             memory::handle_memory_command(command).await?;
         }
     }

@@ -12,7 +12,7 @@ pub mod discovery;
 use discovery::DiscoveryEngine;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use crate::executor::healer_result;
 use crate::SovereignKernel;
@@ -967,6 +967,20 @@ impl ToolHandler for SystemConfigHandler {
     }
 }
 
+/// Returns "python3" if available on this system, otherwise falls back to "python".
+/// Result is cached after the first call.
+fn python_binary() -> &'static str {
+    static PYTHON: OnceLock<&'static str> = OnceLock::new();
+    PYTHON.get_or_init(|| {
+        let ok = std::process::Command::new("python3")
+            .arg("--version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if ok { "python3" } else { "python" }
+    })
+}
+
 fn get_browser_bridge_path() -> String {
     let script = "crates/sk-tools/src/browser_bridge.py";
     if std::path::Path::new(script).exists() {
@@ -988,7 +1002,7 @@ impl ToolHandler for BrowserNavigateHandler {
     }
     async fn handle(&self, _ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
         let args = serde_json::to_string(&input).unwrap_or_default();
-        let output = tokio::process::Command::new("python")
+        let output = tokio::process::Command::new(python_binary())
             .arg(get_browser_bridge_path())
             .arg("navigate")
             .arg(&args)
@@ -1018,7 +1032,7 @@ impl ToolHandler for BrowserReadPageHandler {
     }
     async fn handle(&self, _ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
         let args = serde_json::to_string(&input).unwrap_or_default();
-        let output = tokio::process::Command::new("python")
+        let output = tokio::process::Command::new(python_binary())
             .arg(get_browser_bridge_path())
             .arg("read_page")
             .arg(&args)
@@ -1048,7 +1062,7 @@ impl ToolHandler for BrowserScreenshotHandler {
     }
     async fn handle(&self, _ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
         let args = serde_json::to_string(&input).unwrap_or_default();
-        let output = tokio::process::Command::new("python")
+        let output = tokio::process::Command::new(python_binary())
             .arg(get_browser_bridge_path())
             .arg("screenshot")
             .arg(&args)
@@ -1183,7 +1197,7 @@ impl ToolHandler for BrowserClickHandler {
     }
     async fn handle(&self, _ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
         let args = serde_json::to_string(&input).unwrap_or_default();
-        let output = tokio::process::Command::new("python")
+        let output = tokio::process::Command::new(python_binary())
             .arg(get_browser_bridge_path())
             .arg("click")
             .arg(&args)
@@ -1213,7 +1227,7 @@ impl ToolHandler for BrowserTypeHandler {
     }
     async fn handle(&self, _ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
         let args = serde_json::to_string(&input).unwrap_or_default();
-        let output = tokio::process::Command::new("python")
+        let output = tokio::process::Command::new(python_binary())
             .arg(get_browser_bridge_path())
             .arg("type")
             .arg(&args)
@@ -1243,7 +1257,7 @@ impl ToolHandler for BrowserScrollHandler {
     }
     async fn handle(&self, _ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
         let args = serde_json::to_string(&input).unwrap_or_default();
-        let output = tokio::process::Command::new("python")
+        let output = tokio::process::Command::new(python_binary())
             .arg(get_browser_bridge_path())
             .arg("scroll")
             .arg(&args)
@@ -1273,7 +1287,7 @@ impl ToolHandler for BrowserGetDOMHandler {
     }
     async fn handle(&self, _ctx: ToolContext, input: Value) -> SovereignResult<ToolResult> {
         let args = serde_json::to_string(&input).unwrap_or_default();
-        let output = tokio::process::Command::new("python")
+        let output = tokio::process::Command::new(python_binary())
             .arg(get_browser_bridge_path())
             .arg("get_dom")
             .arg(&args)

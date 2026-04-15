@@ -77,8 +77,25 @@ pub async fn run() -> Result<()> {
         save_to_env(env_var, &clean_api_key(&raw_key))?;
     }
 
-    // 3. Update config.toml
-    update_config(provider_id, default_model, env_var, base_url)?;
+    // 3. Execution mode
+    println!();
+    let modes = vec![
+        "Sandbox (recommended) — only safe commands allowed, asks before risky actions",
+        "Unrestricted          — full access to your system, no restrictions",
+    ];
+    let mode_selection = Select::with_theme(&ColorfulTheme::default())
+        .with_prompt("Choose execution mode")
+        .default(0)
+        .items(&modes)
+        .interact()?;
+
+    let execution_mode = match mode_selection {
+        0 => "sandbox",
+        _ => "unrestricted",
+    };
+
+    // 4. Update config.toml
+    update_config(provider_id, default_model, env_var, base_url, execution_mode)?;
 
     println!("\n✅ {}", "LLM configuration complete!".green());
 
@@ -169,7 +186,7 @@ fn save_to_env(name: &str, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn update_config(provider: &str, model: &str, env_var: &str, base_url: Option<&str>) -> Result<()> {
+fn update_config(provider: &str, model: &str, env_var: &str, base_url: Option<&str>, execution_mode: &str) -> Result<()> {
     let config_path = PathBuf::from("config.toml");
     let content = if config_path.exists() {
         fs::read_to_string(&config_path)?
@@ -178,6 +195,9 @@ fn update_config(provider: &str, model: &str, env_var: &str, base_url: Option<&s
     };
 
     let mut doc = content.parse::<DocumentMut>()?;
+
+    // Write execution_mode
+    doc.insert("execution_mode", toml_edit::value(execution_mode));
 
     // We want to ensure there is at least one [[llm]] block,
     // or update the existing one if it's the primary.
